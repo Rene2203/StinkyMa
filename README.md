@@ -5,7 +5,8 @@ dazu eine **KI, die auf dem Gerät läuft** und Mails sortiert, zusammenfasst un
 „StinkyMa“ ist ein Arbeitsname; der endgültige App-Name ist noch offen.
 
 Die vollständige Spezifikation liegt in [`docs/SPEZIFIKATION.md`](docs/SPEZIFIKATION.md),
-der Stand der Umsetzung in [`CHANGELOG.md`](CHANGELOG.md).
+der laufende Zwischenstand in [`docs/ENTWICKLUNGSSTAND.md`](docs/ENTWICKLUNGSSTAND.md),
+abgeschlossene Phasen in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Stand
 

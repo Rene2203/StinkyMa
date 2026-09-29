@@ -2,6 +2,10 @@
 
 - Spezifikation: `docs/SPEZIFIKATION.md`. Phasenweise arbeiten (Abschnitt 9); jede Phase endet mit
   lauffähigem, getestetem Code und einem Eintrag in `CHANGELOG.md`.
+- **Zwischenstand dokumentieren (Wunsch des Nutzers, wichtig):** `docs/ENTWICKLUNGSSTAND.md` nach jedem
+  größeren Arbeitsschritt aktualisieren – spätestens vor jedem Push. Darin: aktuelle Phase, was geprüft
+  funktioniert, was ungeprüft ist, nächste Schritte, Verlauf mit Datum. Ehrlich bleiben: Ungetestetes
+  als ungetestet markieren.
 - Qualitätsregeln (Abschnitt 10): Swift 6 mit strikter Concurrency, keine Force-Unwraps außer in
   Tests, keine Secrets oder Mail-Inhalte in Logs, UI-Texte deutsch in `App/Resources/Localizable.xcstrings`
   (Englisch als zweite Sprache).
