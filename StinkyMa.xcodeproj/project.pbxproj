@@ -1,0 +1,552 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		11454D20630EC8523993149E /* MessageDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B4B943BA68BCB3B1D91A8E /* MessageDetailView.swift */; };
+		21246FFCB044F816575BAEF8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 139B68FD7D8AC5A6FE823E85 /* Assets.xcassets */; };
+		48BB3DFB9F1EA6BCD2229560 /* MailCore in Frameworks */ = {isa = PBXBuildFile; productRef = D2734D993C81FF49BB619BBC /* MailCore */; };
+		4964C36FA4E7C349CED0DF02 /* Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A709453B4367E87FC2A506DE /* Presentation.swift */; };
+		4EECF7E3D539299D19024827 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C7141F4091892530D2D868 /* RootView.swift */; };
+		54C237E848E09B890876191F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 9F600034746A7428FFF1D77B /* Localizable.xcstrings */; };
+		66786986716251092CC69F95 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 139B68FD7D8AC5A6FE823E85 /* Assets.xcassets */; };
+		6FA8DED1E2E441FE097D5E64 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 9F600034746A7428FFF1D77B /* Localizable.xcstrings */; };
+		79B715AFDAABC2709C421324 /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A7A6371794976609C1469C /* MessageRow.swift */; };
+		7A9B3F5D49AEDDE5017AD553 /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27A7A6371794976609C1469C /* MessageRow.swift */; };
+		7C18D02E469391A69D1CBCBD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACBFB34EA6768432DE8D06D /* SettingsView.swift */; };
+		7C7F1899612A6CD142E22850 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACBFB34EA6768432DE8D06D /* SettingsView.swift */; };
+		89CE81F76208A3E4F0D03F10 /* MailCore in Frameworks */ = {isa = PBXBuildFile; productRef = AF9D469011484D7813CBDFFD /* MailCore */; };
+		B6F0E7C048140BF744BDCB18 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E634C13D831C39E39AC63DA2 /* SidebarView.swift */; };
+		C23DF0CBBFA0ADBFE1E56B1E /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 3DEC1C8A11EA72A2F5F4B550 /* AppFeature */; };
+		C56EA4FE6B25F5CF0F22E1DF /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C7141F4091892530D2D868 /* RootView.swift */; };
+		C7FB29CFB4FFA970D8B1643C /* MessageListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 833132F0703770756C855AA4 /* MessageListView.swift */; };
+		D00A7068F123E89D6015308A /* MessageDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3B4B943BA68BCB3B1D91A8E /* MessageDetailView.swift */; };
+		D74B2BCACA2D946B1485C51A /* StinkyMaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514FAF9BA106552C6F403542 /* StinkyMaApp.swift */; };
+		DBC11E24DE279DA154962775 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A59B3E909ABFF79BF141B8DA /* AppFeature */; };
+		DD053404976878561375CEEC /* MessageListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 833132F0703770756C855AA4 /* MessageListView.swift */; };
+		EF2C8788456C28F136364AC5 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E634C13D831C39E39AC63DA2 /* SidebarView.swift */; };
+		F00B40220B07155DC9087E46 /* Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A709453B4367E87FC2A506DE /* Presentation.swift */; };
+		F2AE2DD2E45FFB1FE4BCED0F /* StinkyMaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514FAF9BA106552C6F403542 /* StinkyMaApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		05C7141F4091892530D2D868 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		132F888810F807379725BAFF /* StinkyMa-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "StinkyMa-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		139B68FD7D8AC5A6FE823E85 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1723F15F963EDCB0A68834A5 /* StinkyMa-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "StinkyMa-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		27A7A6371794976609C1469C /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
+		514FAF9BA106552C6F403542 /* StinkyMaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StinkyMaApp.swift; sourceTree = "<group>"; };
+		7ACBFB34EA6768432DE8D06D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		833132F0703770756C855AA4 /* MessageListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageListView.swift; sourceTree = "<group>"; };
+		9F600034746A7428FFF1D77B /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		A709453B4367E87FC2A506DE /* Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation.swift; sourceTree = "<group>"; };
+		E400BAEFC3D530D01E8DE508 /* StinkyMaKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = StinkyMaKit; path = Packages/StinkyMaKit; sourceTree = SOURCE_ROOT; };
+		E634C13D831C39E39AC63DA2 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		F3B4B943BA68BCB3B1D91A8E /* MessageDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageDetailView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		70BF84BB4486E28329562724 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DBC11E24DE279DA154962775 /* AppFeature in Frameworks */,
+				89CE81F76208A3E4F0D03F10 /* MailCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E015F4528AE8AF7771E32E22 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C23DF0CBBFA0ADBFE1E56B1E /* AppFeature in Frameworks */,
+				48BB3DFB9F1EA6BCD2229560 /* MailCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1E77C3D0A7E67092F784CE32 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				139B68FD7D8AC5A6FE823E85 /* Assets.xcassets */,
+				9F600034746A7428FFF1D77B /* Localizable.xcstrings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		59D8B87AA165A586BB49F381 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				1E77C3D0A7E67092F784CE32 /* Resources */,
+				5FC2A10A4903BE803591252D /* Sources */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5FC2A10A4903BE803591252D /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				F3B4B943BA68BCB3B1D91A8E /* MessageDetailView.swift */,
+				833132F0703770756C855AA4 /* MessageListView.swift */,
+				27A7A6371794976609C1469C /* MessageRow.swift */,
+				A709453B4367E87FC2A506DE /* Presentation.swift */,
+				05C7141F4091892530D2D868 /* RootView.swift */,
+				7ACBFB34EA6768432DE8D06D /* SettingsView.swift */,
+				E634C13D831C39E39AC63DA2 /* SidebarView.swift */,
+				514FAF9BA106552C6F403542 /* StinkyMaApp.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		7B85C8DAE3F12F77CFA419D0 = {
+			isa = PBXGroup;
+			children = (
+				59D8B87AA165A586BB49F381 /* App */,
+				F622775CBE930248970012C2 /* Packages */,
+				BD4760DA6C8A96E5CDCB2C1C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BD4760DA6C8A96E5CDCB2C1C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1723F15F963EDCB0A68834A5 /* StinkyMa-iOS.app */,
+				132F888810F807379725BAFF /* StinkyMa-macOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F622775CBE930248970012C2 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				E400BAEFC3D530D01E8DE508 /* StinkyMaKit */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8B66D08FE37E244D74D2E80C /* StinkyMa-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7293F4118BF8D1360FE59367 /* Build configuration list for PBXNativeTarget "StinkyMa-macOS" */;
+			buildPhases = (
+				B1C9D8BA6BAA0F8A472CA2E4 /* Sources */,
+				34B5A86A75551C4C30718C9F /* Resources */,
+				E015F4528AE8AF7771E32E22 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "StinkyMa-macOS";
+			packageProductDependencies = (
+				3DEC1C8A11EA72A2F5F4B550 /* AppFeature */,
+				D2734D993C81FF49BB619BBC /* MailCore */,
+			);
+			productName = "StinkyMa-macOS";
+			productReference = 132F888810F807379725BAFF /* StinkyMa-macOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AC922D198A87A7C50F3877E2 /* StinkyMa-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 20F2259C3E8DC9AC03AC6707 /* Build configuration list for PBXNativeTarget "StinkyMa-iOS" */;
+			buildPhases = (
+				B4DC5908C3A75EF1038458F7 /* Sources */,
+				1625FAF762831A96A3A86C28 /* Resources */,
+				70BF84BB4486E28329562724 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "StinkyMa-iOS";
+			packageProductDependencies = (
+				A59B3E909ABFF79BF141B8DA /* AppFeature */,
+				AF9D469011484D7813CBDFFD /* MailCore */,
+			);
+			productName = "StinkyMa-iOS";
+			productReference = 1723F15F963EDCB0A68834A5 /* StinkyMa-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EE3BBE7770AC2C6D32DA9BF8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					8B66D08FE37E244D74D2E80C = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					AC922D198A87A7C50F3877E2 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = A2533005D894C493763AAF34 /* Build configuration list for PBXProject "StinkyMa" */;
+			developmentRegion = de;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				de,
+				en,
+			);
+			mainGroup = 7B85C8DAE3F12F77CFA419D0;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8078E124EED354D926D28AE7 /* XCLocalSwiftPackageReference "Packages/StinkyMaKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = BD4760DA6C8A96E5CDCB2C1C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AC922D198A87A7C50F3877E2 /* StinkyMa-iOS */,
+				8B66D08FE37E244D74D2E80C /* StinkyMa-macOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1625FAF762831A96A3A86C28 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				66786986716251092CC69F95 /* Assets.xcassets in Resources */,
+				6FA8DED1E2E441FE097D5E64 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		34B5A86A75551C4C30718C9F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21246FFCB044F816575BAEF8 /* Assets.xcassets in Resources */,
+				54C237E848E09B890876191F /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B1C9D8BA6BAA0F8A472CA2E4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				11454D20630EC8523993149E /* MessageDetailView.swift in Sources */,
+				DD053404976878561375CEEC /* MessageListView.swift in Sources */,
+				7A9B3F5D49AEDDE5017AD553 /* MessageRow.swift in Sources */,
+				4964C36FA4E7C349CED0DF02 /* Presentation.swift in Sources */,
+				4EECF7E3D539299D19024827 /* RootView.swift in Sources */,
+				7C7F1899612A6CD142E22850 /* SettingsView.swift in Sources */,
+				EF2C8788456C28F136364AC5 /* SidebarView.swift in Sources */,
+				D74B2BCACA2D946B1485C51A /* StinkyMaApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B4DC5908C3A75EF1038458F7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D00A7068F123E89D6015308A /* MessageDetailView.swift in Sources */,
+				C7FB29CFB4FFA970D8B1643C /* MessageListView.swift in Sources */,
+				79B715AFDAABC2709C421324 /* MessageRow.swift in Sources */,
+				F00B40220B07155DC9087E46 /* Presentation.swift in Sources */,
+				C56EA4FE6B25F5CF0F22E1DF /* RootView.swift in Sources */,
+				7C18D02E469391A69D1CBCBD /* SettingsView.swift in Sources */,
+				B6F0E7C048140BF744BDCB18 /* SidebarView.swift in Sources */,
+				F2AE2DD2E45FFB1FE4BCED0F /* StinkyMaApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		28F989999B808B10123FBF63 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B6133D48120080880E5F8405 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "App/StinkyMa-macOS.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = "App/Generated/Info-macOS.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = de.stinkyma.mac;
+				PRODUCT_NAME = StinkyMa;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		BC9311E545CE260FD7E8BC65 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "App/StinkyMa-macOS.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = "App/Generated/Info-macOS.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = de.stinkyma.mac;
+				PRODUCT_NAME = StinkyMa;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		BEC8FE45C25D34ADF86F2629 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "App/Generated/Info-iOS.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = de.stinkyma.app;
+				PRODUCT_NAME = StinkyMa;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		C33672F59BA06906A2CEC6E9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		C9F9B997ECB14BF1F92DAAA0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "App/Generated/Info-iOS.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = de.stinkyma.app;
+				PRODUCT_NAME = StinkyMa;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		20F2259C3E8DC9AC03AC6707 /* Build configuration list for PBXNativeTarget "StinkyMa-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BEC8FE45C25D34ADF86F2629 /* Debug */,
+				C9F9B997ECB14BF1F92DAAA0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7293F4118BF8D1360FE59367 /* Build configuration list for PBXNativeTarget "StinkyMa-macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B6133D48120080880E5F8405 /* Debug */,
+				BC9311E545CE260FD7E8BC65 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A2533005D894C493763AAF34 /* Build configuration list for PBXProject "StinkyMa" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				28F989999B808B10123FBF63 /* Debug */,
+				C33672F59BA06906A2CEC6E9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		8078E124EED354D926D28AE7 /* XCLocalSwiftPackageReference "Packages/StinkyMaKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/StinkyMaKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3DEC1C8A11EA72A2F5F4B550 /* AppFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppFeature;
+		};
+		A59B3E909ABFF79BF141B8DA /* AppFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppFeature;
+		};
+		AF9D469011484D7813CBDFFD /* MailCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MailCore;
+		};
+		D2734D993C81FF49BB619BBC /* MailCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MailCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = EE3BBE7770AC2C6D32DA9BF8 /* Project object */;
+}

@@ -1,0 +1,108 @@
+# Xcode-Projekt wird aus dieser Datei erzeugt: `xcodegen generate` (siehe README).
+# Arbeitsname „StinkyMa“ – der endgültige App-Name ist noch offen (Spezifikation, Abschnitt 12).
+name: StinkyMa
+options:
+  bundleIdPrefix: de.stinkyma
+  developmentLanguage: de
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    CODE_SIGN_STYLE: Automatic
+    # Eigene Team-ID in Xcode unter „Signing & Capabilities“ eintragen.
+    DEVELOPMENT_TEAM: ""
+packages:
+  StinkyMaKit:
+    path: Packages/StinkyMaKit
+
+targetTemplates:
+  MailApp:
+    type: application
+    sources:
+      - path: App/Sources
+      - path: App/Resources
+    dependencies:
+      - package: StinkyMaKit
+        product: AppFeature
+      - package: StinkyMaKit
+        product: MailCore
+    settings:
+      base:
+        PRODUCT_NAME: StinkyMa
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+targets:
+  StinkyMa-iOS:
+    templates: [MailApp]
+    platform: iOS
+    info:
+      path: App/Generated/Info-iOS.plist
+      properties:
+        CFBundleDisplayName: StinkyMa
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UIRequiresFullScreen: false
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.stinkyma.app
+        # Nur iPad (Spezifikation: iPadOS-App). „1,2“ würde zusätzlich das iPhone erlauben.
+        TARGETED_DEVICE_FAMILY: "2"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+
+  StinkyMa-macOS:
+    templates: [MailApp]
+    platform: macOS
+    entitlements:
+      path: App/StinkyMa-macOS.entitlements
+    info:
+      path: App/Generated/Info-macOS.plist
+      properties:
+        CFBundleDisplayName: StinkyMa
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        ITSAppUsesNonExemptEncryption: false
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.stinkyma.mac
+        ENABLE_HARDENED_RUNTIME: YES
+
+schemes:
+  StinkyMa-iOS:
+    build:
+      targets:
+        StinkyMa-iOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+  StinkyMa-macOS:
+    build:
+      targets:
+        StinkyMa-macOS: all
+    run:
+      config: Debug
