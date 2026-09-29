@@ -33,8 +33,8 @@
 - **CI:** GitHub Actions testet die Pakete unter Linux und macOS und baut beide Apps.
 
 ### Offen / Hinweise
-- Die SwiftUI-Oberfläche wurde in einer Linux-Umgebung geschrieben; kompiliert wird sie erst
-  in der macOS-CI bzw. in Xcode. Die Kernmodule sind lokal gebaut und getestet.
+- Die SwiftUI-Oberfläche kompiliert in der macOS-CI (Xcode 26), wurde aber noch nicht im
+  Simulator oder auf einem Gerät gestartet.
 - Die App nutzt in Phase 1 eine Datenbank im Arbeitsspeicher mit Mock-Daten; das Speichern auf
   Datei (inkl. Dateischutz) kommt mit echten Konten in Phase 2.
 - App-Icon ist noch leer; App-Name und Bundle-ID sind Platzhalter (offene Entscheidung).
