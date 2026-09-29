@@ -1,0 +1,14 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/*/.swiftpm/
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+StinkyMa.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
+
+# macOS
+.DS_Store
