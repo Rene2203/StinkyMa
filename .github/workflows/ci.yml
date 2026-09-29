@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Plattformneutrale Kernmodule (MailCore, MailStore, …) müssen auch unter Linux bauen und testen.
+  packages-linux:
+    name: Pakete (Linux)
+    runs-on: ubuntu-24.04
+    container: swift:6.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: SQLite installieren
+        run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev
+      - name: Tests
+        run: swift test --package-path Packages/StinkyMaKit
+
+  # iPad- und Mac-App müssen immer kompilieren (Spezifikation 7.4).
+  apps-apple:
+    name: Apps (iPadOS & macOS)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode-Projekt erzeugen
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Pakete testen (macOS)
+        run: swift test --package-path Packages/StinkyMaKit
+      - name: macOS-App bauen
+        run: >
+          xcodebuild build -project StinkyMa.xcodeproj -scheme StinkyMa-macOS
+          -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO
+      - name: iPadOS-App bauen
+        run: >
+          xcodebuild build -project StinkyMa.xcodeproj -scheme StinkyMa-iOS
+          -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
