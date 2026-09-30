@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W2.1 – Korrekturen nach dem ersten Praxistest (umgesetzt, lokal getestet; Windows-CI und erneuter Test beim Nutzer stehen aus)
+**Aktuelle Phase:** W2.1 – Korrekturen nach dem ersten Praxistest (Windows-CI Lauf #17 grün; erneuter Test beim Nutzer steht aus)
 
 ## Überblick
 
@@ -167,3 +167,5 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Lokal: 101 Tests + 3 E2E grün (Scroll-Test fällt ohne Fix nachweislich durch). Swift: 43 Tests grün.
   **Ungeprüft:** Verhalten mit echtem iCloud-Konto und großen Postfächern; Windows-CI steht aus.
 - **Entscheidung Nutzer:** Die Zahlen in der Seitenleiste zeigen weiterhin die **ungelesenen** Mails (nicht die Gesamtzahl).
+- **Windows-CI Lauf #17 (W2.1) grün:** alle Tests inkl. Warteschlange, Scrollen und sofortigem Archivieren auf
+  Windows; neuer Installer verfügbar. iPad/Mac-CI (Swift-Migration v3) läuft noch.
