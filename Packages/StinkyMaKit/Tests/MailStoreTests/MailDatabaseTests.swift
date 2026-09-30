@@ -24,7 +24,7 @@ struct MailDatabaseTests {
         _ = try MailDatabase(writer: queue)
         _ = try MailDatabase(writer: queue)
         let applied = try queue.read { db in try MailSchema.migrator.appliedMigrations(db) }
-        #expect(applied == ["v1-core", "v1-fts"])
+        #expect(applied == ["v1-core", "v1-fts", "v2-account-connection"])
     }
 
     @Test func fileDatabaseIsCreatedWithIntermediateDirectories() throws {
@@ -40,9 +40,10 @@ struct MailDatabaseTests {
     @Test func recordsRoundTrip() throws {
         let database = try MailDatabase.inMemory()
         let account = Account(
-            id: "acc", email: "a@example.org", displayName: "Test", provider: .gmail,
-            imapHost: "imap.example.org", smtpHost: "smtp.example.org", authType: .oauth2,
-            color: .purple, aiCloudAllowed: true, sortOrder: 3
+            id: "acc", email: "a@example.org", displayName: "Test", provider: .gmail, username: "login-a",
+            imapHost: "imap.example.org", imapSecurity: .starttls, smtpHost: "smtp.example.org", smtpSecurity: .tls,
+            authType: .oauth2, color: .purple, aiCloudAllowed: true, sortOrder: 3,
+            lastSyncAt: Date(timeIntervalSince1970: 5_000), syncError: "Zeitüberschreitung"
         )
         let mailbox = Mailbox(id: "box", accountID: "acc", name: "INBOX", role: .inbox, uidValidity: 4_000_000_000, highestModSeq: 9_000_000_000_000)
         let thread = MailThread(id: "t", subject: "Hallo", participants: [EmailAddress(name: "Ä Ö", address: "x@example.org")], lastDate: Date(timeIntervalSince1970: 1_000))

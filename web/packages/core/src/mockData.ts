@@ -61,17 +61,20 @@ export function createMockData(now: Date = new Date()): MockDataSet {
   const accounts: Account[] = [
     {
       id: MockIds.iCloud, email: me.privat.address, displayName: "Privat", provider: "icloud",
-      imapHost: "imap.mail.me.com", imapPort: 993, smtpHost: "smtp.mail.me.com", smtpPort: 587,
+      username: me.privat.address, imapHost: "imap.mail.me.com", imapPort: 993, imapSecurity: "tls",
+      smtpHost: "smtp.mail.me.com", smtpPort: 587, smtpSecurity: "starttls",
       authType: "password", color: "blue", aiCloudAllowed: false, sortOrder: 0,
     },
     {
       id: MockIds.gmail, email: me.gmail.address, displayName: "Gmail", provider: "gmail",
-      imapHost: "imap.gmail.com", imapPort: 993, smtpHost: "smtp.gmail.com", smtpPort: 587,
+      username: me.gmail.address, imapHost: "imap.gmail.com", imapPort: 993, imapSecurity: "tls",
+      smtpHost: "smtp.gmail.com", smtpPort: 587, smtpSecurity: "starttls",
       authType: "oauth2", color: "red", aiCloudAllowed: false, sortOrder: 1,
     },
     {
       id: MockIds.work, email: me.work.address, displayName: "Agentur", provider: "imap",
-      imapHost: "imap.beispiel-agentur.example", imapPort: 993, smtpHost: "smtp.beispiel-agentur.example", smtpPort: 587,
+      username: me.work.address, imapHost: "imap.beispiel-agentur.example", imapPort: 993, imapSecurity: "tls",
+      smtpHost: "smtp.beispiel-agentur.example", smtpPort: 587, smtpSecurity: "starttls",
       authType: "password", color: "green", aiCloudAllowed: false, sortOrder: 2,
     },
   ];

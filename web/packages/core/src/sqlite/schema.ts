@@ -191,6 +191,17 @@ export const migrations: Migration[] = [
       END;
     `,
   },
+  {
+    name: "v2-account-connection",
+    // Anmeldename, Verbindungssicherheit und Sync-Status pro Konto (Phase W2). Gleich in MailSchema.swift.
+    sql: `
+      ALTER TABLE account ADD COLUMN username TEXT NOT NULL DEFAULT '';
+      ALTER TABLE account ADD COLUMN imapSecurity TEXT NOT NULL DEFAULT 'tls';
+      ALTER TABLE account ADD COLUMN smtpSecurity TEXT NOT NULL DEFAULT 'starttls';
+      ALTER TABLE account ADD COLUMN lastSyncAt TEXT;
+      ALTER TABLE account ADD COLUMN syncError TEXT;
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

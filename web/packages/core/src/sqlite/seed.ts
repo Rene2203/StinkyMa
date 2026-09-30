@@ -7,8 +7,10 @@ export function seedIfEmpty(db: Database.Database, data: MockDataSet): boolean {
   if (n > 0) return false;
 
   const insertAccount = db.prepare(
-    `INSERT INTO account (id, email, displayName, provider, imapHost, imapPort, smtpHost, smtpPort, authType, color, aiCloudAllowed, sortOrder)
-     VALUES (@id, @email, @displayName, @provider, @imapHost, @imapPort, @smtpHost, @smtpPort, @authType, @color, @aiCloudAllowed, @sortOrder)`,
+    `INSERT INTO account (id, email, displayName, provider, username, imapHost, imapPort, imapSecurity, smtpHost, smtpPort,
+       smtpSecurity, authType, color, aiCloudAllowed, sortOrder, lastSyncAt, syncError)
+     VALUES (@id, @email, @displayName, @provider, @username, @imapHost, @imapPort, @imapSecurity, @smtpHost, @smtpPort,
+       @smtpSecurity, @authType, @color, @aiCloudAllowed, @sortOrder, @lastSyncAt, @syncError)`,
   );
   const insertMailbox = db.prepare(
     `INSERT INTO mailbox (id, accountId, name, role, uidValidity, highestModSeq)
@@ -32,7 +34,9 @@ export function seedIfEmpty(db: Database.Database, data: MockDataSet): boolean {
   );
 
   db.transaction(() => {
-    for (const a of data.accounts) insertAccount.run({ ...a, aiCloudAllowed: a.aiCloudAllowed ? 1 : 0 });
+    for (const a of data.accounts) {
+      insertAccount.run({ lastSyncAt: null, syncError: null, ...a, aiCloudAllowed: a.aiCloudAllowed ? 1 : 0 });
+    }
     for (const m of data.mailboxes) insertMailbox.run({ uidValidity: null, highestModSeq: null, ...m });
     for (const t of data.threads) {
       insertThread.run({ summary: null, summaryUpdatedAt: null, ...t, participants: JSON.stringify(t.participants) });

@@ -7,6 +7,8 @@ export interface EmailAddress {
 
 export type MailProvider = "icloud" | "gmail" | "outlook" | "yahoo" | "imap";
 export type AuthType = "password" | "oauth2";
+/** Verbindungssicherheit: TLS ab Verbindungsbeginn (993/465), STARTTLS (143/587) oder – nur für Tests – ohne. */
+export type ConnectionSecurity = "tls" | "starttls" | "none";
 export type AccountColor = "blue" | "green" | "orange" | "purple" | "pink" | "teal" | "red" | "yellow";
 
 export interface Account {
@@ -14,16 +16,28 @@ export interface Account {
   email: string;
   displayName: string;
   provider: MailProvider;
+  /** Anmeldename am Server; meist die Mail-Adresse. */
+  username: string;
   imapHost: string;
   imapPort: number;
+  imapSecurity: ConnectionSecurity;
   smtpHost: string;
   smtpPort: number;
+  smtpSecurity: ConnectionSecurity;
   authType: AuthType;
   color: AccountColor;
   /** Nutzer-Freigabe: Darf eine Cloud-KI Mails dieses Kontos verarbeiten? Standard: nein (5.0). */
   aiCloudAllowed: boolean;
   sortOrder: number;
+  /** Zeitpunkt des letzten erfolgreichen Abgleichs (ISO-8601), `null` = noch nie. */
+  lastSyncAt?: string | null;
+  /** Letzter Fehler beim Abgleich (für die Anzeige), `null` = alles gut. */
+  syncError?: string | null;
 }
+
+/** Beispielkonten (Mock-Daten) erkennt man an diesem Präfix. */
+export const demoAccountPrefix = "mock-";
+export const isDemoAccount = (account: Pick<Account, "id">) => account.id.startsWith(demoAccountPrefix);
 
 export type MailboxRole = "inbox" | "sent" | "drafts" | "trash" | "archive" | "spam" | "custom";
 

@@ -6,6 +6,7 @@ enum MailSchema {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1-core", migrate: createCoreTables)
         migrator.registerMigration("v1-fts", migrate: createFullTextSearch)
+        migrator.registerMigration("v2-account-connection", migrate: addAccountConnection)
         return migrator
     }
 
@@ -166,6 +167,17 @@ enum MailSchema {
             t.column("sizeBytes", .integer)
             t.column("quantization", .text)
             t.column("paramCount", .integer)
+        }
+    }
+
+    /// Anmeldename, Verbindungssicherheit und Sync-Status pro Konto. Gleich in web/packages/core/src/sqlite/schema.ts.
+    private static func addAccountConnection(_ db: Database) throws {
+        try db.alter(table: "account") { t in
+            t.add(column: "username", .text).notNull().defaults(to: "")
+            t.add(column: "imapSecurity", .text).notNull().defaults(to: "tls")
+            t.add(column: "smtpSecurity", .text).notNull().defaults(to: "starttls")
+            t.add(column: "lastSyncAt", .datetime)
+            t.add(column: "syncError", .text)
         }
     }
 

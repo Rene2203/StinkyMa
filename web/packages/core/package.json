@@ -7,12 +7,18 @@
   "exports": {
     ".": "./src/index.ts",
     "./sqlite": "./src/sqlite/index.ts",
-    "./node": "./src/node/index.ts"
+    "./node": "./src/node/index.ts",
+    "./mail": "./src/mail/index.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3"
+    "better-sqlite3": "^13.0.3",
+    "html-to-text": "^9.0.5",
+    "imapflow": "^2.1.2",
+    "mailparser": "^3.9.32"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/html-to-text": "^9.0.4",
+    "@types/mailparser": "^3.9.0"
   }
 }

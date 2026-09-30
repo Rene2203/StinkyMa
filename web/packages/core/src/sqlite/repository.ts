@@ -25,9 +25,12 @@ const json = <T>(v: unknown) => JSON.parse(v as string) as T;
 export function accountFromRow(r: Row): Account {
   return {
     id: str(r.id), email: str(r.email), displayName: str(r.displayName),
-    provider: str(r.provider) as Account["provider"], imapHost: str(r.imapHost), imapPort: num(r.imapPort),
-    smtpHost: str(r.smtpHost), smtpPort: num(r.smtpPort), authType: str(r.authType) as Account["authType"],
-    color: str(r.color) as Account["color"], aiCloudAllowed: bool(r.aiCloudAllowed), sortOrder: num(r.sortOrder),
+    provider: str(r.provider) as Account["provider"], username: str(r.username) || str(r.email),
+    imapHost: str(r.imapHost), imapPort: num(r.imapPort), imapSecurity: str(r.imapSecurity) as Account["imapSecurity"],
+    smtpHost: str(r.smtpHost), smtpPort: num(r.smtpPort), smtpSecurity: str(r.smtpSecurity) as Account["smtpSecurity"],
+    authType: str(r.authType) as Account["authType"], color: str(r.color) as Account["color"],
+    aiCloudAllowed: bool(r.aiCloudAllowed), sortOrder: num(r.sortOrder),
+    lastSyncAt: optStr(r.lastSyncAt), syncError: optStr(r.syncError),
   };
 }
 

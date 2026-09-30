@@ -5,14 +5,14 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W1 – Fundament Windows (fertig, auf Windows in der CI geprüft; Installation beim Nutzer steht aus)
+**Aktuelle Phase:** W2 – Ein Konto lesen (in Arbeit: Kern fertig und getestet, Oberfläche & Windows-App folgen)
 
 ## Überblick
 
 | Phase | Status |
 |---|---|
 | **W1 – Fundament Windows** | 🟢 fertig: 65 Unit-Tests + 2 E2E-Tests grün unter Linux **und Windows**; Installer wird gebaut |
-| W2 – Ein Konto lesen (IMAP, iCloud) | ⚪ offen |
+| W2 – Ein Konto lesen (IMAP, iCloud) | 🟡 in Arbeit: IMAP-Abgleich, Aktionen auf dem Server, Kontoverwaltung im Kern fertig (Integrationstests gegen GreenMail); Oberfläche folgt |
 | W3–W5, S1 (Server & Browser) | ⚪ offen |
 | iPad/Mac Phase 1 | ⏸️ fertig und im Simulator abgenommen, **ruht** (siehe unten) |
 
@@ -124,3 +124,15 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - **Leitplanken vom Nutzer bekräftigt:** ursprüngliches Ziel (iPad, Windows, Server) bleibt; KI-Kernfunktionen
   müssen mit einem 3B-Modell auf Low-End-Hardware funktionieren; der Haupt-PC ist nicht der Maßstab.
   Festgehalten in `docs/ROADMAP-WINDOWS.md` und `CLAUDE.md`.
+- **W2, Teil 1 (Kern):** Datenmodell um Anmeldename, Verbindungssicherheit und Sync-Status erweitert –
+  Migration `v2-account-connection` in TypeScript **und** Swift (iPad-Parität, 43 Swift-Tests grün).
+  Neues Modul `@stinkyma/core/mail`: Anbieter-Erkennung (iCloud, Gmail, Yahoo, GMX, WEB.DE, T-Online, Posteo,
+  mailbox.org; Outlook braucht OAuth → W3), Ordnerrollen (SPECIAL-USE, sonst Namen inkl. deutsch),
+  deterministische Konversations-IDs aus References/In-Reply-To, MIME-Parsing (mailparser; Vorschau ohne
+  Zitate/Signatur; HTML→Text), IMAP-Abgleich (imapflow): 30 Tage, neue Mails, Flags, gelöschte Mails,
+  UIDVALIDITY-Wechsel. `MailService`: Lesen aus SQLite; bei echten Konten wirken Gelesen/Markieren/Archivieren/
+  Papierkorb zuerst auf dem Server; Beispielkonten bleiben lokal; Konto hinzufügen testet die Verbindung,
+  speichert das Passwort verschlüsselt und entfernt auf Wunsch die Beispielkonten; verständliche deutsche
+  Fehlermeldungen ohne Zugangsdaten.
+- Tests: 83 Unit-Tests + 6 Integrationstests gegen einen lokalen **GreenMail**-Testserver (nie gegen echte
+  Konten). Ohne Testserver werden die Integrationstests übersprungen.

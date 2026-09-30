@@ -14,14 +14,19 @@ extension Account: FetchableRecord, PersistableRecord {
             email: row["email"],
             displayName: row["displayName"],
             provider: MailProvider(rawValue: row["provider"]) ?? .genericIMAP,
+            username: (row["username"] as String?).flatMap { $0.isEmpty ? nil : $0 },
             imapHost: row["imapHost"],
             imapPort: row["imapPort"],
+            imapSecurity: ConnectionSecurity(rawValue: row["imapSecurity"] ?? "") ?? .tls,
             smtpHost: row["smtpHost"],
             smtpPort: row["smtpPort"],
+            smtpSecurity: ConnectionSecurity(rawValue: row["smtpSecurity"] ?? "") ?? .starttls,
             authType: AuthType(rawValue: row["authType"]) ?? .password,
             color: AccountColor(rawValue: row["color"]) ?? .blue,
             aiCloudAllowed: row["aiCloudAllowed"],
-            sortOrder: row["sortOrder"]
+            sortOrder: row["sortOrder"],
+            lastSyncAt: row["lastSyncAt"],
+            syncError: row["syncError"]
         )
     }
 
@@ -30,14 +35,19 @@ extension Account: FetchableRecord, PersistableRecord {
         container["email"] = email
         container["displayName"] = displayName
         container["provider"] = provider.rawValue
+        container["username"] = username
         container["imapHost"] = imapHost
         container["imapPort"] = imapPort
+        container["imapSecurity"] = imapSecurity.rawValue
         container["smtpHost"] = smtpHost
         container["smtpPort"] = smtpPort
+        container["smtpSecurity"] = smtpSecurity.rawValue
         container["authType"] = authType.rawValue
         container["color"] = color.rawValue
         container["aiCloudAllowed"] = aiCloudAllowed
         container["sortOrder"] = sortOrder
+        container["lastSyncAt"] = lastSyncAt
+        container["syncError"] = syncError
     }
 }
 
