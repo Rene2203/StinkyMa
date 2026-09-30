@@ -110,10 +110,34 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await expect(frame.locator("img[src*='tracker']")).toHaveCount(0);
   await page.screenshot({ path: join(screenshotDir, "08-HTML-Mail.png") });
 
-  await test.step("Externe Inhalte nur auf Klick", async () => {
-    await page.getByRole("button", { name: "Externe Inhalte laden" }).click();
+  await test.step("Ausnahme über Optionen: Absender lädt externe Inhalte sofort", async () => {
+    await page.getByTestId("remote-always").click();
+    const dialog = page.getByTestId("options-dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId("remote-exception-input")).toHaveValue("stadtwerke.example");
+    await dialog.getByTestId("remote-exception-add").click();
+    await expect(dialog.getByTestId("remote-exception")).toHaveText([/stadtwerke\.example/]);
+    await dialog.getByTestId("remote-exception-input").fill("kein eintrag");
+    await dialog.getByTestId("remote-exception-add").click();
+    await expect(dialog.getByRole("alert")).toContainText("E-Mail-Adresse oder Domain");
+    await page.screenshot({ path: join(screenshotDir, "09-Optionen-Ausnahmen.png") });
+    await dialog.getByRole("button", { name: "Fertig" }).click();
+    await expect(dialog).toHaveCount(0);
     await expect(frame.locator("img[src*='tracker']")).toHaveCount(1);
     await expect(frame.locator("script")).toHaveCount(0);
+    await expect(page.getByText("Ausnahme für stadtwerke.example")).toBeVisible();
+  });
+
+  await test.step("Ausnahme entfernen (Zahnrad), dann nur auf Klick", async () => {
+    await page.getByTestId("open-options").click();
+    const dialog = page.getByTestId("options-dialog");
+    await dialog.getByRole("button", { name: "stadtwerke.example entfernen" }).click();
+    await expect(dialog.getByTestId("remote-exception")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(frame.locator("img[src*='tracker']")).toHaveCount(0);
+    await page.getByRole("button", { name: "Externe Inhalte laden" }).click();
+    await expect(frame.locator("img[src*='tracker']")).toHaveCount(1);
     await expect(page.getByText("Externe Inhalte wurden blockiert")).toHaveCount(0);
   });
 

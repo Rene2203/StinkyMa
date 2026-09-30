@@ -12,6 +12,12 @@
 ### Neu
 - **„Externe Inhalte laden“** pro Mail (Spezifikation 7.2: externe Bilder nur auf Wunsch). Gilt nur für die
   geöffnete Mail und wird nicht gespeichert; Skripte bleiben auch dann gesperrt.
+- **Optionen** (Zahnrad unten in der Seitenleiste) mit **Ausnahmeliste für externe Inhalte**: Adressen
+  (`news@shop.example`) oder Domains (`shop.example`, gilt auch für Subdomains). Mails dieser Absender laden
+  Bilder sofort; ein Hinweis in der Mail nennt die greifende Ausnahme. Aus einer blockierten Mail führt
+  „Für Absender immer laden …“ direkt in die Optionen, mit der Absender-Domain vorausgefüllt.
+  Gespeichert in der Datenbank (Migration `v4-remote-content-exceptions`, nur TypeScript – Swift steht in
+  `docs/SWIFT-NACHHOLEN.md`).
 
 ## W2.1 – Korrekturen nach dem ersten Praxistest (Windows)
 

@@ -1,4 +1,4 @@
-import { AlertTriangle, Plus, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, Plus, RefreshCw, Settings, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -96,34 +96,50 @@ export function Sidebar() {
           </ul>
         </section>
       ))}
-      {store.canManageAccounts && (
-        <footer className="sidebar-footer">
-          {onlyDemo && <p className="demo-hint">{t("account.demoHint")}</p>}
+      <footer className="sidebar-footer">
+        {store.canManageAccounts && onlyDemo && <p className="demo-hint">{t("account.demoHint")}</p>}
+        {store.canManageAccounts && (
           <button type="button" className="sidebar-button" data-testid="add-account" onClick={() => setDialogOpen(true)}>
             <Plus size={16} aria-hidden="true" /> {t("account.add")}
           </button>
-          <div className="sync-row">
-            <span className="muted small" data-testid="sync-status">
-              {state.syncing
+        )}
+        <div className="sync-row">
+          <span className="muted small" data-testid="sync-status">
+            {!store.canManageAccounts
+              ? ""
+              : state.syncing
                 ? t("sync.running")
                 : state.lastSyncAt
                   ? t("sync.last", { time: new Date(state.lastSyncAt).toLocaleTimeString(locale === "de" ? "de-DE" : "en-GB", { hour: "2-digit", minute: "2-digit" }) })
                   : t("sync.never")}
-            </span>
+          </span>
+          <span className="footer-actions">
             <button
               type="button"
-              className={`icon-button${state.syncing ? " spinning" : ""}`}
-              title={`${t("sync.now")} (F5)`}
-              aria-label={t("sync.now")}
-              data-testid="sync-now"
-              disabled={state.syncing}
-              onClick={() => void store.syncNow()}
+              className="icon-button"
+              title={t("options.title")}
+              aria-label={t("options.title")}
+              data-testid="open-options"
+              onClick={() => store.openOptions()}
             >
-              <RefreshCw size={15} />
+              <Settings size={15} />
             </button>
-          </div>
-        </footer>
-      )}
+            {store.canManageAccounts && (
+              <button
+                type="button"
+                className={`icon-button${state.syncing ? " spinning" : ""}`}
+                title={`${t("sync.now")} (F5)`}
+                aria-label={t("sync.now")}
+                data-testid="sync-now"
+                disabled={state.syncing}
+                onClick={() => void store.syncNow()}
+              >
+                <RefreshCw size={15} />
+              </button>
+            )}
+          </span>
+        </div>
+      </footer>
       {dialogOpen && <AccountDialog onClose={() => setDialogOpen(false)} />}
     </nav>
   );

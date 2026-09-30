@@ -1,18 +1,23 @@
 import { ImageDown, ShieldCheck } from "lucide-react";
+import { matchRemoteContentException, senderDomain } from "@stinkyma/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useUi } from "../context.js";
+import { useBrowserState, useUi } from "../context.js";
 import { emailDocument, sanitizeEmailHtml } from "../sanitize.js";
 
 /**
  * HTML-Mail in einem Sandbox-Frame: Skripte sind abgeschaltet (kein allow-scripts), Links öffnen im Browser.
  * allow-same-origin ohne allow-scripts ist unbedenklich und erlaubt, die Höhe des Inhalts zu messen.
  */
-export function SafeHtml({ html }: { html: string }) {
-  const { t } = useUi();
+export function SafeHtml({ html, sender }: { html: string; sender: string }) {
+  const { store, t } = useUi();
+  const { remoteContentExceptions } = useBrowserState();
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(120);
-  // Externe Inhalte nur auf Klick und nur für diese eine Mail (Spezifikation 7.2) – nichts wird gespeichert.
-  const [allowRemote, setAllowRemote] = useState(false);
+  // Externe Inhalte nur auf Wunsch (Spezifikation 7.2): per Klick für diese eine Mail (nicht gespeichert)
+  // oder dauerhaft für Absender aus der Ausnahmeliste in den Optionen.
+  const [loadedByClick, setLoadedByClick] = useState(false);
+  const exception = matchRemoteContentException(remoteContentExceptions, sender);
+  const allowRemote = loadedByClick || exception !== null;
   const sanitized = useMemo(() => sanitizeEmailHtml(html, { allowRemote }), [html, allowRemote]);
 
   useEffect(() => {
@@ -40,9 +45,24 @@ export function SafeHtml({ html }: { html: string }) {
       {sanitized.blockedRemote > 0 && (
         <p className="blocked-note">
           <ShieldCheck size={14} aria-hidden="true" /> {t("html.blocked")}
-          <button type="button" className="link-button" onClick={() => setAllowRemote(true)}>
-            <ImageDown size={14} aria-hidden="true" /> {t("html.loadRemote")}
-          </button>
+          <span className="note-actions">
+            <button type="button" className="link-button" onClick={() => setLoadedByClick(true)}>
+              <ImageDown size={14} aria-hidden="true" /> {t("html.loadRemote")}
+            </button>
+            <button type="button" className="link-button" data-testid="remote-always" onClick={() => store.openOptions(senderDomain(sender))}>
+              {t("html.always")}
+            </button>
+          </span>
+        </p>
+      )}
+      {exception !== null && sanitized.remoteCount > 0 && (
+        <p className="blocked-note">
+          <ImageDown size={14} aria-hidden="true" /> {t("html.loadedByException", { exception })}
+          <span className="note-actions">
+            <button type="button" className="link-button" onClick={() => store.openOptions()}>
+              {t("html.manageExceptions")}
+            </button>
+          </span>
         </p>
       )}
       <iframe

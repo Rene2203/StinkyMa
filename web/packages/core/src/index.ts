@@ -6,3 +6,4 @@ export * from "./mockData.js";
 export * from "./inMemoryRepository.js";
 export * from "./providers.js";
 export * from "./accounts.js";
+export * from "./remoteContent.js";

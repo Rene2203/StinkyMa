@@ -1,6 +1,7 @@
 import type { AccountsApi, MailRepository } from "@stinkyma/core";
 import { useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
+import { OptionsDialog } from "./components/OptionsDialog.js";
 import { MessageList } from "./components/MessageList.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { UiContext, useBrowserState, useUi } from "./context.js";
@@ -48,6 +49,7 @@ function Shell() {
       <Sidebar />
       <MessageList />
       <MessageDetail />
+      {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}
       {state.error && (
         <div className="error-banner" role="alert">
           <strong>{t("error.title")}</strong>

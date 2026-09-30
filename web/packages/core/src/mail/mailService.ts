@@ -75,6 +75,9 @@ export class MailService implements MailRepository, AccountsApi {
   attachments(messageId: string): Promise<Attachment[]> { return this.repository.attachments(messageId); }
   unreadCount(scope: MessageScope): Promise<number> { return this.repository.unreadCount(scope); }
   overview(): Promise<MailOverview> { return this.repository.overview(); }
+  remoteContentExceptions(): Promise<string[]> { return this.repository.remoteContentExceptions(); }
+  addRemoteContentException(input: string): Promise<string> { return this.repository.addRemoteContentException(input); }
+  removeRemoteContentException(exception: string): Promise<void> { return this.repository.removeRemoteContentException(exception); }
 
   // --- Aktionen ---
 

@@ -88,7 +88,7 @@ function ThreadMessage({ message, attachments, initiallyExpanded }: { message: M
       {expanded && (
         <>
           {message.bodyHtml ? (
-            <SafeHtml html={message.bodyHtml} />
+            <SafeHtml html={message.bodyHtml} sender={message.from.address} />
           ) : (
             <div className="card-body">{message.bodyText ?? message.snippet}</div>
           )}

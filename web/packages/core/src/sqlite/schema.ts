@@ -220,6 +220,17 @@ export const migrations: Migration[] = [
       CREATE INDEX pendingAction_on_accountId_id ON pendingAction(accountId, id);
     `,
   },
+  {
+    name: "v4-remote-content-exceptions",
+    // Absender (Adresse oder Domain), deren externe Bilder sofort geladen werden (Spezifikation 7.2).
+    // Swift zieht das später nach – siehe docs/SWIFT-NACHHOLEN.md.
+    sql: `
+      CREATE TABLE remoteContentException (
+        pattern TEXT PRIMARY KEY NOT NULL,
+        createdAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

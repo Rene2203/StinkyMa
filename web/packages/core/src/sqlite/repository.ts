@@ -12,6 +12,7 @@ import type {
 } from "../models.js";
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
+import { requireRemoteContentException } from "../remoteContent.js";
 
 type Row = Record<string, unknown>;
 
@@ -173,5 +174,23 @@ export class SqliteMailRepository implements MailRepository {
          WHERE target.accountId = message.accountId AND message.id IN ${placeholders(messageIds.length)}`,
       )
       .run(role, ...messageIds);
+  }
+
+  async remoteContentExceptions(): Promise<string[]> {
+    return (this.db.prepare("SELECT pattern FROM remoteContentException ORDER BY pattern").all() as { pattern: string }[]).map(
+      (r) => r.pattern,
+    );
+  }
+
+  async addRemoteContentException(input: string): Promise<string> {
+    const exception = requireRemoteContentException(input);
+    this.db
+      .prepare("INSERT OR IGNORE INTO remoteContentException (pattern, createdAt) VALUES (?, ?)")
+      .run(exception, new Date().toISOString());
+    return exception;
+  }
+
+  async removeRemoteContentException(exception: string): Promise<void> {
+    this.db.prepare("DELETE FROM remoteContentException WHERE pattern = ?").run(exception);
   }
 }

@@ -62,6 +62,20 @@ describe("BrowserStore", () => {
     expect(state.messages.some((m) => m.id === second!.id)).toBe(true);
   });
 
+  it("Optionen: Ausnahmen für externe Inhalte hinzufügen und entfernen", async () => {
+    store.openOptions("shop.example");
+    expect(store.getState().options).toEqual({ suggestion: "shop.example" });
+    expect(await store.addRemoteContentException("Shop <News@Shop.example>")).toBe("news@shop.example");
+    await store.addRemoteContentException("zeitung.example");
+    expect(store.getState().remoteContentExceptions).toEqual(["news@shop.example", "zeitung.example"]);
+    await expect(store.addRemoteContentException("kaputt")).rejects.toThrow();
+    expect(store.getState().error).toBeNull(); // Fehler gehören in den Dialog, nicht ins Banner
+    await store.removeRemoteContentException("news@shop.example");
+    expect(store.getState().remoteContentExceptions).toEqual(["zeitung.example"]);
+    store.closeOptions();
+    expect(store.getState().options).toBeNull();
+  });
+
   it("lädt Anhänge der Konversation", async () => {
     const invoice = store.getState().messages.find((m) => m.subject === "Nebenkostenabrechnung 2025")!;
     await store.selectMessage(invoice.id);

@@ -19,6 +19,11 @@ export interface MailRepository {
   setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void>;
   /** Verschiebt in den Ordner mit dieser Rolle im jeweiligen Konto; ohne solchen Ordner bleibt die Mail, wo sie ist. */
   move(messageIds: string[], role: MailboxRole): Promise<void>;
+  /** Absender (Adressen oder Domains), deren externe Inhalte sofort geladen werden – alphabetisch. */
+  remoteContentExceptions(): Promise<string[]>;
+  /** Fügt eine Ausnahme hinzu (wird vereinheitlicht, siehe `normalizeRemoteContentException`) und gibt sie zurück. */
+  addRemoteContentException(input: string): Promise<string>;
+  removeRemoteContentException(exception: string): Promise<void>;
 }
 
 export interface UnreadCounts {
@@ -49,6 +54,9 @@ export const mailRepositoryMethods = [
   "overview",
   "setFlag",
   "move",
+  "remoteContentExceptions",
+  "addRemoteContentException",
+  "removeRemoteContentException",
 ] as const satisfies readonly (keyof MailRepository)[];
 
 export type MailRepositoryMethod = (typeof mailRepositoryMethods)[number];

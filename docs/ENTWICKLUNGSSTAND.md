@@ -186,3 +186,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   damit allein beim Säubern, das jetzt auch `<style>`-Blöcke und `@import` abdeckt (Tests). Lokal: 104 Tests
   + 3 E2E grün. **Ungeprüft:** Windows-CI; echtes Laden externer Bilder (im Test gibt es kein Internet – geprüft
   wird nur, dass die Adresse im Mail-Frame steht).
+- **W2.2 – Ausnahmeliste (Wunsch des Nutzers):** Statt eines Knopfs pro Absender in der Mail gibt es jetzt
+  **Optionen** (Zahnrad unten links) mit einer Liste von Adressen/Domains, deren externe Inhalte sofort laden.
+  Migration v4 (nur TS, Swift auf der Nachhol-Liste). Aus einer blockierten Mail führt ein Link in die
+  Optionen, Domain vorausgefüllt. Tests: Normalisierung/Abgleich (u. a. `evilshop.example` greift nicht bei
+  `shop.example`), Vertragstest beider Repositorys, Store, E2E (hinzufügen, ungültige Eingabe, entfernen).
+  Lokal: 121 Tests + 3 E2E grün. **Ungeprüft:** Windows-CI; echte Bilder aus dem Internet.

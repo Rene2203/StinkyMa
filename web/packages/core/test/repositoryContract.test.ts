@@ -136,4 +136,16 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
   it("unbekannte Mail ergibt null", async () => {
     expect(await make().message("gibt-es-nicht")).toBeNull();
   });
+
+  it("Ausnahmen für externe Inhalte: hinzufügen (vereinheitlicht), doppelt ignorieren, entfernen", async () => {
+    const repo = make();
+    expect(await repo.remoteContentExceptions()).toEqual([]);
+    expect(await repo.addRemoteContentException("Shop <News@Shop.example>")).toBe("news@shop.example");
+    await repo.addRemoteContentException("zeitung.example");
+    await repo.addRemoteContentException("@zeitung.example");
+    expect(await repo.remoteContentExceptions()).toEqual(["news@shop.example", "zeitung.example"]);
+    await expect(repo.addRemoteContentException("kein gültiger eintrag")).rejects.toThrow(/E-Mail-Adresse oder Domain/);
+    await repo.removeRemoteContentException("news@shop.example");
+    expect(await repo.remoteContentExceptions()).toEqual(["zeitung.example"]);
+  });
 });

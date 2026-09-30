@@ -15,7 +15,9 @@ unten abarbeiten.
 
 | Seit | Was | Wo in TypeScript |
 |------|-----|------------------|
-| – | (noch nichts – neue Migrationen ab v4 und Funktionen hier eintragen) | |
+| 30.09.2026 | Migration `v4-remote-content-exceptions`: Tabelle `remoteContentException(pattern TEXT PRIMARY KEY, createdAt TEXT)` | `web/packages/core/src/sqlite/schema.ts` |
+| 30.09.2026 | Ausnahmeliste für externe Inhalte (Adresse/Domain, Subdomains) + Repository-Methoden | `web/packages/core/src/remoteContent.ts`, `repository.ts` |
+| 30.09.2026 | Optionen-Dialog, „Externe Inhalte laden“ pro Mail | `web/packages/ui/src/components/OptionsDialog.tsx`, `SafeHtml.tsx` |
 
 Funktional fehlt der Swift-App alles ab Windows-Phase W2 (echte IMAP-Konten, Abruf, Warteschlange, HTML-Ansicht).
 Die Logik dazu liegt plattformneutral in `web/packages/core` und dient als Vorlage.

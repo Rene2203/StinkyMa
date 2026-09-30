@@ -49,6 +49,10 @@ export interface BrowserState {
   syncing: boolean;
   /** Zeitpunkt des letzten abgeschlossenen Abgleichs (ISO-8601). */
   lastSyncAt: string | null;
+  /** Absender (Adressen/Domains), deren externe Inhalte sofort geladen werden. */
+  remoteContentExceptions: string[];
+  /** Offener Optionen-Dialog, ggf. mit vorgeschlagener Ausnahme (z. B. Domain der geöffneten Mail). */
+  options: { suggestion: string } | null;
 }
 
 export const initialState: BrowserState = {
@@ -63,6 +67,8 @@ export const initialState: BrowserState = {
   error: null,
   syncing: false,
   lastSyncAt: null,
+  remoteContentExceptions: [],
+  options: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -136,7 +142,7 @@ export class BrowserStore {
   // --- Laden ---
 
   async start(): Promise<void> {
-    await Promise.all([this.loadSidebar(), this.loadMessages(), this.#loadSyncStatus()]);
+    await Promise.all([this.loadSidebar(), this.loadMessages(), this.#loadSyncStatus(), this.#loadRemoteContentExceptions()]);
   }
 
   /** Nach Änderungen von außen (Abgleich, andere Fenster): alles neu laden, Auswahl behalten, nichts als gelesen markieren. */
@@ -149,6 +155,36 @@ export class BrowserStore {
     await this.#guard(async () => {
       const thread = await this.#repository.thread(message.threadId);
       if (request === this.#threadRequest) this.#set({ thread: thread.length ? thread : [message] });
+    });
+  }
+
+  // --- Optionen ---
+
+  openOptions(suggestion = ""): void {
+    this.#set({ options: { suggestion } });
+  }
+
+  closeOptions(): void {
+    this.#set({ options: null });
+  }
+
+  /** Fügt eine Ausnahme hinzu. Fehler (ungültige Eingabe) gehen an den Dialog, nicht ins Banner. */
+  async addRemoteContentException(input: string): Promise<string> {
+    const exception = await this.#repository.addRemoteContentException(input);
+    await this.#loadRemoteContentExceptions();
+    return exception;
+  }
+
+  async removeRemoteContentException(exception: string): Promise<void> {
+    // Sofort aus der Liste nehmen, dann speichern.
+    this.#set({ remoteContentExceptions: this.#state.remoteContentExceptions.filter((e) => e !== exception) });
+    await this.#guard(() => this.#repository.removeRemoteContentException(exception));
+    await this.#loadRemoteContentExceptions();
+  }
+
+  async #loadRemoteContentExceptions(): Promise<void> {
+    await this.#guard(async () => {
+      this.#set({ remoteContentExceptions: await this.#repository.remoteContentExceptions() });
     });
   }
 

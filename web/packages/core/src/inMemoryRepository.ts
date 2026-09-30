@@ -2,10 +2,12 @@ import type { Account, Attachment, Mailbox, MailboxRole, Message, MessageFlagNam
 import { MessageFlag, mailboxRoleRank } from "./models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
+import { requireRemoteContentException } from "./remoteContent.js";
 
 /** `MailRepository` im Arbeitsspeicher – für UI-Tests und Vorschauen, ohne Datenbank. */
 export class InMemoryMailRepository implements MailRepository {
   readonly #data: MockDataSet;
+  readonly #remoteContentExceptions = new Set<string>();
 
   constructor(data: MockDataSet) {
     this.#data = structuredClone(data);
@@ -84,6 +86,20 @@ export class InMemoryMailRepository implements MailRepository {
       const target = this.#data.mailboxes.find((b) => b.accountId === m.accountId && b.role === role);
       if (target) m.mailboxId = target.id;
     }
+  }
+
+  async remoteContentExceptions(): Promise<string[]> {
+    return [...this.#remoteContentExceptions].sort();
+  }
+
+  async addRemoteContentException(input: string): Promise<string> {
+    const exception = requireRemoteContentException(input);
+    this.#remoteContentExceptions.add(exception);
+    return exception;
+  }
+
+  async removeRemoteContentException(exception: string): Promise<void> {
+    this.#remoteContentExceptions.delete(exception);
   }
 
   #roleOf(mailboxId: string): MailboxRole | undefined {
