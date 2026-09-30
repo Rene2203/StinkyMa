@@ -40,10 +40,11 @@ final class NavigationUITests: XCTestCase {
         // 4. Posteingang eines einzelnen Kontos (Gmail, weit oben in der Seitenleiste)
         let gmailInbox = app.descendants(matching: .any).matching(identifier: "sidebar.mailbox.mock-gmail-inbox").firstMatch
         showSidebarIfNeeded(app, element: gmailInbox)
-        XCTAssertTrue(gmailInbox.waitForExistence(timeout: 10))
+        XCTAssertTrue(gmailInbox.waitForExistence(timeout: 30))
         click(gmailInbox)
+        // Großzügiges Zeitlimit: auf dem CI-Simulator dauert jede Abfrage der Ansicht teils über eine Sekunde.
         let fourMails = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 4"), object: rows)
-        XCTAssertEqual(XCTWaiter().wait(for: [fourMails], timeout: 10), .completed, "Im Gmail-Posteingang liegen 4 Mails")
+        XCTAssertEqual(XCTWaiter().wait(for: [fourMails], timeout: 30), .completed, "Im Gmail-Posteingang liegen 4 Mails (gefunden: \(rows.count))")
         snapshot(app, "04-Gmail-Posteingang")
     }
 

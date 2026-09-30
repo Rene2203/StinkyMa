@@ -169,3 +169,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - **Entscheidung Nutzer:** Die Zahlen in der Seitenleiste zeigen weiterhin die **ungelesenen** Mails (nicht die Gesamtzahl).
 - **Windows-CI Lauf #17 (W2.1) grün:** alle Tests inkl. Warteschlange, Scrollen und sofortigem Archivieren auf
   Windows; neuer Installer verfügbar. iPad/Mac-CI (Swift-Migration v3) läuft noch.
+- **iPad/Mac-CI Lauf #13 (W2.1) rot, aber nicht wegen der Migration:** Swift-Paket-Job grün (Migration v3
+  läuft, 43 Tests auch lokal grün). Rot war der iPad-UI-Test in Schritt 4 (Gmail-Posteingang, 4 Mails): der
+  Simulator brauchte ~80 s, um den Seitenleisten-Eintrag zu finden, danach reichte das 10-s-Limit nicht.
+  Korrektur: Zeitlimits in `NavigationUITests` auf 30 s, Fehlermeldung nennt die gefundene Anzahl.
+  **Ungeprüft:** ob der UI-Test damit stabil grün ist (nur auf macOS-CI prüfbar).
