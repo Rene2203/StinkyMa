@@ -1,0 +1,25 @@
+{
+  "name": "stinkyma-web",
+  "private": true,
+  "description": "StinkyMa für Windows (Electron) und später Server/Browser",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p packages/core && tsc -p packages/ui && tsc -p apps/desktop",
+    "test": "vitest run",
+    "dev": "npm run dev -w @stinkyma/desktop",
+    "build": "npm run build -w @stinkyma/desktop",
+    "dist:win": "npm run dist:win -w @stinkyma/desktop",
+    "e2e": "npm run e2e -w @stinkyma/desktop"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

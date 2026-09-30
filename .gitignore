@@ -13,3 +13,10 @@ StinkyMa.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
 # macOS
 .DS_Store
 build/
+
+# Windows-App (web/)
+web/node_modules/
+web/**/node_modules/
+web/apps/desktop/out/
+web/apps/desktop/release/
+web/apps/desktop/test-results/
