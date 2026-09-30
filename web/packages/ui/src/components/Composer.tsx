@@ -1,24 +1,8 @@
 import { Send, X } from "lucide-react";
-import { displayName, formatAddressList, parseAddressList, type ComposeDraft, type ComposeLabels, type Message } from "@stinkyma/core";
+import { formatAddressList, parseAddressList, textToHtml, type ComposeDraft } from "@stinkyma/core";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
-import { formatFullDate, formatList } from "../format.js";
-import type { Locale, Translate } from "../i18n.js";
-
-/** Texte für Zitat-Kopf und Weiterleitung in der Sprache der Oberfläche. */
-export function composeLabels(t: Translate, locale: Locale): ComposeLabels {
-  return {
-    wrote: (m: Message) => t("compose.wrote", { date: formatFullDate(m.date, locale), name: displayName(m.from) }),
-    forwardHeader: (m: Message) =>
-      [
-        t("compose.forwardHeader"),
-        `${t("compose.forwardFrom")}: ${formatAddressList([m.from])}`,
-        `${t("compose.forwardDate")}: ${formatFullDate(m.date, locale)}`,
-        `${t("compose.forwardSubject")}: ${m.subject}`,
-        `${t("compose.forwardTo")}: ${formatList(m.to.map((a) => formatAddressList([a])), locale)}`,
-      ].join("\n"),
-  };
-}
+import { RichTextEditor } from "./RichTextEditor.js";
 
 const titles = { new: "compose.new", reply: "compose.reply", replyAll: "compose.replyAll", forward: "compose.forward" } as const;
 
@@ -26,7 +10,7 @@ const titles = { new: "compose.new", reply: "compose.reply", replyAll: "compose.
  * Composer: Von, An, Cc/Bcc, Betreff, Text. Gesendet wird nur per Klick auf „Senden“ (oder Strg+Enter).
  * Die Mail geht in den Postausgang; der Composer schließt sofort.
  */
-export function Composer({ draft }: { draft: ComposeDraft }) {
+export default function Composer({ draft }: { draft: ComposeDraft }) {
   const { store, t } = useUi();
   const state = useBrowserState();
   const accounts = useMemo(() => Object.values(state.accountsById).sort((a, b) => a.sortOrder - b.sortOrder), [state.accountsById]);
@@ -37,30 +21,26 @@ export function Composer({ draft }: { draft: ComposeDraft }) {
   const [bcc, setBcc] = useState(formatAddressList(draft.bcc));
   const [showCcBcc, setShowCcBcc] = useState(draft.cc.length + draft.bcc.length > 0);
   const [subject, setSubject] = useState(draft.subject);
-  const [body, setBody] = useState(draft.bodyText);
+  const initialHtml = useMemo(() => draft.bodyHtml ?? textToHtml(draft.bodyText), [draft]);
+  const [body, setBody] = useState({ html: initialHtml, text: draft.bodyText });
+  const [bodyTouched, setBodyTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnedNoSubject, setWarnedNoSubject] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const toField = useRef<HTMLInputElement>(null);
-  const bodyField = useRef<HTMLTextAreaElement>(null);
+  const isReply = draft.mode === "reply" || draft.mode === "replyAll";
 
   useEffect(() => {
     dialog.current?.showModal();
-    // Antworten: Cursor an den Anfang des Textes (über dem Zitat); sonst ins Feld „An“.
-    if (draft.mode === "reply" || draft.mode === "replyAll") {
-      bodyField.current?.focus();
-      bodyField.current?.setSelectionRange(0, 0);
-      bodyField.current?.scrollTo(0, 0);
-    } else {
-      toField.current?.focus();
-    }
-  }, [draft.mode]);
+    // Antworten: Cursor an den Anfang des Textes (über dem Zitat, macht der Editor); sonst ins Feld „An“.
+    if (!isReply) toField.current?.focus();
+  }, [isReply]);
 
   const changed =
     to !== formatAddressList(draft.to) || cc !== formatAddressList(draft.cc) || bcc !== formatAddressList(draft.bcc) ||
-    subject !== draft.subject || body !== draft.bodyText;
+    subject !== draft.subject || bodyTouched;
 
   const close = () => {
     if (busy) return;
@@ -100,7 +80,8 @@ export function Composer({ draft }: { draft: ComposeDraft }) {
         cc: ccList ?? [],
         bcc: bccList ?? [],
         subject: subject.trim(),
-        bodyText: body,
+        bodyText: body.text,
+        bodyHtml: body.html,
         inReplyTo: draft.inReplyTo ?? null,
         references: draft.references ?? [],
         answeredMessageId: draft.answeredMessageId ?? null,
@@ -111,9 +92,11 @@ export function Composer({ draft }: { draft: ComposeDraft }) {
     }
   };
 
-  const onKeyDown = (event: KeyboardEvent) => {
+  // In der Capture-Phase, damit der Editor Strg+Enter nicht als Zeilenumbruch nimmt.
+  const onKeyDownCapture = (event: KeyboardEvent) => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
+      event.stopPropagation();
       void send();
     }
   };
@@ -128,7 +111,7 @@ export function Composer({ draft }: { draft: ComposeDraft }) {
         e.preventDefault();
         close();
       }}
-      onKeyDown={onKeyDown}
+      onKeyDownCapture={onKeyDownCapture}
     >
       <form onSubmit={send}>
         <header className="dialog-header">
@@ -186,13 +169,13 @@ export function Composer({ draft }: { draft: ComposeDraft }) {
           </label>
         </div>
 
-        <textarea
-          ref={bodyField}
-          className="composer-body"
-          aria-label={t("compose.body")}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          data-testid="compose-body"
+        <RichTextEditor
+          initialHtml={initialHtml}
+          focus={isReply ? "start" : null}
+          onChange={(value) => {
+            setBody(value);
+            setBodyTouched(true);
+          }}
         />
 
         {error && <p className="dialog-error" role="alert">{error}</p>}

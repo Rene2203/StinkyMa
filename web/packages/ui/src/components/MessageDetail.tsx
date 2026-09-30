@@ -6,7 +6,7 @@ import { formatBytes, formatFullDate, formatList } from "../format.js";
 import { attachmentIcon } from "../icons.js";
 import { selectedMessage, threadFor } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
-import { composeLabels } from "./Composer.js";
+import { composeLabels } from "../composeLabels.js";
 import { SafeHtml } from "./SafeHtml.js";
 
 export function MessageDetail() {

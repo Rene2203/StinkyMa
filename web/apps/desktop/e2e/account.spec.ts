@@ -1,5 +1,6 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -202,8 +203,24 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect(composer).toBeVisible();
     await expect(composer.getByTestId("compose-to")).toHaveValue("Jonas <jonas@example.test>");
     await expect(composer.getByTestId("compose-subject")).toHaveValue("Re: Grillen?");
-    await expect(composer.getByTestId("compose-body")).toBeFocused();
-    await page.keyboard.type("Ja, ich komme gern!");
+    const editor = composer.getByTestId("compose-body");
+    await expect(editor).toBeFocused();
+    // Formatieren: Fett per Tastatur, Aufzählung per Knopf, Schriftart aus der Auswahl
+    await page.keyboard.press("Control+b");
+    await page.keyboard.type("Ja");
+    await page.keyboard.press("Control+b");
+    await page.keyboard.type(", ich komme gern! Ich bringe mit:");
+    await page.keyboard.press("Enter");
+    await composer.getByTestId("format-bullets").click();
+    await page.keyboard.type("Salat");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Brot");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter"); // Liste beenden
+    await composer.getByTestId("format-font").selectOption({ label: "Georgia" });
+    await page.keyboard.type("Bis Samstag");
+    await expect(editor.locator("strong")).toHaveText("Ja");
+    await expect(editor.locator("ul li")).toHaveCount(2);
     await page.screenshot({ path: join(screenshotDir, "10-Antworten.png") });
     await page.keyboard.press("Control+Enter");
     await expect(composer).toHaveCount(0, { timeout: 5_000 });
@@ -225,9 +242,15 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
       if (msg.envelope?.subject === "Re: Grillen?") source = msg.source?.toString("utf8") ?? "";
     }
     await jonas.logout();
-    expect(source).toContain("Ja, ich komme gern!");
-    expect(source).toContain("> Kommst du Samstag?");
     expect(source).toMatch(/In-Reply-To: <g1@example.test>/i);
+    const parsed = await simpleParser(source);
+    expect(parsed.html).toContain("<strong>Ja</strong>, ich komme gern!");
+    expect(parsed.html).toMatch(/<li><p[^>]*>Salat<\/p><\/li>/);
+    expect(parsed.html).toMatch(/font-family: Georgia[^"]*">Bis Samstag/);
+    expect(parsed.html).toContain("<blockquote");
+    expect(parsed.text).toContain("Ja, ich komme gern! Ich bringe mit:");
+    expect(parsed.text).toContain(" • Salat");
+    expect(parsed.text).toContain("> Kommst du Samstag?");
     await expect(page.getByTestId("outbox")).toHaveCount(0);
   });
 

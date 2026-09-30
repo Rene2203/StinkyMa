@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ImapFlow } from "imapflow";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createMockData, InMemorySecretStore, isDemoAccount, isRead, SecretKeys } from "../src/index.js";
 import { MailService, type AccountSettings } from "../src/mail/index.js";
 import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
@@ -31,7 +31,32 @@ function rfc822(opts: { from: string; subject: string; date: Date; messageId: st
   ].join("\r\n");
 }
 
+/**
+ * GreenMail öffnet den Port, bevor er Befehle annimmt (in der Windows-CI sichtbar: alle Tests scheiterten
+ * direkt nach dem Start mit „Command failed“). Deshalb warten, bis ein echter Befehl durchgeht.
+ */
+async function waitForGreenMail(timeoutMs = 30_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    const probe = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: `probe-${randomUUID().slice(0, 8)}@example.test`, pass: "x" }, logger: false });
+    try {
+      await probe.connect();
+      await probe.mailboxCreate("Probe");
+      await probe.logout();
+      return;
+    } catch (error) {
+      lastError = error;
+      probe.close();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  throw new Error(`GreenMail nimmt keine Befehle an: ${String((lastError as { responseText?: string })?.responseText ?? lastError)}`);
+}
+
 describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
+  beforeAll(() => waitForGreenMail(), 40_000);
+
   let user: string;
   let admin: ImapFlow;
   let service: MailService;
@@ -67,8 +92,8 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
   });
 
   afterEach(async () => {
-    service.dispose();
-    await admin.logout().catch(() => admin.close());
+    service?.dispose();
+    await admin?.logout().catch(() => admin.close());
   });
 
   async function serverFlags(subject: string, mailbox = "INBOX"): Promise<string[] | undefined> {

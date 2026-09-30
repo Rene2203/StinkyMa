@@ -1,13 +1,16 @@
 import type { AccountsApi, MailRepository } from "@stinkyma/core";
-import { useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
-import { Composer, composeLabels } from "./components/Composer.js";
+import { composeLabels } from "./composeLabels.js";
 import { MessageList } from "./components/MessageList.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { UiContext, useBrowserState, useUi } from "./context.js";
 import { translator, type Locale } from "./i18n.js";
 import { BrowserStore, selectedMessage } from "./store.js";
+
+// Das Mail-Fenster (mit Editor) wird erst beim ersten Öffnen geladen – schnellerer Start auf schwachen Rechnern.
+const Composer = lazy(() => import("./components/Composer.js"));
 
 export interface AppProps {
   repository: MailRepository;
@@ -50,7 +53,11 @@ function Shell() {
       <Sidebar />
       <MessageList />
       <MessageDetail />
-      {state.compose && <Composer draft={state.compose} />}
+      {state.compose && (
+        <Suspense fallback={null}>
+          <Composer draft={state.compose} />
+        </Suspense>
+      )}
       {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}
       {state.error && (
         <div className="error-banner" role="alert">

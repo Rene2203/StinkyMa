@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import MailComposer from "nodemailer/lib/mail-composer";
-import type { OutgoingMail } from "../compose.js";
+import { emailHtml, type OutgoingMail } from "../compose.js";
+import { convert } from "html-to-text";
 import type { Account, ConnectionSecurity, EmailAddress } from "../models.js";
 import { MailConnectionError } from "./connection.js";
 
@@ -31,7 +32,9 @@ export async function buildMessage(mail: OutgoingMail, options: { from: EmailAdd
     cc: mail.cc.map(address),
     bcc: mail.bcc.map(address),
     subject: mail.subject,
-    text: mail.bodyText,
+    // Formatierte Mails: HTML plus daraus erzeugte Nur-Text-Fassung (multipart/alternative).
+    text: mail.bodyHtml ? plainTextFromEditorHtml(mail.bodyHtml) : mail.bodyText,
+    html: mail.bodyHtml ? emailHtml(mail.bodyHtml) : undefined,
     messageId: options.messageId,
     date: options.date,
     inReplyTo: mail.inReplyTo ?? undefined,
@@ -95,4 +98,20 @@ export function classifySmtpError(error: unknown): Error {
   if (e.code === "EENVELOPE") return new SmtpRejectedError("Mindestens ein Empfänger fehlt oder ist ungültig.");
   const reason = e.code === "ETIMEDOUT" ? "Zeitüberschreitung" : e.code === "ECONNECTION" || e.code === "ESOCKET" || e.code === "EDNS" ? "Server nicht erreichbar" : (e.message ?? "unbekannter Fehler");
   return new MailConnectionError(`Senden nicht möglich (${reason}). Die Mail bleibt im Postausgang.`);
+}
+
+/** Nur-Text-Fassung einer formatierten Mail: eine Editor-Zeile = eine Textzeile, Links mit Adresse, Zitate mit „>“. */
+export function plainTextFromEditorHtml(html: string): string {
+  const line = { leadingLineBreaks: 1, trailingLineBreaks: 1 };
+  return convert(html, {
+    wordwrap: 78,
+    selectors: [
+      { selector: "p", options: line },
+      { selector: "ul", options: { ...line, itemPrefix: " • " } },
+      { selector: "ol", options: line },
+      { selector: "blockquote", options: { ...line, trimEmptyLines: false } },
+      { selector: "a", options: { hideLinkHrefIfSameAsText: true, linkBrackets: ["<", ">"] } },
+      { selector: "img", format: "skip" },
+    ],
+  }).replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }

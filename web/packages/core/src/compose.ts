@@ -12,7 +12,10 @@ export interface OutgoingMail {
   cc: EmailAddress[];
   bcc: EmailAddress[];
   subject: string;
+  /** Nur-Text-Fassung (immer vorhanden – für schlichte Mailprogramme und die Vorschau). */
   bodyText: string;
+  /** Formatierte Fassung aus dem Editor (HTML-Fragment ohne <html>/<body>); fehlt bei reinen Textmails. */
+  bodyHtml?: string | null;
   /** Message-ID der beantworteten Mail (für In-Reply-To). */
   inReplyTo?: string | null;
   /** Kette der Message-IDs der Konversation, älteste zuerst (für References). */
@@ -83,6 +86,7 @@ export function prepareCompose(
       accountId: original.accountId,
       subject: forwardSubject(original.subject),
       bodyText: `\n\n${labels.forwardHeader(original)}\n\n${body.replace(/\n+$/, "")}\n`,
+      bodyHtml: `<p></p><p></p>${textToHtml(labels.forwardHeader(original))}<p></p>${textToHtml(body)}`,
     };
   }
 
@@ -111,10 +115,50 @@ export function prepareCompose(
     cc,
     subject: replySubject(original.subject),
     bodyText: `\n\n${labels.wrote(original)}\n${quoteText(body)}\n`,
+    bodyHtml: `<p></p><p></p>${textToHtml(labels.wrote(original))}<blockquote>${textToHtml(body)}</blockquote>`,
     inReplyTo: original.messageId ?? null,
     references,
     answeredMessageId: original.id,
   };
+}
+
+/** Text → HTML-Absätze (eine Zeile = ein Absatz, Sonderzeichen maskiert). Zitierte Zeilen („> “) werden eingerückt. */
+export function textToHtml(text: string): string {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\n+$/, "").split("\n");
+  let html = "";
+  let depth = 0;
+  for (const line of lines) {
+    const level = /^(>\s?)+/.exec(line)?.[0].replace(/\s/g, "").length ?? 0;
+    while (depth < level) { html += "<blockquote>"; depth++; }
+    while (depth > level) { html += "</blockquote>"; depth--; }
+    const content = line.replace(/^(>\s?)+/, "");
+    html += content ? `<p>${escapeHtml(content)}</p>` : "<p></p>";
+  }
+  while (depth > 0) { html += "</blockquote>"; depth--; }
+  return html;
+}
+
+export function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** Grundschrift gesendeter Mails, wenn der Nutzer nichts anderes wählt – auf allen Systemen vorhanden. */
+export const defaultMailFont = { family: "Arial, Helvetica, sans-serif", size: "11pt" };
+
+/**
+ * Macht aus dem Editor-HTML eine versandfertige HTML-Mail: Stile inline (Mailprogramme ignorieren <style>
+ * oft), Absätze ohne Abstand wie in Outlook/Apple Mail, leere Zeilen bleiben sichtbar, Zitate mit Linie.
+ */
+export function emailHtml(fragment: string): string {
+  const body = fragment
+    .replace(/<p([^>]*)><\/p>/g, "<p$1><br></p>")
+    .replace(/<p(?![^>]*style=)([^>]*)>/g, '<p style="margin:0"$1>')
+    .replace(/<p([^>]*)style="([^"]*)"([^>]*)>/g, (match, a: string, style: string, b: string) =>
+      style.includes("margin") ? match : `<p${a}style="margin:0;${style}"${b}>`)
+    .replace(/<blockquote>/g, '<blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #c8c8c8;padding-left:1ex;color:#555">')
+    .replace(/<ul>/g, '<ul style="margin:0;padding-left:1.6em">')
+    .replace(/<ol>/g, '<ol style="margin:0;padding-left:1.6em">');
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body><div style="font-family:${defaultMailFont.family};font-size:${defaultMailFont.size};line-height:1.4">${body}</div></body></html>`;
 }
 
 /**
@@ -213,7 +257,7 @@ export function localSentMessage(
     date: options.date,
     snippet: text.replace(/^>.*$/gm, "").replace(/\s+/g, " ").trim().slice(0, 160),
     bodyText: text,
-    bodyHtml: null,
+    bodyHtml: mail.bodyHtml ? emailHtml(mail.bodyHtml) : null,
     flags: 1, // gelesen
     hasAttachments: false,
   };

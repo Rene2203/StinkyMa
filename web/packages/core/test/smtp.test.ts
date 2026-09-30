@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMessage, classifySmtpError, MailConnectionError, SmtpRejectedError } from "../src/mail/index.js";
+import { buildMessage, classifySmtpError, MailConnectionError, plainTextFromEditorHtml, SmtpRejectedError } from "../src/mail/index.js";
 
 describe("MIME-Nachricht bauen", () => {
   it("Bcc nur im Umschlag, Antwort-Kopfzeilen gesetzt, Umlaute korrekt", async () => {
@@ -25,6 +25,35 @@ describe("MIME-Nachricht bauen", () => {
     expect(raw).toMatch(/^Message-ID: <neu@example.test>/im);
     expect(raw).toMatch(/^Subject: =\?UTF-8\?/m);
     expect(raw).not.toMatch(/X-Mailer: Nodemailer/i);
+  });
+});
+
+describe("Formatierte Mail", () => {
+  it("HTML und Nur-Text als multipart/alternative, Text aus dem HTML abgeleitet", async () => {
+    const built = await buildMessage(
+      {
+        accountId: "a",
+        to: [{ address: "anna@example.test" }],
+        cc: [],
+        bcc: [],
+        subject: "Liste",
+        bodyText: "wird ersetzt",
+        bodyHtml: '<p>Hallo <strong>Anna</strong>,</p><ul><li><p>Eins</p></li><li><p>Zwei</p></li></ul><p><a href="https://shop.example/x">Shop</a></p>',
+      },
+      { from: { address: "bernd@example.test" }, messageId: "<f@example.test>", date: new Date("2026-09-30T12:00:00Z") },
+    );
+    const raw = built.raw.toString("utf8");
+    expect(raw).toMatch(/Content-Type: multipart\/alternative/);
+    expect(raw).toMatch(/Content-Type: text\/plain/);
+    expect(raw).toMatch(/Content-Type: text\/html/);
+    expect(raw).toContain("<strong>Anna</strong>");
+    expect(raw).not.toContain("wird ersetzt");
+  });
+
+  it("Nur-Text: eine Zeile pro Absatz, Aufzählungszeichen, Link mit Adresse, Zitat mit >", () => {
+    expect(
+      plainTextFromEditorHtml('<p>Hallo</p><p></p><p>Zeile</p><ul><li><p>Eins</p></li></ul><ol><li><p>A</p></li></ol><blockquote><p>alt</p></blockquote><p><a href="https://x.example">Link</a></p>'),
+    ).toBe("Hallo\n\nZeile\n • Eins\n 1. A\n> alt\nLink <https://x.example>\n");
   });
 });
 

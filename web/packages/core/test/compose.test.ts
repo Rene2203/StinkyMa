@@ -6,6 +6,8 @@ import {
   prepareCompose,
   quoteText,
   replySubject,
+  emailHtml,
+  textToHtml,
   type ComposeLabels,
   type Message,
 } from "../src/index.js";
@@ -110,3 +112,25 @@ describe("Empfängerzeile", () => {
     expect(parseAddressList(formatAddressList(list)).addresses.map((a) => a.address)).toEqual(["carl@example.test", "b@example.test"]);
   });
 });
+
+describe("HTML für formatierte Mails", () => {
+  it("Antwort bringt das Zitat auch als HTML mit (maskiert)", () => {
+    const draft = prepareCompose("reply", { account: me, original: message({ bodyText: "a < b & c\n> alt" }), labels });
+    expect(draft.bodyHtml).toBe("<p></p><p></p><p>Anna schrieb:</p><blockquote><p>a &lt; b &amp; c</p><blockquote><p>alt</p></blockquote></blockquote>");
+  });
+
+  it("Text → Absätze, leere Zeilen bleiben", () => {
+    expect(textToHtml("Hallo\n\n<Welt>")).toBe("<p>Hallo</p><p></p><p>&lt;Welt&gt;</p>");
+  });
+
+  it("versandfertig: Grundschrift, Absätze ohne Abstand, leere Zeilen sichtbar, Zitat mit Linie", () => {
+    const html = emailHtml('<p>Hallo</p><p></p><p style="text-align: center">Mitte</p><blockquote><p>alt</p></blockquote><ul><li><p>Eins</p></li></ul>');
+    expect(html).toContain("font-family:Arial, Helvetica, sans-serif;font-size:11pt");
+    expect(html).toContain('<p style="margin:0">Hallo</p>');
+    expect(html).toContain('<p style="margin:0"><br></p>');
+    expect(html).toContain('<p style="margin:0;text-align: center">Mitte</p>');
+    expect(html).toContain('<blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #c8c8c8');
+    expect(html).toContain('<ul style="margin:0;padding-left:1.6em">');
+  });
+});
+

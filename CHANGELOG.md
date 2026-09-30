@@ -15,8 +15,17 @@
   Einmal angenommene Mails werden nie doppelt gesendet. Nichts wird ohne Klick auf „Senden“ verschickt.
 - Test: Die Methodenliste der Preload-Brücke wird gegen die Schnittstellen geprüft (hatte „send“ vergessen).
 
+- **Formatierung (Wunsch des Nutzers):** Leiste im Mail-Fenster mit Schriftart (11 gängige Schriften, die auch
+  beim Empfänger vorhanden sind), Schriftgröße in pt, Fett/Kursiv/Unterstrichen/Durchgestrichen (Strg+B/I/U),
+  Textfarbe, Aufzählung, Nummerierung, Zitat, Ausrichtung, Link, „Formatierung entfernen“. Editor: TipTap 3.
+  Versand als multipart/alternative (HTML mit Inline-Stilen + daraus erzeugter Nur-Text-Fassung).
+  Das Mail-Fenster wird erst beim ersten Öffnen geladen (Startpaket bleibt ~0,85 MB).
+- Tests warten auf die Bereitschaft von GreenMail (Windows-CI #25 scheiterte direkt nach dem Start; #26 mit
+  identischem Code war grün).
+
 ### Noch nicht (Teil 2)
-- Entwürfe, Anhänge, Adressvorschläge, HTML-Formatierung; OAuth für Gmail/Outlook.
+- Entwürfe, Anhänge, Adressvorschläge, Bilder im Text; OAuth für Gmail/Outlook.
+- Weiterleiten übernimmt die Originalmail bisher als Text (nicht mit ihrer HTML-Gestaltung).
 
 ## W2.2 – Zweiter Praxistest (Windows)
 

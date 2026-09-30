@@ -202,3 +202,12 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   **Ungeprüft:** echtes Senden über iCloud (smtp.mail.me.com:587, STARTTLS, app-spezifisches Passwort) – insbesondere
   ob iCloud die Mail zusätzlich selbst in „Gesendet“ ablegt (dann stünde sie doppelt dort); Windows-CI.
   Bewusst noch nicht: Entwürfe (Verwerfen fragt deshalb nach), Anhänge, Adressvorschläge, HTML-Mails schreiben.
+- **Windows-CI #25 rot, #26 grün (gleicher Code):** Alle IMAP-Tests scheiterten beim Aufbau mit „Command failed“,
+  3 s nach dem Start von GreenMail. Ursache: Port offen, Server nimmt aber noch keine Befehle an. Korrektur: Tests
+  warten, bis ein echter IMAP-Befehl durchgeht. Code der App war nicht betroffen.
+- **Formatierung im Mail-Fenster (Wunsch des Nutzers):** TipTap-Editor mit Leiste (Schriftart, pt-Größe, B/I/U/S,
+  Farbe, Listen, Zitat, Ausrichtung, Link, Formatierung entfernen). Antworten zitieren als HTML-Blockquote.
+  Versand multipart/alternative; Nur-Text-Fassung aus dem HTML (Listen mit „•“, Links mit Adresse, Zitat mit „>“).
+  E2E prüft beim Empfänger: <strong>, Liste, Schriftart Georgia, Zitat, Nur-Text. Mail-Fenster wird nachgeladen
+  (Startpaket 0,85 MB statt 1,7 MB). Lokal: 154 Tests + 3 E2E grün.
+  **Ungeprüft:** Darstellung beim Empfänger in echten Programmen (Outlook, Apple Mail, Gmail); Windows-CI.

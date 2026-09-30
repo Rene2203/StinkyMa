@@ -6,7 +6,7 @@ import { formatListDate } from "../format.js";
 import { showsAccountIndicator, sidebarItem, visibleMessages } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
 import { ContextMenu, type ContextMenuState } from "./ContextMenu.js";
-import { composeLabels } from "./Composer.js";
+import { composeLabels } from "../composeLabels.js";
 import { sidebarTitle } from "./Sidebar.js";
 
 export function MessageList() {
