@@ -4,34 +4,43 @@ Laufendes Protokoll des Zwischenstands. Wird nach jedem größeren Arbeitsschrit
 nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHANGELOG.md`.
 
 **Zuletzt aktualisiert:** 30.09.2026
-**Aktuelle Phase:** 1 – Fundament (im iPad-Simulator abgenommen; Test in Swift Playgrounds auf echtem iPad steht aus)
+**Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
+**Aktuelle Phase:** W1 – Fundament Windows (umgesetzt, lokal getestet; erster Windows-CI-Lauf steht aus)
 
 ## Überblick
 
 | Phase | Status |
 |---|---|
-| 1 – Fundament | 🟢 CI grün; iPad-UI-Test im Simulator besteht (Screenshots in `docs/screenshots/`) |
-| 2 – Ein Konto lesen | ⚪ offen |
-| 3–15 | ⚪ offen |
+| **W1 – Fundament Windows** | 🟢 fertig: 65 Unit-Tests + 2 E2E-Tests grün (Linux); Windows-CI steht aus |
+| W2 – Ein Konto lesen (IMAP, iCloud) | ⚪ offen |
+| W3–W5, S1 (Server & Browser) | ⚪ offen |
+| iPad/Mac Phase 1 | ⏸️ fertig und im Simulator abgenommen, **ruht** (siehe unten) |
 
-## Was funktioniert (geprüft)
+## Windows – was geprüft funktioniert (lokal, Linux-Container)
+- Kernpaket: Schema/Migrationen, FTS5, beide Repository-Implementierungen (gemeinsame Vertragstests),
+  Mock-Daten, verschlüsselter Passwortspeicher (mit Test-Verschlüsselung).
+- Oberflächen-Zustand (BrowserStore): Laden, Auswahl, Gelesen-Markieren, Archivieren mit Folgeauswahl,
+  Tastatur-Navigation, Suche, Fehlerbehandlung.
+- E2E mit der echten Electron-App: Posteingang, Mail öffnen (Zähler sinkt), „Markiert“, Gmail-Posteingang,
+  ↓ + E (archivieren), Rechtsklick-Menü inkl. Escape, Suche, Daten bleiben nach Neustart erhalten.
+- Gepackte App (electron-builder, Linux-Variante) startet und zeigt die Mails – `better-sqlite3` (Node-API)
+  funktioniert ohne Neubau in Node und Electron.
+- Screenshots: `docs/screenshots/windows-*.png`
 
-- Kernmodule `MailCore`, `MailStore`, `PlatformServices`, `AppFeature` bauen unter Linux
-  (Swift 6.1, strikte Concurrency, ohne Warnungen).
-- 43 Tests grün: Modelle, Migrationen, FTS5-Index, Repository (gemeinsamer Posteingang,
-  Ungelesen, Markiert, Threads, Flags, Archiv/Papierkorb), Mock-Daten, Keychain-Ersatz,
-  Oberflächen-Modell (Auswahl, Als-gelesen-Markieren, Auswahl nach Archivieren).
-- Xcode-Projekt lässt sich aus `project.yml` erzeugen (XcodeGen).
-- CI-Lauf #2 (29.09.2026) grün: Pakettests unter Linux und macOS (inkl. Keychain-Test),
-  macOS-App und iPadOS-App (Simulator) bauen mit Xcode 26 ohne Fehler.
+## Windows – noch ungeprüft
+- **Auf echtem Windows:** weder CI-Lauf noch Installation beim Nutzer bisher. Insbesondere: NSIS-Installer,
+  Windows-DPAPI (`safeStorage`), Segoe-Schrift, hoher DPI-Wert, dunkler Modus.
+- `EncryptedFileSecretStore` mit echter DPAPI (wird erst ab W2 genutzt).
 
-## Was noch nicht geprüft ist
+## Nächste Schritte
+1. Windows-CI auswerten, Installer vom Nutzer testen lassen (`docs/WINDOWS-TESTEN.md`).
+2. Phase W2: IMAP-Anbindung (imapflow), Konto-Einrichtung iCloud, MIME, sichere HTML-Anzeige.
+3. Offene Frage an den Nutzer für S1: Heimserver-Hardware / Docker?
 
-- **Auf echtem iPad:** noch nicht gestartet. Swift-Playgrounds-Paket baut in der CI, Öffnen auf dem
-  iPad des Nutzers steht aus.
-- Im Simulator ungeprüft: Wischgesten, Kontextmenü, Tastaturkürzel, VoiceOver, Hochformat, Mac-App.
-- Keychain-Test in CI: Läuft ohne Signatur; falls der Keychain dort `errSecMissingEntitlement`
-  meldet, wird der Test stillschweigend übersprungen – echter Nachweis erst in der signierten App.
+## iPad/Mac (ruht)
+Grund: Ohne Mac und ohne bezahlten Apple-Developer-Account (99 €/Jahr) kann der Nutzer die App nicht auf
+Geräten testen. Stand: Phase 1 fertig, CI grün, UI-Test im iPad-Simulator besteht. Die Apple-CI läuft nur
+noch bei Änderungen am Swift-Code. Details im Verlauf unten.
 
 ## Testen ohne Mac
 
@@ -51,6 +60,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
    app-spezifischem Passwort, MIME-Parser, HTML-Anzeige, Datenbank als Datei.
 
 ## Offene Entscheidungen (aus Spezifikation, Abschnitt 12)
+
+- Heimserver: Hardware, Betriebssystem, Docker? (für Phase S1)
 
 - App-Name (Arbeitsname „StinkyMa“), Bundle-ID `de.stinkyma.*` ist Platzhalter
 - Private Nutzung oder App-Store-Release
@@ -91,3 +102,11 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - Swift-Playgrounds-Export (`scripts/make-playground.sh`): kopiert alle Module in ein App-Target.
   Unter Linux geprüft, dass die Kernmodule als ein Modul kompilieren; Playground-Build in der CI
   (Xcode) und Öffnen auf dem iPad **noch ungeprüft**.
+- **Richtungswechsel:** Nutzer kann iOS derzeit nicht testen → Fokus „zuerst voll auf Windows“, danach
+  Server mit Browser. Architektur: TypeScript-Workspaces unter `web/` (Kern, React-Oberfläche, Electron-App),
+  derselbe Kern und dieselbe Oberfläche später im Server. Begründung TypeScript statt Swift unter Windows:
+  ausgereifte Mail-Bibliotheken (imapflow, mailparser, nodemailer), Electron/Installer-Werkzeuge,
+  eine Sprache für Windows-App und Server.
+- Phase W1 umgesetzt (siehe Überblick). Gefundener und behobener Fehler beim E2E-Test: Escape schloss das
+  Rechtsklick-Menü nicht, weil das App-weite Tastenkürzel ein Neu-Rendern auslöste, das den Listener des
+  Menüs während desselben Ereignisses entfernte. Menü behandelt Tasten jetzt selbst (inkl. ↑/↓).

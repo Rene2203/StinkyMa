@@ -1,0 +1,58 @@
+name: CI Windows
+
+on:
+  push:
+    paths:
+      - "web/**"
+      - ".github/workflows/ci-windows.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/ci-windows.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  windows:
+    name: Windows-App (Tests, E2E, Installer)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Abhängigkeiten installieren
+        run: npm ci
+      - name: Typen prüfen
+        run: npm run typecheck
+      - name: Tests (Kern & Oberfläche)
+        run: npm test
+      - name: App bauen
+        run: npm run build
+      - name: E2E-Test der Windows-App (mit Screenshots)
+        run: npm run e2e
+      - name: Screenshots hochladen
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-screenshots
+          path: web/apps/desktop/test-results/screenshots
+          if-no-files-found: warn
+      - name: Installer erzeugen
+        working-directory: web/apps/desktop
+        run: npx electron-builder --win --x64 --publish never
+      - name: Installer hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: StinkyMa-Windows-Installer
+          path: web/apps/desktop/release/*.exe
+          if-no-files-found: error

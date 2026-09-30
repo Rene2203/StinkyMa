@@ -10,10 +10,22 @@ abgeschlossene Phasen in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Stand
 
-**Phase 1 – Fundament** ist umgesetzt: Drei-Spalten-Layout mit erfundenen Beispielmails,
-iPad- und Mac-App, Datenbankschema mit Migrationen, Keychain-Zugriff. Echte Konten folgen in Phase 2.
+**Aktueller Fokus: Windows**, danach Server mit Browser-Zugriff (siehe [`docs/ROADMAP-WINDOWS.md`](docs/ROADMAP-WINDOWS.md)).
+
+- **Windows-App – Phase W1 (Fundament)** ist umgesetzt: Drei-Spalten-Oberfläche mit Beispielmails, SQLite,
+  verschlüsselter Passwortspeicher, Installer aus der CI. Installation: [`docs/WINDOWS-TESTEN.md`](docs/WINDOWS-TESTEN.md).
+- **iPad/Mac – Phase 1** ist umgesetzt und im Simulator abgenommen, ruht aber vorerst.
 
 ## Aufbau
+
+```
+web/                     Windows-App & später Server (TypeScript)
+  packages/core          Modelle, SQLite-Speicher, Repository, Mock-Daten
+  packages/ui            React-Oberfläche
+  apps/desktop           Electron-App für Windows
+```
+
+iPad/Mac (Swift, ruht vorerst):
 
 ```
 App/                     SwiftUI-Oberfläche (gemeinsam für iPadOS und macOS)

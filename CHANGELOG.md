@@ -1,5 +1,33 @@
 # Changelog
 
+## Phase W1 – Fundament Windows
+
+### Fertig
+- **Richtungswechsel:** Fokus zuerst Windows, dann Server mit Browser-Zugriff; iPad/Mac ruht
+  (ohne Mac/bezahlten Apple-Account nicht auf Geräten testbar). Roadmap: `docs/ROADMAP-WINDOWS.md`.
+- **Struktur `web/`** (npm-Workspaces, TypeScript strikt): `packages/core`, `packages/ui`, `apps/desktop`.
+- **Kern:** Modelle wie in der Swift-App; SQLite-Schema mit denselben Tabellen und Migrationen
+  (`PRAGMA user_version`), FTS5-Volltextindex ohne Umlaut-Empfindlichkeit; `SqliteMailRepository` und
+  `InMemoryMailRepository` mit gemeinsamer Vertrags-Testreihe; gleiche Mock-Daten; verschlüsselter
+  Passwortspeicher (`EncryptedFileSecretStore`, in der App mit Windows-DPAPI über Electron `safeStorage`).
+- **Oberfläche (React):** Drei-Spalten-Layout wie auf dem iPad; Seitenleiste mit Zählern, Mail-Liste mit
+  Kontofarbe (als Balken – nicht mit dem Ungelesen-Punkt verwechselbar), Kategorie-Chips, Schnellaktionen
+  beim Überfahren, Rechtsklick-Menü (mit Tastatur bedienbar), lokale Suche; Konversationsansicht mit Anhängen;
+  Tastaturkürzel (↑/↓, J/K, E, Entf, S, U, Esc); Deutsch/Englisch nach Systemsprache; hell/dunkel nach Windows.
+- **Windows-App (Electron 44):** Datenbank im Main-Prozess, abgesicherte IPC-Brücke (nur freigegebene
+  Methoden, Sandbox, Context Isolation, CSP, keine fremde Navigation), Einzelinstanz, deutsches Menü.
+  Demo-Datenbank in `%APPDATA%\StinkyMa\demo.sqlite`, Änderungen bleiben nach Neustart erhalten.
+- **Tests:** 65 Unit-Tests (Vitest) + 2 E2E-Tests (Playwright startet die echte App, prüft Navigation,
+  Tastatur, Kontextmenü, Suche, Neustart) mit Screenshots.
+- **CI Windows:** Typprüfung, Tests, E2E und NSIS-Installer als Download-Artefakt. Die Apple-CI läuft nur noch
+  bei Änderungen am Swift-Code.
+
+### Offen / Hinweise
+- Installer ist nicht signiert → SmartScreen-Warnung beim ersten Start.
+- App-Icon ist das Standard-Electron-Icon; App-Name und Bundle-ID sind Platzhalter.
+- Suche filtert nur die geladene Liste; die FTS5-Suche wird in W4 angebunden.
+- HTML-Mails werden noch nicht angezeigt (nur Text) – kommt mit echten Konten in W2.
+
 ## Phase 1 – Fundament
 
 ### Fertig

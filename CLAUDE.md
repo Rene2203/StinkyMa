@@ -14,7 +14,24 @@
 - Datenbank: bestehende Migrationen in `MailSchema.swift` nie ändern, neue anhängen.
 - Testdaten sind erfunden; Adressen enden auf `.example`.
 
-## Befehle
+## Aktueller Fokus: Windows (web/)
+
+Seit 30.09.2026: zuerst Windows-App, dann Server mit Browser (`docs/ROADMAP-WINDOWS.md`). Die Swift-App ruht.
+- `web/packages/core`: plattformneutral (kein Electron/DOM). SQLite-Teil nur über `@stinkyma/core/sqlite`,
+  Node-spezifisches über `@stinkyma/core/node` – damit die Oberfläche kein natives Modul einbündelt.
+- `web/packages/ui`: spricht nur mit `MailRepository`. UI-Texte in `packages/ui/src/i18n.ts` (de + en).
+- Schema-Änderungen immer in **beiden** Welten gleich halten (`MailSchema.swift` ↔ `web/packages/core/src/sqlite/schema.ts`).
+
+```sh
+cd web
+npm install
+npm test                                  # Vitest: Kern + Oberfläche
+npm run typecheck
+npm run build                             # Electron-App bauen
+cd apps/desktop && xvfb-run -a npx playwright test   # E2E unter Linux (Windows: npx playwright test)
+```
+
+## Befehle (iPad/Mac)
 
 ```sh
 swift build --package-path Packages/StinkyMaKit

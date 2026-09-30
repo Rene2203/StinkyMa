@@ -1,12 +1,21 @@
-name: CI
+name: CI iPad & Mac
 
+# Die iPad-/Mac-Version ruht vorerst (Fokus Windows). Läuft nur, wenn sich ihr Code ändert – spart macOS-Minuten.
 on:
   push:
+    paths: &apple-paths
+      - "App/**"
+      - "Packages/**"
+      - "project.yml"
+      - "StinkyMa.xcodeproj/**"
+      - "scripts/**"
+      - ".github/workflows/ci-apple.yml"
   pull_request:
+    paths: *apple-paths
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-apple-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
