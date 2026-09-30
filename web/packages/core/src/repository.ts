@@ -45,6 +45,8 @@ export interface MailRepository {
    * dann häufige und zuletzt genutzte Kontakte. Eigene Adressen fehlen.
    */
   suggestAddresses(query: string, limit: number): Promise<EmailAddress[]>;
+  /** Signatur eines Kontos setzen (leer/`null` = keine Signatur). */
+  setSignature(accountId: string, html: string | null): Promise<void>;
 }
 
 /** Eine Mail im Postausgang (noch nicht gesendet). */
@@ -100,6 +102,7 @@ export const mailRepositoryMethods = [
   "deleteDraft",
   "openDraft",
   "suggestAddresses",
+  "setSignature",
 ] as const satisfies readonly (keyof MailRepository)[];
 
 export type MailRepositoryMethod = (typeof mailRepositoryMethods)[number];

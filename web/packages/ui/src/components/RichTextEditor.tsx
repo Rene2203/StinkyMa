@@ -53,8 +53,14 @@ export function RichTextEditor({
   focus,
   onChange,
   onReady,
+  testId = "compose-body",
+  placeholder,
+  label,
 }: {
   initialHtml: string;
+  testId?: string;
+  placeholder?: string;
+  label?: string;
   /** „start“ bei Antworten (über dem Zitat), sonst kein Fokus. */
   focus: "start" | null;
   onChange: (value: RichTextValue) => void;
@@ -75,11 +81,11 @@ export function RichTextEditor({
       FontSize,
       Color,
       TextAlign.configure({ types: ["paragraph"] }),
-      Placeholder.configure({ placeholder: t("compose.body") }),
+      Placeholder.configure({ placeholder: placeholder ?? t("compose.body") }),
     ],
     content: initialHtml,
     editorProps: {
-      attributes: { "data-testid": "compose-body", "aria-label": t("compose.body"), class: "composer-editor", spellcheck: "true" },
+      attributes: { "data-testid": testId, "aria-label": label ?? t("compose.body"), class: "composer-editor", spellcheck: "true" },
     },
     onUpdate: ({ editor: e }) => onChange({ html: e.getHTML(), text: e.getText({ blockSeparator: "\n" }) }),
   });

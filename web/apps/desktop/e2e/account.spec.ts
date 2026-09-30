@@ -359,6 +359,31 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect(composer).toHaveCount(0);
   });
 
+  await test.step("Signatur in den Optionen – erscheint in neuen Mails", async () => {
+    await page.getByTestId("open-options").click();
+    const options = page.getByTestId("options-dialog");
+    const signature = options.getByTestId("signature-body");
+    await expect(signature).toBeVisible();
+    await signature.click();
+    await page.keyboard.press("Control+b");
+    await page.keyboard.type("Viele Grüße");
+    await page.keyboard.press("Control+b");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Anna");
+    await options.getByTestId("signature-save").click();
+    await expect(options.getByText("Gespeichert")).toBeVisible();
+    await page.screenshot({ path: join(screenshotDir, "14-Signatur.png") });
+    await options.getByRole("button", { name: "Fertig" }).click();
+    await expect(options).toHaveCount(0);
+
+    await page.getByTestId("compose-new").click();
+    const composer = page.getByTestId("composer");
+    await expect(composer.getByTestId("compose-body").locator("strong")).toHaveText("Viele Grüße");
+    await expect(composer.getByTestId("compose-body")).toContainText("Anna");
+    await page.keyboard.press("Escape"); // unverändert → kein Entwurf
+    await expect(composer).toHaveCount(0);
+  });
+
   await test.step("Abruf per Knopf", async () => {
     await page.getByTestId("sync-now").click();
     await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });

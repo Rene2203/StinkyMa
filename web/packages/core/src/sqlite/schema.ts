@@ -273,6 +273,13 @@ export const migrations: Migration[] = [
       CREATE INDEX draft_on_messageId ON draft(messageId);
     `,
   },
+  {
+    name: "v7-account-signature",
+    // Signatur pro Konto (HTML-Fragment aus dem Editor).
+    sql: `
+      ALTER TABLE account ADD COLUMN signatureHtml TEXT;
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

@@ -138,6 +138,11 @@ export class MailService implements MailRepository, AccountsApi {
     if (accountId && !isDemoAccount({ id: accountId })) this.#scheduleFlush(accountId);
   }
 
+  async setSignature(accountId: string, html: string | null): Promise<void> {
+    await this.repository.setSignature(accountId, html);
+    this.options.onChange?.();
+  }
+
   suggestAddresses(query: string, limit: number): Promise<EmailAddress[]> {
     return this.repository.suggestAddresses(query, limit);
   }

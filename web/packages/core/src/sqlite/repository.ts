@@ -13,7 +13,7 @@ import type {
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 import { requireRemoteContentException } from "../remoteContent.js";
-import { draftFromMessage, formatAddressList, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "../compose.js";
+import { normalizeSignature, draftFromMessage, formatAddressList, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "../compose.js";
 import type { OutboxItem } from "../repository.js";
 
 type Row = Record<string, unknown>;
@@ -33,7 +33,7 @@ export function accountFromRow(r: Row): Account {
     smtpHost: str(r.smtpHost), smtpPort: num(r.smtpPort), smtpSecurity: str(r.smtpSecurity) as Account["smtpSecurity"],
     authType: str(r.authType) as Account["authType"], color: str(r.color) as Account["color"],
     aiCloudAllowed: bool(r.aiCloudAllowed), sortOrder: num(r.sortOrder),
-    lastSyncAt: optStr(r.lastSyncAt), syncError: optStr(r.syncError),
+    lastSyncAt: optStr(r.lastSyncAt), syncError: optStr(r.syncError), signatureHtml: optStr(r.signatureHtml),
   };
 }
 
@@ -262,6 +262,10 @@ export class SqliteMailRepository implements MailRepository {
       "INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId) VALUES (?, ?, ?, ?, ?, 0, NULL)",
     );
     (mail.attachments ?? []).forEach((a, i) => insertAttachment.run(`${message.id}/a${i}`, message.id, a.filename, a.mimeType, a.size));
+  }
+
+  async setSignature(accountId: string, html: string | null): Promise<void> {
+    this.db.prepare("UPDATE account SET signatureHtml = ? WHERE id = ?").run(normalizeSignature(html), accountId);
   }
 
   // --- Adressvorschläge ---

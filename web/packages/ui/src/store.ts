@@ -221,7 +221,7 @@ export class BrowserStore {
     }
     const ownAddresses = Object.values(state.accountsById).map((a) => a.email);
     const thread = original ? threadFor(state, original) : [];
-    this.#set({ compose: prepareCompose(mode, { account, original, thread, ownAddresses, labels }) });
+    this.#set({ compose: prepareCompose(mode, { account, original, thread, ownAddresses, labels, signatureHtml: account.signatureHtml }) });
   }
 
   closeCompose(): void {
@@ -241,6 +241,12 @@ export class BrowserStore {
         this.#set({ messages: replace(this.#state.messages), thread: replace(this.#state.thread) });
       }
     }
+  }
+
+  /** Signatur eines Kontos speichern (Fehler an den Dialog). */
+  async setSignature(accountId: string, html: string | null): Promise<void> {
+    await this.#repository.setSignature(accountId, html);
+    await this.loadSidebar();
   }
 
   /** Adressvorschläge für die Empfängerfelder (Fehler → keine Vorschläge, nie ein Banner). */

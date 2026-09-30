@@ -152,3 +152,19 @@ describe("Adressvorschläge ordnen", () => {
   });
 });
 
+describe("Signatur", () => {
+  const sig = "<p><strong>Bernd</strong></p><p>Tel. 0123</p>";
+  it("neue Mail: Signatur unter zwei leeren Zeilen", () => {
+    const draft = prepareCompose("new", { account: me, labels, signatureHtml: sig });
+    expect(draft.bodyHtml).toBe(`<p></p><p></p>${sig}`);
+    expect(draft.bodyText).toBe("\n\nBernd\nTel. 0123");
+  });
+
+  it("Antwort: Signatur über dem Zitat; leere Signatur zählt nicht", () => {
+    const draft = prepareCompose("reply", { account: me, original: message(), labels, signatureHtml: sig });
+    expect(draft.bodyHtml).toBe(`<p></p><p></p>${sig}<p></p><p>Anna schrieb:</p><blockquote><p>Kommst du?</p><blockquote><p>alte Zeile</p></blockquote></blockquote>`);
+    expect(draft.bodyText).toBe("\n\nBernd\nTel. 0123\n\nAnna schrieb:\n> Kommst du?\n>> alte Zeile\n");
+    expect(prepareCompose("new", { account: me, labels, signatureHtml: "<p></p><p> </p>" }).bodyHtml).toBeUndefined();
+  });
+});
+

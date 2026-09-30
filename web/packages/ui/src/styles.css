@@ -1469,3 +1469,49 @@ button.attachment-open:hover {
 .address-suggestions strong {
   font-weight: 600;
 }
+
+/* Signatur */
+
+.options-dialog {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.signature-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dialog .signature-account {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.signature-box {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.signature-box .composer-body {
+  min-height: 90px;
+  max-height: 180px;
+}
+
+.signature-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.signature-actions .primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--fg-on-accent);
+  border-radius: 6px;
+  padding: 6px 14px;
+}

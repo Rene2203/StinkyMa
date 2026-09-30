@@ -1,6 +1,9 @@
-import { ImageDown, Plus, X } from "lucide-react";
+import { ImageDown, PenLine, Plus, X } from "lucide-react";
 import { normalizeRemoteContentException } from "@stinkyma/core";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+
+// Der Signatur-Editor braucht den großen Editor-Baustein – erst laden, wenn die Optionen offen sind.
+const SignatureEditor = lazy(() => import("./SignatureEditor.js"));
 import { useBrowserState, useUi } from "../context.js";
 
 /** Dialog „Optionen“. Erster Bereich: Absender, deren externe Inhalte sofort geladen werden. */
@@ -108,6 +111,16 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
               ))}
             </ul>
           )}
+        </section>
+
+        <section className="options-section" aria-labelledby="options-signature-heading">
+          <h3 id="options-signature-heading">
+            <PenLine size={16} aria-hidden="true" /> {t("signature.title")}
+          </h3>
+          <p className="hint">{t("signature.text")}</p>
+          <Suspense fallback={null}>
+            <SignatureEditor />
+          </Suspense>
         </section>
 
         <footer className="dialog-footer">

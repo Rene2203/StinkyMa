@@ -230,3 +230,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   (Combobox, Tastatur). Nebenbei behoben: Enter in einem Feld hat die Mail sofort gesendet. Tests: Rangfolge,
   Vertragstests (inkl. Sonderzeichen %), Token-Logik, E2E (Jonas nach Antwort oben, Enter übernimmt, Esc).
   Lokal alle Tests + 3 E2E grün. **Ungeprüft:** Tempo bei sehr großen Postfächern (> 50 000 Mails) auf schwacher Hardware.
+- **W3 Teil 2, Baustein 4 – Signatur:** Spalte `account.signatureHtml` (v7), `setSignature`, Einfügen in
+  `prepareCompose` (neu/Antwort/Weiterleiten), Bereich in den Optionen (Editor wird nachgeladen). Tests: Einfügen und
+  Leerzeilen, leere Signatur = keine, Vertragstest, E2E (Signatur mit Fett speichern → steht in neuer Mail).
+  **Bekannte Lücke:** Wechselt man im Mail-Fenster das Absender-Konto, bleibt die Signatur des zuerst gewählten Kontos.

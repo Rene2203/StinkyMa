@@ -77,10 +77,25 @@ export function prepareCompose(
     thread?: Message[];
     ownAddresses?: string[];
     labels: ComposeLabels;
+    /** Signatur des Kontos (HTML); steht unter dem eigenen Text, über einem Zitat. */
+    signatureHtml?: string | null;
   },
 ): ComposeDraft {
   const { account, original, labels } = options;
-  const empty: ComposeDraft = { mode: "new", accountId: account.id, to: [], cc: [], bcc: [], subject: "", bodyText: "" };
+  const signature = normalizeSignature(options.signatureHtml ?? null);
+  const signatureHtml = signature ? `<p></p>${signature}` : "";
+  // Text vor Zitat/Weiterleitung: zwei Leerzeilen zum Schreiben, ggf. die Signatur
+  const leadText = signature ? `\n\n${plainFromHtml(signature)}\n\n` : "\n\n";
+  const empty: ComposeDraft = {
+    mode: "new",
+    accountId: account.id,
+    to: [],
+    cc: [],
+    bcc: [],
+    subject: "",
+    bodyText: signature ? `\n\n${plainFromHtml(signature)}` : "",
+    ...(signature ? { bodyHtml: `<p></p>${signatureHtml}` } : {}),
+  };
   if (mode === "new" || !original) return empty;
 
   const body = original.bodyText ?? original.snippet;
@@ -90,8 +105,8 @@ export function prepareCompose(
       mode,
       accountId: original.accountId,
       subject: forwardSubject(original.subject),
-      bodyText: `\n\n${labels.forwardHeader(original)}\n\n${body.replace(/\n+$/, "")}\n`,
-      bodyHtml: `<p></p><p></p>${textToHtml(labels.forwardHeader(original))}<p></p>${textToHtml(body)}`,
+      bodyText: `${leadText}${labels.forwardHeader(original)}\n\n${body.replace(/\n+$/, "")}\n`,
+      bodyHtml: `<p></p>${signatureHtml}<p></p>${textToHtml(labels.forwardHeader(original))}<p></p>${textToHtml(body)}`,
     };
   }
 
@@ -119,8 +134,8 @@ export function prepareCompose(
     to,
     cc,
     subject: replySubject(original.subject),
-    bodyText: `\n\n${labels.wrote(original)}\n${quoteText(body)}\n`,
-    bodyHtml: `<p></p><p></p>${textToHtml(labels.wrote(original))}<blockquote>${textToHtml(body)}</blockquote>`,
+    bodyText: `${leadText}${labels.wrote(original)}\n${quoteText(body)}\n`,
+    bodyHtml: `<p></p>${signatureHtml}<p></p>${textToHtml(labels.wrote(original))}<blockquote>${textToHtml(body)}</blockquote>`,
     inReplyTo: original.messageId ?? null,
     references,
     answeredMessageId: original.id,
@@ -321,4 +336,25 @@ export function rankContacts(contacts: ContactUsage[], options: { query: string;
     .sort((a, b) => b.score - a.score || b.c.last.localeCompare(a.c.last))
     .slice(0, options.limit)
     .map(({ c }) => ({ name: c.name, address: c.address }));
+}
+
+/** Leere Signaturen (nur leere Absätze) gelten als „keine Signatur“. */
+export function normalizeSignature(html: string | null): string | null {
+  if (!html) return null;
+  const text = plainFromHtml(html).trim();
+  return text ? html.trim() : null;
+}
+
+/** Einfacher Text aus Editor-HTML (plattformneutral, ohne Parser-Bibliothek): Absätze → Zeilen. */
+export function plainFromHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|blockquote|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\n+$/, "");
 }

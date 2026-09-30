@@ -33,6 +33,8 @@ export interface Account {
   lastSyncAt?: string | null;
   /** Letzter Fehler beim Abgleich (für die Anzeige), `null` = alles gut. */
   syncError?: string | null;
+  /** Signatur (HTML-Fragment aus dem Editor), wird unter neue Mails und Antworten gesetzt. */
+  signatureHtml?: string | null;
 }
 
 /** Beispielkonten (Mock-Daten) erkennt man an diesem Präfix. */

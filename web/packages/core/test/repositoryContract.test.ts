@@ -211,5 +211,13 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
     expect(await repo.suggestAddresses("%", 5)).toEqual([]);
     expect((await repo.suggestAddresses("example", 3)).length).toBeLessThanOrEqual(3);
   });
+
+  it("Signatur setzen und wieder entfernen", async () => {
+    const repo = make();
+    await repo.setSignature(MockIds.iCloud, "<p>Viele Grüße</p>");
+    expect((await repo.accounts()).find((a) => a.id === MockIds.iCloud)?.signatureHtml).toBe("<p>Viele Grüße</p>");
+    await repo.setSignature(MockIds.iCloud, "<p></p>");
+    expect((await repo.accounts()).find((a) => a.id === MockIds.iCloud)?.signatureHtml ?? null).toBeNull();
+  });
 });
 

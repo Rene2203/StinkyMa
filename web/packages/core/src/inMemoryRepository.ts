@@ -3,7 +3,7 @@ import { MessageFlag, mailboxRoleRank } from "./models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
 import { requireRemoteContentException } from "./remoteContent.js";
-import { draftFromMessage, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "./compose.js";
+import { normalizeSignature, draftFromMessage, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "./compose.js";
 
 /** `MailRepository` im Arbeitsspeicher – für UI-Tests und Vorschauen, ohne Datenbank. */
 export class InMemoryMailRepository implements MailRepository {
@@ -165,6 +165,11 @@ export class InMemoryMailRepository implements MailRepository {
     const draft: ComposeDraft = { ...draftFromMessage(message), draftId: id };
     this.#drafts.set(id, { draft, messageId });
     return draft;
+  }
+
+  async setSignature(accountId: string, html: string | null): Promise<void> {
+    const account = this.#data.accounts.find((a) => a.id === accountId);
+    if (account) account.signatureHtml = normalizeSignature(html);
   }
 
   async suggestAddresses(query: string, limit: number): Promise<EmailAddress[]> {

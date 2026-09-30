@@ -17,6 +17,8 @@
 - **Adressvorschläge** in An/Cc/Bcc: passend zu Name oder Adresse; wem man geschrieben hat, steht oben (5-fach),
   dann Absender empfangener Mails, bei Gleichstand der zuletzt genutzte. ↑/↓, Enter/Tab übernimmt, Esc schließt nur
   die Liste. Eigene Adressen werden nicht vorgeschlagen. Enter in einem Feld sendet nicht mehr (nur Knopf/Strg+Enter).
+- **Signatur pro Konto** in den Optionen (mit demselben Editor, formatierbar). Steht unter neuen Mails, Antworten
+  und Weiterleitungen – bei Antworten über dem Zitat. Migration `v7-account-signature`.
 
 ## W3 (Teil 1) – Mails schreiben und senden
 
