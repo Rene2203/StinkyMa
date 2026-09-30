@@ -33,8 +33,8 @@ export async function buildMessage(mail: OutgoingMail, options: { from: EmailAdd
     bcc: mail.bcc.map(address),
     subject: mail.subject,
     // Formatierte Mails: HTML plus daraus erzeugte Nur-Text-Fassung (multipart/alternative).
-    text: mail.bodyHtml ? plainTextFromEditorHtml(mail.bodyHtml) : mail.bodyText,
-    html: mail.bodyHtml ? emailHtml(mail.bodyHtml) : undefined,
+    text: (mail.bodyHtml ? plainTextFromEditorHtml(mail.bodyHtml) : mail.bodyText) + (mail.forwardedText ? `\n${mail.forwardedText}` : ""),
+    html: mail.bodyHtml ? emailHtml(mail.bodyHtml, mail.forwardedHtml) : undefined,
     messageId: options.messageId,
     date: options.date,
     inReplyTo: mail.inReplyTo ?? undefined,

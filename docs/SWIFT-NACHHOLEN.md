@@ -19,6 +19,7 @@ unten abarbeiten.
 | 30.09.2026 | Ausnahmeliste für externe Inhalte (Adresse/Domain, Subdomains) + Repository-Methoden | `web/packages/core/src/remoteContent.ts`, `repository.ts` |
 | 30.09.2026 | Optionen-Dialog, „Externe Inhalte laden“ pro Mail | `web/packages/ui/src/components/OptionsDialog.tsx`, `SafeHtml.tsx` |
 | 30.09.2026 | Migration `v5-outbox`: Tabelle `outbox` (Postausgang, siehe schema.ts) | `web/packages/core/src/sqlite/schema.ts` |
+| 30.09.2026 | Weiterleiten mit Original-HTML und Original-Anhängen | `core/src/compose.ts` (`prepareCompose`, `emailHtml`), `mailService.send` |
 | 30.09.2026 | Migration `v7-account-signature` (`account.signatureHtml`), Signatur beim Schreiben | `core/src/sqlite/schema.ts`, `core/src/compose.ts` |
 | 30.09.2026 | Adressvorschläge (`suggestAddresses`, `rankContacts`) | `core/src/sqlite/repository.ts`, `core/src/compose.ts` |
 | 30.09.2026 | Migration `v6-drafts` (Tabelle `draft`), Entwürfe mit Server-Abgleich | `core/src/sqlite/schema.ts`, `mail/mailService.ts` (`#flushDrafts`) |

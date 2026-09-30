@@ -1,4 +1,4 @@
-import type { Account, EmailAddress, Message } from "./models.js";
+import type { Account, Attachment, EmailAddress, Message } from "./models.js";
 import type { OutgoingAttachment } from "./files.js";
 
 // Mails schreiben: Antworten, Allen antworten, Weiterleiten. Plattformneutral (kein Node, kein DOM),
@@ -27,6 +27,19 @@ export interface OutgoingMail {
   answeredMessageId?: string | null;
   /** Entwurf, aus dem diese Mail entstanden ist – wird nach dem Senden gelöscht. */
   draftId?: string | null;
+  /** Weiterleiten: Original-HTML, bleibt außerhalb des Editors (Layout erhalten) und wird unten angehängt. */
+  forwardedHtml?: string | null;
+  /** Weiterleiten: Originaltext für die Nur-Text-Fassung. */
+  forwardedText?: string | null;
+  /** Anhänge der Originalmail, die mitgehen; der Inhalt wird erst beim Senden vom Server geholt. */
+  forwardAttachments?: ForwardAttachment[];
+}
+
+export interface ForwardAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
 }
 
 /** Vorbelegung des Composers. */
@@ -79,6 +92,8 @@ export function prepareCompose(
     labels: ComposeLabels;
     /** Signatur des Kontos (HTML); steht unter dem eigenen Text, über einem Zitat. */
     signatureHtml?: string | null;
+    /** Anhänge der Originalmail (für Weiterleiten). */
+    attachments?: Attachment[];
   },
 ): ComposeDraft {
   const { account, original, labels } = options;
@@ -106,7 +121,15 @@ export function prepareCompose(
       accountId: original.accountId,
       subject: forwardSubject(original.subject),
       bodyText: `${leadText}${labels.forwardHeader(original)}\n\n${body.replace(/\n+$/, "")}\n`,
-      bodyHtml: `<p></p>${signatureHtml}<p></p>${textToHtml(labels.forwardHeader(original))}<p></p>${textToHtml(body)}`,
+      // HTML-Mails: Original bleibt unverändert außerhalb des Editors; Textmails kommen als Text in den Editor.
+      bodyHtml: original.bodyHtml
+        ? `<p></p>${signatureHtml}<p></p>${textToHtml(labels.forwardHeader(original))}`
+        : `<p></p>${signatureHtml}<p></p>${textToHtml(labels.forwardHeader(original))}<p></p>${textToHtml(body)}`,
+      forwardedHtml: original.bodyHtml ? bodyContent(original.bodyHtml) : null,
+      forwardedText: original.bodyHtml ? body : null,
+      forwardAttachments: (options.attachments ?? [])
+        .filter((a) => !a.isInline)
+        .map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size })),
     };
   }
 
@@ -169,7 +192,7 @@ export const defaultMailFont = { family: "Arial, Helvetica, sans-serif", size: "
  * Macht aus dem Editor-HTML eine versandfertige HTML-Mail: Stile inline (Mailprogramme ignorieren <style>
  * oft), Absätze ohne Abstand wie in Outlook/Apple Mail, leere Zeilen bleiben sichtbar, Zitate mit Linie.
  */
-export function emailHtml(fragment: string): string {
+export function emailHtml(fragment: string, forwardedHtml?: string | null): string {
   const body = fragment
     .replace(/<p([^>]*)><\/p>/g, "<p$1><br></p>")
     .replace(/<p(?![^>]*style=)([^>]*)>/g, '<p style="margin:0"$1>')
@@ -178,7 +201,9 @@ export function emailHtml(fragment: string): string {
     .replace(/<blockquote>/g, '<blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #c8c8c8;padding-left:1ex;color:#555">')
     .replace(/<ul>/g, '<ul style="margin:0;padding-left:1.6em">')
     .replace(/<ol>/g, '<ol style="margin:0;padding-left:1.6em">');
-  return `<!doctype html><html><head><meta charset="utf-8"></head><body><div style="font-family:${defaultMailFont.family};font-size:${defaultMailFont.size};line-height:1.4">${body}</div></body></html>`;
+  // Weitergeleitetes Original folgt unter dem eigenen Text, mit eigenem Layout (nicht in unserer Grundschrift).
+  const forwarded = forwardedHtml ? `<div>${bodyContent(forwardedHtml)}</div>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body><div style="font-family:${defaultMailFont.family};font-size:${defaultMailFont.size};line-height:1.4">${body}</div>${forwarded}</body></html>`;
 }
 
 /**
@@ -277,7 +302,7 @@ export function localSentMessage(
     date: options.date,
     snippet: text.replace(/^>.*$/gm, "").replace(/\s+/g, " ").trim().slice(0, 160),
     bodyText: text,
-    bodyHtml: mail.bodyHtml ? emailHtml(mail.bodyHtml) : null,
+    bodyHtml: mail.bodyHtml ? emailHtml(mail.bodyHtml, mail.forwardedHtml) : null,
     flags: 1, // gelesen
     hasAttachments: (mail.attachments?.length ?? 0) > 0,
   };
@@ -301,12 +326,12 @@ export function draftFromMessage(message: Message): ComposeDraft {
     bcc: [],
     subject: message.subject,
     bodyText: message.bodyText ?? message.snippet,
-    bodyHtml: message.bodyHtml ? htmlBodyContent(message.bodyHtml) : null,
+    bodyHtml: message.bodyHtml ? bodyContent(message.bodyHtml) : null,
   };
 }
 
-/** Inhalt von <body> (ohne Kopf, Stile und Skripte) – für den Editor. */
-function htmlBodyContent(html: string): string {
+/** Inhalt von <body> (ohne Kopf, Stile und Skripte). Keine vollständige Bereinigung – das macht die Oberfläche. */
+export function bodyContent(html: string): string {
   const body = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html)?.[1] ?? html;
   return body.replace(/<(script|style|head)[^>]*>[\s\S]*?<\/\1>/gi, "");
 }

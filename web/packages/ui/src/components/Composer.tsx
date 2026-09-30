@@ -1,4 +1,4 @@
-import { Paperclip, Send, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Paperclip, Send, X } from "lucide-react";
 import {
   attachmentLimitBytes,
   attachmentWarningBytes,
@@ -7,6 +7,7 @@ import {
   textToHtml,
   type ComposeDraft,
   type EmailAddress,
+  type ForwardAttachment,
   type OutgoingAttachment,
 } from "@stinkyma/core";
 import { formatBytes } from "../format.js";
@@ -14,6 +15,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import { useBrowserState, useUi } from "../context.js";
 import { RichTextEditor } from "./RichTextEditor.js";
 import { AddressInput } from "./AddressInput.js";
+import { SafeHtml } from "./SafeHtml.js";
+import { sanitizeEmailHtml } from "../sanitize.js";
 
 const titles = { new: "compose.new", reply: "compose.reply", replyAll: "compose.replyAll", forward: "compose.forward" } as const;
 
@@ -39,9 +42,12 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
   const [attachments, setAttachments] = useState<OutgoingAttachment[]>(draft.attachments ?? []);
+  // Weiterleiten: Anhänge der Originalmail (Inhalt kommt beim Senden vom Server) und Vorschau des Originals
+  const [forwardAttachments, setForwardAttachments] = useState<ForwardAttachment[]>(draft.forwardAttachments ?? []);
+  const [showForwarded, setShowForwarded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const totalSize = attachments.reduce((sum, a) => sum + a.size, 0);
+  const totalSize = attachments.reduce((sum, a) => sum + a.size, 0) + forwardAttachments.reduce((sum, a) => sum + a.size, 0);
   const dialog = useRef<HTMLDialogElement>(null);
   const toField = useRef<HTMLInputElement>(null);
   const isReply = draft.mode === "reply" || draft.mode === "replyAll";
@@ -68,8 +74,11 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
     references: draft.references ?? [],
     answeredMessageId: draft.answeredMessageId ?? null,
     draftId: draftIdRef.current,
+    forwardedHtml: draft.forwardedHtml ?? null,
+    forwardedText: draft.forwardedText ?? null,
+    forwardAttachments,
   });
-  const snapshotKey = JSON.stringify([accountId, to, cc, bcc, subject, body.html, attachments.map((a) => [a.filename, a.size])]);
+  const snapshotKey = JSON.stringify([accountId, to, cc, bcc, subject, body.html, attachments.map((a) => [a.filename, a.size]), forwardAttachments.map((a) => a.id)]);
   const savedKey = useRef(snapshotKey);
   const dirty = snapshotKey !== savedKey.current;
 
@@ -179,6 +188,10 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
         references: draft.references ?? [],
         answeredMessageId: draft.answeredMessageId ?? null,
         draftId: draftIdRef.current,
+        // Original bereinigt (keine Skripte/Formulare); externe Bilder bleiben für den Empfänger erhalten.
+        forwardedHtml: draft.forwardedHtml ? sanitizeEmailHtml(draft.forwardedHtml, { allowRemote: true }).html : null,
+        forwardedText: draft.forwardedText ?? null,
+        forwardAttachments,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e));
@@ -293,8 +306,31 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
           onChange={setBody}
         />
 
-        {attachments.length > 0 && (
+        {draft.forwardedHtml && (
+          <div className="forwarded-original">
+            <button type="button" className="disclosure" aria-expanded={showForwarded} onClick={() => setShowForwarded(!showForwarded)}>
+              {showForwarded ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {t("forward.original")}
+            </button>
+            {showForwarded && <SafeHtml html={draft.forwardedHtml} sender="" remoteActions={false} />}
+          </div>
+        )}
+        {attachments.length + forwardAttachments.length > 0 && (
           <ul className="composer-attachments" aria-label={t("attachment.add")}>
+            {forwardAttachments.map((a) => (
+              <li key={a.id} className="composer-attachment" data-testid="compose-attachment" title={t("forward.attachmentHint")}>
+                <Paperclip size={13} aria-hidden="true" />
+                <span className="name">{a.filename}</span>
+                <span className="muted">{formatBytes(a.size, locale)}</span>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t("attachment.remove", { name: a.filename })}
+                  onClick={() => setForwardAttachments((current) => current.filter((x) => x.id !== a.id))}
+                >
+                  <X size={12} />
+                </button>
+              </li>
+            ))}
             {attachments.map((a, i) => (
               <li key={`${a.filename}-${i}`} className="composer-attachment" data-testid="compose-attachment">
                 <Paperclip size={13} aria-hidden="true" />

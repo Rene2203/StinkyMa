@@ -221,7 +221,10 @@ export class BrowserStore {
     }
     const ownAddresses = Object.values(state.accountsById).map((a) => a.email);
     const thread = original ? threadFor(state, original) : [];
-    this.#set({ compose: prepareCompose(mode, { account, original, thread, ownAddresses, labels, signatureHtml: account.signatureHtml }) });
+    const attachments = original ? (state.attachmentsByMessageId[original.id] ?? []) : [];
+    this.#set({
+      compose: prepareCompose(mode, { account, original, thread, ownAddresses, labels, signatureHtml: account.signatureHtml, attachments }),
+    });
   }
 
   closeCompose(): void {

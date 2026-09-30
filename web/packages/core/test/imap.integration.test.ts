@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ImapFlow } from "imapflow";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createMockData, InMemorySecretStore, isDemoAccount, isRead, SecretKeys } from "../src/index.js";
-import { MailService, type AccountSettings } from "../src/mail/index.js";
+import { extractAttachment, MailService, parseMessage, type AccountSettings } from "../src/mail/index.js";
 import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
 import { sampleReply } from "./fixtures.js";
 
@@ -409,6 +409,41 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     await service.flushNow(account.id);
     const status = await admin.status("Drafts", { messages: true });
     expect(status && status.messages).toBe(1); // alte Fassung vom iPhone ersetzt
+  });
+
+  it("Weiterleiten: Anhang der Originalmail wird vom Server geholt und mitgesendet, Layout bleibt", async () => {
+    const boundary = "fwd42";
+    await admin.append(
+      "INBOX",
+      [
+        "From: Stadtwerke <rechnung@stadtwerke.example>", `To: ${user}`, "Subject: Abrechnung", `Date: ${now.toUTCString()}`,
+        "Message-ID: <fwd1@stadtwerke.example>", "MIME-Version: 1.0", `Content-Type: multipart/mixed; boundary="${boundary}"`, "",
+        `--${boundary}`, "Content-Type: text/html; charset=utf-8", "", "<table><tr><td>Betrag 86 EUR</td></tr></table>",
+        `--${boundary}`, 'Content-Type: application/pdf; name="Abrechnung.pdf"', 'Content-Disposition: attachment; filename="Abrechnung.pdf"',
+        "Content-Transfer-Encoding: base64", "", Buffer.from("%PDF Abrechnung").toString("base64"),
+        `--${boundary}--`, "",
+      ].join("\r\n"),
+      [],
+      now,
+    );
+    const account = await addAndSync();
+    const original = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Abrechnung")!;
+    const [attachment] = await service.attachments(original.id);
+    const to = `fwd-${randomUUID().slice(0, 8)}@example.test`;
+    await service.send({
+      accountId: account.id, to: [{ address: to }], cc: [], bcc: [], subject: "Fwd: Abrechnung",
+      bodyText: "Zur Info", bodyHtml: "<p>Zur Info</p>",
+      forwardedHtml: "<table><tr><td>Betrag 86 EUR</td></tr></table>", forwardedText: "Betrag 86 EUR",
+      forwardAttachments: [{ id: attachment!.id, filename: attachment!.filename, mimeType: attachment!.mimeType, size: attachment!.size }],
+    });
+    await service.flushNow(account.id);
+    const source = await receivedBy(to, "Fwd: Abrechnung");
+    const parsed = await parseMessage(source!);
+    expect(parsed.bodyHtml).toContain("<table><tr><td>Betrag 86 EUR</td></tr></table>");
+    expect(parsed.bodyText).toContain("Zur Info");
+    expect(parsed.bodyText).toContain("Betrag 86 EUR");
+    expect(parsed.attachments.map((a) => a.filename)).toEqual(["Abrechnung.pdf"]);
+    expect((await extractAttachment(source!, 0))?.content.toString("utf8")).toBe("%PDF Abrechnung");
   });
 });
 

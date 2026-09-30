@@ -1515,3 +1515,21 @@ button.attachment-open:hover {
   border-radius: 6px;
   padding: 6px 14px;
 }
+
+/* Weiterleiten: Original-Vorschau */
+
+.forwarded-original {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.forwarded-original .disclosure {
+  font-size: 13px;
+}
+
+.forwarded-original .safe-html {
+  margin-top: 8px;
+}

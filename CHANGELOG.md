@@ -19,6 +19,9 @@
   die Liste. Eigene Adressen werden nicht vorgeschlagen. Enter in einem Feld sendet nicht mehr (nur Knopf/Strg+Enter).
 - **Signatur pro Konto** in den Optionen (mit demselben Editor, formatierbar). Steht unter neuen Mails, Antworten
   und Weiterleitungen – bei Antworten über dem Zitat. Migration `v7-account-signature`.
+- **Weiterleiten mit Original-Layout:** Bei HTML-Mails bleibt das Original außerhalb des Editors und wird unverändert
+  (bereinigt: ohne Skripte/Formulare) unter den eigenen Text gehängt; Vorschau im Mail-Fenster. Anhänge der
+  Originalmail gehen mit (einzeln abwählbar) und werden erst beim Senden vom Server geholt.
 
 ## W3 (Teil 1) – Mails schreiben und senden
 

@@ -101,6 +101,20 @@ export class MailService implements MailRepository, AccountsApi {
       this.options.onChange?.();
       return;
     }
+    // Weiterleiten: Anhänge der Originalmail jetzt vom Server holen und fest anhängen.
+    if (mail.forwardAttachments?.length) {
+      const loaded = [];
+      for (const a of mail.forwardAttachments) {
+        try {
+          const content = await this.attachmentContent(a.id);
+          loaded.push({ filename: content.filename, mimeType: content.mimeType, size: content.content.length, contentBase64: content.content.toString("base64") });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(`Der Anhang „${a.filename}“ der weitergeleiteten Mail konnte nicht geladen werden (${reason}). Ohne ihn senden: im Mail-Fenster entfernen.`);
+        }
+      }
+      mail = { ...mail, attachments: [...(mail.attachments ?? []), ...loaded], forwardAttachments: [] };
+    }
     const now = this.#now();
     const domain = account.email.split("@")[1] ?? "stinkyma.local";
     const built = await buildMessage(mail, {

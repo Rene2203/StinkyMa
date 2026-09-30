@@ -168,3 +168,30 @@ describe("Signatur", () => {
   });
 });
 
+describe("Weiterleiten mit Original-Layout", () => {
+  const html = '<html><head><style>p{color:red}</style></head><body><table><tr><td>Rechnung</td></tr></table></body></html>';
+  const attachments = [
+    { id: "m2/a0", messageId: "m2", filename: "Rechnung.pdf", mimeType: "application/pdf", size: 1200, isInline: false, isEncrypted: false, analysisStatus: "pending" as const, riskFlags: 0 },
+    { id: "m2/a1", messageId: "m2", filename: "logo.png", mimeType: "image/png", size: 300, isInline: true, isEncrypted: false, analysisStatus: "pending" as const, riskFlags: 0 },
+  ];
+
+  it("HTML-Original bleibt außerhalb des Editors, Anhänge (ohne eingebettete Bilder) gehen mit", () => {
+    const draft = prepareCompose("forward", { account: me, original: message({ bodyHtml: html }), labels, attachments });
+    expect(draft.bodyHtml).not.toContain("<table>");
+    expect(draft.forwardedHtml).toBe("<table><tr><td>Rechnung</td></tr></table>");
+    expect(draft.forwardedText).toContain("Kommst du?");
+    expect(draft.forwardAttachments).toEqual([{ id: "m2/a0", filename: "Rechnung.pdf", mimeType: "application/pdf", size: 1200 }]);
+  });
+
+  it("Textmail: Original kommt als Text in den Editor", () => {
+    const draft = prepareCompose("forward", { account: me, original: message(), labels });
+    expect(draft.forwardedHtml).toBeNull();
+    expect(draft.bodyHtml).toContain("<p>Kommst du?</p>");
+  });
+
+  it("versandfertig: Original unter dem eigenen Text, nicht in der Grundschrift", () => {
+    const out = emailHtml("<p>Siehe unten</p>", "<table><tr><td>Rechnung</td></tr></table>");
+    expect(out).toMatch(/<div style="font-family:[^"]*"><p style="margin:0">Siehe unten<\/p><\/div><div><table>/);
+  });
+});
+

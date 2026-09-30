@@ -384,6 +384,53 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect(composer).toHaveCount(0);
   });
 
+  const receivedBy = async (address: string, subject: string) => {
+    const client = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: address, pass: "x" }, logger: false });
+    await client.connect();
+    let source: Buffer | undefined;
+    await client.mailboxOpen("INBOX");
+    for await (const msg of client.fetch("1:*", { envelope: true, source: true })) {
+      if (msg.envelope?.subject === subject) source = msg.source;
+    }
+    await client.logout();
+    return source ? simpleParser(source) : null;
+  };
+
+  await test.step("Weiterleiten: HTML-Layout bleibt (ohne Skript), Anhänge der Originalmail gehen mit – einzeln abwählbar", async () => {
+    await page.locator(".sidebar").getByRole("button", { name: /^Archiv/ }).click(); // wurde weiter oben archiviert
+    await page.getByText("Ihre Rechnung als HTML").click();
+    await page.getByTestId("action-forward").click();
+    const composer = page.getByTestId("composer");
+    await composer.getByRole("button", { name: /Weitergeleitete Nachricht/ }).click();
+    await expect(composer.frameLocator("iframe[title='E-Mail']").getByRole("heading", { name: "Ihre Rechnung" })).toBeVisible();
+    await composer.getByTestId("compose-to").fill("kasse@example.test");
+    await page.screenshot({ path: join(screenshotDir, "15-Weiterleiten.png") });
+    await composer.getByTestId("compose-send").click();
+    await expect(composer).toHaveCount(0, { timeout: 5_000 });
+    let html = "";
+    await expect.poll(async () => {
+      html = String((await receivedBy("kasse@example.test", "Fwd: Ihre Rechnung als HTML"))?.html ?? "");
+      return html;
+    }, { timeout: 15_000 }).toContain("Ihre Rechnung</h1>");
+    expect(html).toContain("Zum Kundenkonto");
+    expect(html).not.toMatch(/<script/i);
+
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    await page.getByText("Unterlagen", { exact: true }).click();
+    await page.keyboard.press("f");
+    await expect(composer.getByTestId("compose-attachment")).toHaveCount(2);
+    await composer.getByRole("button", { name: "setup.exe entfernen" }).click();
+    await expect(composer.getByTestId("compose-attachment")).toHaveCount(1);
+    await composer.getByTestId("compose-to").fill("archiv@example.test");
+    await composer.getByTestId("compose-send").click();
+    await expect(composer).toHaveCount(0, { timeout: 5_000 });
+    await expect.poll(async () => (await receivedBy("archiv@example.test", "Fwd: Unterlagen"))?.attachments.map((a) => a.filename) ?? [], { timeout: 15_000 })
+      .toEqual(["Vertrag.pdf"]);
+    const forwarded = await receivedBy("archiv@example.test", "Fwd: Unterlagen");
+    expect(forwarded?.attachments[0]?.content.toString("utf8")).toBe("%PDF-1.4 Vertrag");
+    expect(forwarded?.text).toContain("Anbei die Unterlagen.");
+  });
+
   await test.step("Abruf per Knopf", async () => {
     await page.getByTestId("sync-now").click();
     await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });

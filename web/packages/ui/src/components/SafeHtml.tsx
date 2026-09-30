@@ -8,7 +8,7 @@ import { emailDocument, sanitizeEmailHtml } from "../sanitize.js";
  * HTML-Mail in einem Sandbox-Frame: Skripte sind abgeschaltet (kein allow-scripts), Links öffnen im Browser.
  * allow-same-origin ohne allow-scripts ist unbedenklich und erlaubt, die Höhe des Inhalts zu messen.
  */
-export function SafeHtml({ html, sender }: { html: string; sender: string }) {
+export function SafeHtml({ html, sender, remoteActions = true }: { html: string; sender: string; remoteActions?: boolean }) {
   const { store, t } = useUi();
   const { remoteContentExceptions } = useBrowserState();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -49,9 +49,11 @@ export function SafeHtml({ html, sender }: { html: string; sender: string }) {
             <button type="button" className="link-button" onClick={() => setLoadedByClick(true)}>
               <ImageDown size={14} aria-hidden="true" /> {t("html.loadRemote")}
             </button>
-            <button type="button" className="link-button" data-testid="remote-always" onClick={() => store.openOptions(senderDomain(sender))}>
-              {t("html.always")}
-            </button>
+            {remoteActions && (
+              <button type="button" className="link-button" data-testid="remote-always" onClick={() => store.openOptions(senderDomain(sender))}>
+                {t("html.always")}
+              </button>
+            )}
           </span>
         </p>
       )}

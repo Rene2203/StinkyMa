@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W3 Teil 2 – Entwürfe, Anhänge, Adressvorschläge, Signatur, Weiterleiten (in Arbeit; Nutzer testet später gesammelt)
+**Aktuelle Phase:** W3 Teil 2 fertig (lokal geprüft) – Test durch den Nutzer mit iCloud steht aus; danach OAuth-Frage (Gmail/Outlook) bzw. W4
 
 ## Überblick
 
@@ -234,3 +234,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   `prepareCompose` (neu/Antwort/Weiterleiten), Bereich in den Optionen (Editor wird nachgeladen). Tests: Einfügen und
   Leerzeilen, leere Signatur = keine, Vertragstest, E2E (Signatur mit Fett speichern → steht in neuer Mail).
   **Bekannte Lücke:** Wechselt man im Mail-Fenster das Absender-Konto, bleibt die Signatur des zuerst gewählten Kontos.
+- **W3 Teil 2, Baustein 5 – Weiterleiten:** `forwardedHtml`/`forwardedText`/`forwardAttachments` in OutgoingMail,
+  `emailHtml` hängt das Original an, MailService holt Original-Anhänge beim Senden (`attachmentContent`), Oberfläche
+  bereinigt das Original mit DOMPurify (externe Bilder bleiben für den Empfänger). Tests: Vorbelegung, Versand-HTML,
+  GreenMail (Layout + PDF kommen an), E2E (HTML-Rechnung ohne Skript, „Unterlagen“ mit PDF, .exe abgewählt).
+  **W3 Teil 2 damit komplett.** Lokal 178 Tests + 3 E2E grün. **Ungeprüft:** alles mit echtem iCloud-Konto;
+  Weiterleiten ohne Internet (Original-Anhänge nicht ladbar → Hinweis im Mail-Fenster, Mail bleibt offen).
