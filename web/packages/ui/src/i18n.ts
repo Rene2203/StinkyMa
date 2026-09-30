@@ -83,6 +83,7 @@ const de = {
   "dialog.connect": "Verbinden",
   "dialog.connecting": "Verbinde …",
   "html.blocked": "Externe Inhalte wurden blockiert (Schutz vor Tracking).",
+  "html.loadRemote": "Externe Inhalte laden",
   "shortcuts.hint": "Tastatur: ↑/↓ oder J/K wechseln · E archivieren · Entf Papierkorb · S markieren · U gelesen/ungelesen",
 } as const;
 
@@ -170,6 +171,7 @@ const en: Record<MessageKey, string> = {
   "dialog.connect": "Connect",
   "dialog.connecting": "Connecting …",
   "html.blocked": "External content was blocked (tracking protection).",
+  "html.loadRemote": "Load external content",
   "shortcuts.hint": "Keyboard: ↑/↓ or J/K to move · E archive · Del trash · S flag · U read/unread",
 };
 

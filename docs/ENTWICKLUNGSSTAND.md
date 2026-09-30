@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W2.1 – Korrekturen nach dem ersten Praxistest (Windows-CI Lauf #17 grün; erneuter Test beim Nutzer steht aus)
+**Aktuelle Phase:** W2.2 – Korrekturen nach dem zweiten Praxistest (Windows-CI steht aus)
 
 ## Überblick
 
@@ -178,3 +178,11 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - **Entscheidung Nutzer: iPad/Mac zurückgestellt.** Kein paralleles Swift-Schema mehr (maßgeblich: `schema.ts`),
   Apple-CI nur noch von Hand, Nachhol-Liste in `docs/SWIFT-NACHHOLEN.md`. Der UI-Test-Fix aus Lauf #13 bleibt
   eingecheckt, aber ungeprüft.
+- **Nutzer-Test W2.1:** Speicherproblem gemeldet – laut Screenshot Windows-Dienste (CDPUserSvc, Explorer) und
+  PowerToys, StinkyMa nicht darunter. Kein Handlungsbedarf in der App; Nutzer prüft StinkyMa separat.
+- **W2.2:** (1) „Ungelesen“: geöffnete Mail verschwand durch Neuladen nach `mail:changed` → bleibt jetzt bis zum
+  Auswahlwechsel stehen (Store-Test und E2E-Schritt, beide schlagen ohne Fix nachweislich fehl). (2) Knopf
+  „Externe Inhalte laden“ pro Mail, nicht gespeichert; CSP `img-src` um `https: http:` erweitert – Schutz liegt
+  damit allein beim Säubern, das jetzt auch `<style>`-Blöcke und `@import` abdeckt (Tests). Lokal: 104 Tests
+  + 3 E2E grün. **Ungeprüft:** Windows-CI; echtes Laden externer Bilder (im Test gibt es kein Internet – geprüft
+  wird nur, dass die Adresse im Mail-Frame steht).

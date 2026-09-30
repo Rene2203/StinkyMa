@@ -2,34 +2,60 @@ import DOMPurify from "dompurify";
 
 export interface SanitizedHtml {
   html: string;
-  /** Anzahl entfernter externer Inhalte (Bilder, Hintergründe) – meist Tracking-Pixel. */
+  /** Anzahl externer Inhalte (Bilder, Hintergründe) in der Mail – meist auch Tracking-Pixel. */
+  remoteCount: number;
+  /** Davon blockiert: alle, solange der Nutzer sie nicht ausdrücklich lädt. */
   blockedRemote: number;
 }
 
+export interface SanitizeOptions {
+  /** Externe Bilder laden – nur auf ausdrücklichen Wunsch des Nutzers (Spezifikation 7.2). */
+  allowRemote?: boolean;
+}
+
 const remote = /^\s*(https?:)?\/\//i;
+const remoteCssUrl = /url\(\s*['"]?\s*(https?:)?\/\/[^)]*\)/gi;
+const remoteCssImport = /@import\s+(url\()?\s*['"]?\s*(https?:)?\/\/[^;]*;?/gi;
 
 /**
  * Macht HTML-Mails sicher für die Anzeige (Spezifikation 4.4 / 7.6):
  * keine Skripte, keine Formulare, keine eingebetteten Fremdseiten, externe Bilder blockiert,
  * Links öffnen außerhalb der App. Zusätzlich läuft die Anzeige in einem Sandbox-Frame ohne Skripte.
  */
-export function sanitizeEmailHtml(html: string, window: Window & typeof globalThis = globalThis.window): SanitizedHtml {
+export function sanitizeEmailHtml(
+  html: string,
+  options: SanitizeOptions = {},
+  window: Window & typeof globalThis = globalThis.window,
+): SanitizedHtml {
   const purify = DOMPurify(window);
-  let blockedRemote = 0;
+  const allowRemote = options.allowRemote ?? false;
+  let remoteCount = 0;
+
+  /** Entfernt externe Adressen aus CSS (Stil-Attribut oder <style>-Block) und zählt sie. */
+  const stripCss = (css: string): string => {
+    const withoutImports = css.replace(remoteCssImport, "");
+    const hits = (css.match(remoteCssImport)?.length ?? 0) + (withoutImports.match(remoteCssUrl)?.length ?? 0);
+    remoteCount += hits;
+    return hits === 0 || allowRemote ? css : withoutImports.replace(remoteCssUrl, "none");
+  };
+
+  purify.addHook("uponSanitizeElement", (node, data) => {
+    if (data.tagName === "style" && node.textContent) node.textContent = stripCss(node.textContent);
+  });
 
   purify.addHook("afterSanitizeAttributes", (node) => {
     const element = node as Element;
     for (const attribute of ["src", "srcset", "background", "poster"]) {
       const value = element.getAttribute?.(attribute);
       if (value && remote.test(value)) {
-        element.removeAttribute(attribute);
-        blockedRemote += 1;
+        remoteCount += 1;
+        if (!allowRemote) element.removeAttribute(attribute);
       }
     }
     const style = element.getAttribute?.("style");
-    if (style && /url\(\s*['"]?\s*(https?:)?\/\//i.test(style)) {
-      element.setAttribute("style", style.replace(/url\([^)]*\)/gi, "none"));
-      blockedRemote += 1;
+    if (style) {
+      const cleaned = stripCss(style);
+      if (cleaned !== style) element.setAttribute("style", cleaned);
     }
     if (element.tagName === "A") {
       const href = element.getAttribute("href") ?? "";
@@ -50,7 +76,7 @@ export function sanitizeEmailHtml(html: string, window: Window & typeof globalTh
   }) as unknown as string;
 
   purify.removeAllHooks();
-  return { html: clean, blockedRemote };
+  return { html: clean, remoteCount, blockedRemote: allowRemote ? 0 : remoteCount };
 }
 
 /** Vollständiges Dokument für den Sandbox-Frame. Mails erwarten meist hellen Hintergrund – daher immer hell. */

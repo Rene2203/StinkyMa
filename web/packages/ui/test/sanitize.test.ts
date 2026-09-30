@@ -34,4 +34,27 @@ describe("HTML-Mails säubern", () => {
     expect(html).toContain("color:red");
     expect(blockedRemote).toBe(0);
   });
+
+  it("blockiert externe Adressen auch in <style>-Blöcken und @import", () => {
+    const result = sanitizeEmailHtml(
+      '<p>Hallo</p><style>body{background:url("https://t.example/bg.png")} @import url(https://t.example/x.css); p{color:red}</style>',
+    );
+    expect(result.html).not.toContain("t.example");
+    expect(result.html).toContain("color:red");
+    expect(result.blockedRemote).toBe(2);
+  });
+
+  it("lädt externe Bilder nur auf Wunsch – Skripte bleiben trotzdem draußen", () => {
+    const mail = '<img src="https://bilder.example/logo.png"><div style="background:url(https://bilder.example/bg.png)">x</div><script>alert(1)</script><img src="x" onerror="alert(2)">';
+    const blocked = sanitizeEmailHtml(mail);
+    expect(blocked.html).not.toContain("bilder.example");
+    expect(blocked.remoteCount).toBe(2);
+
+    const loaded = sanitizeEmailHtml(mail, { allowRemote: true });
+    expect(loaded.html).toContain('src="https://bilder.example/logo.png"');
+    expect(loaded.html).toContain("bilder.example/bg.png");
+    expect(loaded.html).not.toMatch(/script|onerror/i);
+    expect(loaded.remoteCount).toBe(2);
+    expect(loaded.blockedRemote).toBe(0);
+  });
 });

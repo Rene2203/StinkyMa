@@ -221,9 +221,15 @@ export class BrowserStore {
     const request = ++this.#messagesRequest;
     const scope = this.#state.selectedScope;
     await this.#guard(async () => {
-      const messages = await this.#repository.messages(scope, this.pageSize);
+      let messages = await this.#repository.messages(scope, this.pageSize);
       if (request !== this.#messagesRequest) return; // überholt
       const selected = this.#state.selectedMessageId;
+      // In „Ungelesen“/„Markiert“ bleibt die geöffnete Mail stehen, auch wenn sie nicht mehr dazugehört
+      // (gerade gelesen) – sonst verschwindet sie beim Öffnen. Sie geht erst beim Wechsel der Auswahl.
+      const kept = this.#state.messages.find((m) => m.id === selected);
+      if (kept && (scope.kind === "unread" || scope.kind === "flagged") && !messages.some((m) => m.id === selected)) {
+        messages = [...messages, kept].sort((a, b) => b.date.localeCompare(a.date));
+      }
       const keepSelection = selected !== null && messages.some((m) => m.id === selected);
       this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {} }) });
     });

@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { ImageDown, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUi } from "../context.js";
 import { emailDocument, sanitizeEmailHtml } from "../sanitize.js";
@@ -11,7 +11,9 @@ export function SafeHtml({ html }: { html: string }) {
   const { t } = useUi();
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(120);
-  const sanitized = useMemo(() => sanitizeEmailHtml(html), [html]);
+  // Externe Inhalte nur auf Klick und nur für diese eine Mail (Spezifikation 7.2) – nichts wird gespeichert.
+  const [allowRemote, setAllowRemote] = useState(false);
+  const sanitized = useMemo(() => sanitizeEmailHtml(html, { allowRemote }), [html, allowRemote]);
 
   useEffect(() => {
     const iframe = frame.current;
@@ -38,6 +40,9 @@ export function SafeHtml({ html }: { html: string }) {
       {sanitized.blockedRemote > 0 && (
         <p className="blocked-note">
           <ShieldCheck size={14} aria-hidden="true" /> {t("html.blocked")}
+          <button type="button" className="link-button" onClick={() => setAllowRemote(true)}>
+            <ImageDown size={14} aria-hidden="true" /> {t("html.loadRemote")}
+          </button>
         </p>
       )}
       <iframe

@@ -110,6 +110,13 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await expect(frame.locator("img[src*='tracker']")).toHaveCount(0);
   await page.screenshot({ path: join(screenshotDir, "08-HTML-Mail.png") });
 
+  await test.step("Externe Inhalte nur auf Klick", async () => {
+    await page.getByRole("button", { name: "Externe Inhalte laden" }).click();
+    await expect(frame.locator("img[src*='tracker']")).toHaveCount(1);
+    await expect(frame.locator("script")).toHaveCount(0);
+    await expect(page.getByText("Externe Inhalte wurden blockiert")).toHaveCount(0);
+  });
+
   await test.step("Passwort liegt nicht im Klartext auf der Platte", async () => {
     // Unter Windows: DPAPI; im Linux-Test: Electrons Test-Speicher
     const secrets = readFileSync(join(dataDir, "secrets.json"), "utf8");
@@ -131,6 +138,19 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
         return status && status.messages;
       }, { timeout: 10_000 })
       .toBe(1);
+  });
+
+  await test.step("„Ungelesen“: geöffnete Mail bleibt sichtbar", async () => {
+    await page.getByTestId("sidebar-unread").click();
+    const rows = page.getByTestId("message-row");
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
+    await rows.first().click();
+    await expect(page.getByTestId("thread-subject")).toBeVisible();
+    // Das Gelesen-Setzen löst im Hauptprozess „mail:changed“ aus – danach muss die Mail noch offen sein.
+    await page.waitForTimeout(1_500);
+    await expect(page.getByTestId("thread-subject")).toBeVisible();
+    await expect(rows).toHaveCount(count);
   });
 
   await test.step("Abruf per Knopf", async () => {

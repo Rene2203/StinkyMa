@@ -45,6 +45,23 @@ describe("BrowserStore", () => {
     expect(isRead((await repo.message(unread.id))!)).toBe(true);
   });
 
+  it("„Ungelesen“: geöffnete Mail bleibt nach dem Neuladen sichtbar, andere gelesene gehen", async () => {
+    await store.selectScope({ kind: "unread" });
+    const [first, second] = store.getState().messages;
+    await store.selectMessage(first!.id);
+    await store.reload(); // wie nach „mail:changed“ vom Hauptprozess
+    let state = store.getState();
+    expect(state.selectedMessageId).toBe(first!.id);
+    expect(state.messages.some((m) => m.id === first!.id)).toBe(true);
+    expect(selectedMessage(state)).not.toBeNull();
+
+    await store.selectMessage(second!.id);
+    await store.reload();
+    state = store.getState();
+    expect(state.messages.some((m) => m.id === first!.id)).toBe(false);
+    expect(state.messages.some((m) => m.id === second!.id)).toBe(true);
+  });
+
   it("lädt Anhänge der Konversation", async () => {
     const invoice = store.getState().messages.find((m) => m.subject === "Nebenkostenabrechnung 2025")!;
     await store.selectMessage(invoice.id);

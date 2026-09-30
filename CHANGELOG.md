@@ -1,5 +1,18 @@
 # Changelog
 
+## W2.2 – Zweiter Praxistest (Windows)
+
+### Behoben
+- **„Ungelesen“:** Eine angeklickte Mail verschwand sofort aus der Liste und ließ sich nicht lesen. Ursache: Das
+  Gelesen-Setzen löste im Hauptprozess `mail:changed` aus, die Liste wurde neu geladen und die Mail gehörte nicht
+  mehr dazu. Jetzt bleibt die geöffnete Mail in „Ungelesen“/„Markiert“ stehen, bis man eine andere wählt.
+- **Tracking-Schutz:** Externe Bilder in `<style>`-Blöcken und `@import` werden jetzt ebenfalls vom Säubern entfernt
+  (bisher fing sie nur die Sicherheitsrichtlinie der App ab).
+
+### Neu
+- **„Externe Inhalte laden“** pro Mail (Spezifikation 7.2: externe Bilder nur auf Wunsch). Gilt nur für die
+  geöffnete Mail und wird nicht gespeichert; Skripte bleiben auch dann gesperrt.
+
 ## W2.1 – Korrekturen nach dem ersten Praxistest (Windows)
 
 Rückmeldung des Nutzers mit echtem iCloud-Konto: Zahlen in der Seitenleiste nicht aktuell, App träge,
