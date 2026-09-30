@@ -40,6 +40,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "6C62CB2E1F7B70FF3E44C347"
+               BuildableName = "StinkyMa-iOS-UITests.xctest"
+               BlueprintName = "StinkyMa-iOS-UITests"
+               ReferencedContainer = "container:StinkyMa.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

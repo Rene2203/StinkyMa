@@ -3,7 +3,7 @@
 Laufendes Protokoll des Zwischenstands. Wird nach jedem größeren Arbeitsschritt aktualisiert –
 nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHANGELOG.md`.
 
-**Zuletzt aktualisiert:** 29.09.2026
+**Zuletzt aktualisiert:** 30.09.2026
 **Aktuelle Phase:** 1 – Fundament (umgesetzt, baut in CI; Abnahme auf Gerät steht aus)
 
 ## Überblick
@@ -32,6 +32,13 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 - Keychain-Test in CI: Läuft ohne Signatur; falls der Keychain dort `errSecMissingEntitlement`
   meldet, wird der Test stillschweigend übersprungen – echter Nachweis erst in der signierten App.
 
+## Testen ohne Mac
+
+Der Nutzer hat keinen Mac. Deshalb startet die CI die iPad-App im Simulator, klickt sich per
+UI-Test durch (Posteingang → Mail öffnen → „Markiert“ → Entwürfe) und lädt Screenshots als
+Artefakt `ipad-screenshots` hoch (Skript: `scripts/ci-ipad-screenshots.sh`).
+Für eigenes Ausprobieren auf dem iPad kommen Swift Playgrounds oder TestFlight infrage (siehe Verlauf).
+
 ## Nächste Schritte
 
 1. Abnahme Phase 1 auf iPad und Mac (App startet, Mock-Posteingang, Navigation).
@@ -52,3 +59,8 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 - Spezifikation nach `docs/SPEZIFIKATION.md` übernommen.
 - Erster CI-Build: beide Apps kompilieren auf Anhieb. Veralteten Info.plist-Schlüssel
   `UIRequiresFullScreen` entfernt (iOS-26-Warnung).
+
+### 30.09.2026
+- UI-Test für die Abnahme von Phase 1 (`App/UITests`) und CI-Schritt, der die iPad-App im
+  Simulator startet und Screenshots erzeugt. Accessibility-Kennungen für Liste, Seitenleiste
+  und Konversation ergänzt. **Status: erster Lauf steht aus.**

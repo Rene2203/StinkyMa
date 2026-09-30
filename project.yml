@@ -71,6 +71,19 @@ targets:
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
 
+  StinkyMa-iOS-UITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: App/UITests
+    dependencies:
+      - target: StinkyMa-iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.stinkyma.app.uitests
+        TARGETED_DEVICE_FAMILY: "2"
+        GENERATE_INFOPLIST_FILE: YES
+
   StinkyMa-macOS:
     templates: [MailApp]
     platform: macOS
@@ -99,6 +112,8 @@ schemes:
       config: Debug
     test:
       config: Debug
+      targets:
+        - StinkyMa-iOS-UITests
   StinkyMa-macOS:
     build:
       targets:

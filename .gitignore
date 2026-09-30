@@ -12,3 +12,4 @@ StinkyMa.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
 
 # macOS
 .DS_Store
+build/

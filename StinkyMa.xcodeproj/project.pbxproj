@@ -20,6 +20,7 @@
 		7C18D02E469391A69D1CBCBD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACBFB34EA6768432DE8D06D /* SettingsView.swift */; };
 		7C7F1899612A6CD142E22850 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACBFB34EA6768432DE8D06D /* SettingsView.swift */; };
 		89CE81F76208A3E4F0D03F10 /* MailCore in Frameworks */ = {isa = PBXBuildFile; productRef = AF9D469011484D7813CBDFFD /* MailCore */; };
+		A53FDC8ECAAE25A5C387E11C /* NavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651A9044E9D89CA5BA31B475 /* NavigationUITests.swift */; };
 		B6F0E7C048140BF744BDCB18 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E634C13D831C39E39AC63DA2 /* SidebarView.swift */; };
 		C23DF0CBBFA0ADBFE1E56B1E /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 3DEC1C8A11EA72A2F5F4B550 /* AppFeature */; };
 		C56EA4FE6B25F5CF0F22E1DF /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C7141F4091892530D2D868 /* RootView.swift */; };
@@ -33,6 +34,16 @@
 		F2AE2DD2E45FFB1FE4BCED0F /* StinkyMaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514FAF9BA106552C6F403542 /* StinkyMaApp.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		F93274538152D583FC206418 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EE3BBE7770AC2C6D32DA9BF8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AC922D198A87A7C50F3877E2;
+			remoteInfo = "StinkyMa-iOS";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		05C7141F4091892530D2D868 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		132F888810F807379725BAFF /* StinkyMa-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "StinkyMa-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -40,10 +51,12 @@
 		1723F15F963EDCB0A68834A5 /* StinkyMa-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "StinkyMa-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		27A7A6371794976609C1469C /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
 		514FAF9BA106552C6F403542 /* StinkyMaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StinkyMaApp.swift; sourceTree = "<group>"; };
+		651A9044E9D89CA5BA31B475 /* NavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationUITests.swift; sourceTree = "<group>"; };
 		7ACBFB34EA6768432DE8D06D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		833132F0703770756C855AA4 /* MessageListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageListView.swift; sourceTree = "<group>"; };
 		9F600034746A7428FFF1D77B /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A709453B4367E87FC2A506DE /* Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation.swift; sourceTree = "<group>"; };
+		BF65B7608A3E016763301C11 /* StinkyMa-iOS-UITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = "StinkyMa-iOS-UITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		E400BAEFC3D530D01E8DE508 /* StinkyMaKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = StinkyMaKit; path = Packages/StinkyMaKit; sourceTree = SOURCE_ROOT; };
 		E634C13D831C39E39AC63DA2 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		F3B4B943BA68BCB3B1D91A8E /* MessageDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageDetailView.swift; sourceTree = "<group>"; };
@@ -71,6 +84,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		165673B2AF93F76903030025 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				651A9044E9D89CA5BA31B475 /* NavigationUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		1E77C3D0A7E67092F784CE32 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -85,6 +106,7 @@
 			children = (
 				1E77C3D0A7E67092F784CE32 /* Resources */,
 				5FC2A10A4903BE803591252D /* Sources */,
+				165673B2AF93F76903030025 /* UITests */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -116,6 +138,7 @@
 		BD4760DA6C8A96E5CDCB2C1C /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				BF65B7608A3E016763301C11 /* StinkyMa-iOS-UITests.xctest */,
 				1723F15F963EDCB0A68834A5 /* StinkyMa-iOS.app */,
 				132F888810F807379725BAFF /* StinkyMa-macOS.app */,
 			);
@@ -133,6 +156,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		6C62CB2E1F7B70FF3E44C347 /* StinkyMa-iOS-UITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 99F3C66BE0DD6FBD3F975D1B /* Build configuration list for PBXNativeTarget "StinkyMa-iOS-UITests" */;
+			buildPhases = (
+				B6A29317BE562D91CB5E4FD6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6AA81CC2DBEE4A48728984BC /* PBXTargetDependency */,
+			);
+			name = "StinkyMa-iOS-UITests";
+			packageProductDependencies = (
+			);
+			productName = "StinkyMa-iOS-UITests";
+			productReference = BF65B7608A3E016763301C11 /* StinkyMa-iOS-UITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		8B66D08FE37E244D74D2E80C /* StinkyMa-macOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7293F4118BF8D1360FE59367 /* Build configuration list for PBXNativeTarget "StinkyMa-macOS" */;
@@ -184,6 +225,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					6C62CB2E1F7B70FF3E44C347 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = AC922D198A87A7C50F3877E2;
+					};
 					8B66D08FE37E244D74D2E80C = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
@@ -213,6 +259,7 @@
 			projectRoot = "";
 			targets = (
 				AC922D198A87A7C50F3877E2 /* StinkyMa-iOS */,
+				6C62CB2E1F7B70FF3E44C347 /* StinkyMa-iOS-UITests */,
 				8B66D08FE37E244D74D2E80C /* StinkyMa-macOS */,
 			);
 		};
@@ -270,9 +317,42 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B6A29317BE562D91CB5E4FD6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A53FDC8ECAAE25A5C387E11C /* NavigationUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		6AA81CC2DBEE4A48728984BC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AC922D198A87A7C50F3877E2 /* StinkyMa-iOS */;
+			targetProxy = F93274538152D583FC206418 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		217391EDEC6CA4388BAD5ECB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = de.stinkyma.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = "StinkyMa-iOS";
+			};
+			name = Debug;
+		};
 		28F989999B808B10123FBF63 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -344,6 +424,23 @@
 				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
+		};
+		613577B86DA67167D3DC2BAF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = de.stinkyma.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = "StinkyMa-iOS";
+			};
+			name = Release;
 		};
 		B6133D48120080880E5F8405 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -507,6 +604,15 @@
 			buildConfigurations = (
 				B6133D48120080880E5F8405 /* Debug */,
 				BC9311E545CE260FD7E8BC65 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		99F3C66BE0DD6FBD3F975D1B /* Build configuration list for PBXNativeTarget "StinkyMa-iOS-UITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				217391EDEC6CA4388BAD5ECB /* Debug */,
+				613577B86DA67167D3DC2BAF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -57,6 +57,16 @@ extension SidebarItem {
         }
     }
 
+    /// Stabile Kennung für UI-Tests, unabhängig von der Sprache.
+    var accessibilityID: String {
+        switch kind {
+        case .unifiedInbox: "sidebar.unifiedInbox"
+        case .unread: "sidebar.unread"
+        case .flagged: "sidebar.flagged"
+        case .mailbox(let mailbox): "sidebar.mailbox.\(mailbox.id)"
+        }
+    }
+
     var systemImage: String {
         switch kind {
         case .unifiedInbox: "tray.2"

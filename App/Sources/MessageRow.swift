@@ -49,6 +49,7 @@ struct MessageRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("messageRow")
     }
 
     private var statusColumn: some View {

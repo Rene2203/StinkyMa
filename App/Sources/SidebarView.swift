@@ -56,5 +56,6 @@ private struct SidebarRow: View {
             Image(systemName: item.systemImage)
         }
         .badge(item.unreadCount)
+        .accessibilityIdentifier(item.accessibilityID)
     }
 }

@@ -14,6 +14,7 @@ struct MessageDetailView: View {
                         Text(verbatim: message.subject)
                             .font(.title2.bold())
                             .textSelection(.enabled)
+                            .accessibilityIdentifier("threadSubject")
                         if let category = message.category {
                             CategoryChip(category: category)
                         }

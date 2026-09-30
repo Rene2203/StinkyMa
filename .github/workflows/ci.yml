@@ -38,7 +38,12 @@ jobs:
         run: >
           xcodebuild build -project StinkyMa.xcodeproj -scheme StinkyMa-macOS
           -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO
-      - name: iPadOS-App bauen
-        run: >
-          xcodebuild build -project StinkyMa.xcodeproj -scheme StinkyMa-iOS
-          -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
+      - name: iPadOS-App im Simulator testen (UI-Tests mit Screenshots)
+        run: scripts/ci-ipad-screenshots.sh
+      - name: Screenshots hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-screenshots
+          path: build/screenshots
+          if-no-files-found: warn
