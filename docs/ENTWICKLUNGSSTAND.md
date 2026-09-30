@@ -5,13 +5,13 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W1 – Fundament Windows (umgesetzt, lokal getestet; erster Windows-CI-Lauf steht aus)
+**Aktuelle Phase:** W1 – Fundament Windows (fertig, auf Windows in der CI geprüft; Installation beim Nutzer steht aus)
 
 ## Überblick
 
 | Phase | Status |
 |---|---|
-| **W1 – Fundament Windows** | 🟢 fertig: 65 Unit-Tests + 2 E2E-Tests grün (Linux); Windows-CI steht aus |
+| **W1 – Fundament Windows** | 🟢 fertig: 65 Unit-Tests + 2 E2E-Tests grün unter Linux **und Windows**; Installer wird gebaut |
 | W2 – Ein Konto lesen (IMAP, iCloud) | ⚪ offen |
 | W3–W5, S1 (Server & Browser) | ⚪ offen |
 | iPad/Mac Phase 1 | ⏸️ fertig und im Simulator abgenommen, **ruht** (siehe unten) |
@@ -27,15 +27,19 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
   funktioniert ohne Neubau in Node und Electron.
 - Screenshots: `docs/screenshots/windows-*.png`
 
+- **Windows-CI (Lauf #1, windows-latest): auf Anhieb grün** – Typprüfung, Tests, E2E mit der echten App,
+  NSIS-Installer (~120 MB). Screenshots mit echter Windows-Darstellung (Segoe UI) in `docs/screenshots/windows-*.png`.
+
 ## Windows – noch ungeprüft
-- **Auf echtem Windows:** weder CI-Lauf noch Installation beim Nutzer bisher. Insbesondere: NSIS-Installer,
-  Windows-DPAPI (`safeStorage`), Segoe-Schrift, hoher DPI-Wert, dunkler Modus.
+- **Installation beim Nutzer** (SmartScreen, Startmenü, Deinstallation), hoher DPI-Wert, dunkler Modus,
+  Windows-DPAPI (`safeStorage`) auf einem echten Benutzerkonto.
 - `EncryptedFileSecretStore` mit echter DPAPI (wird erst ab W2 genutzt).
 
 ## Nächste Schritte
-1. Windows-CI auswerten, Installer vom Nutzer testen lassen (`docs/WINDOWS-TESTEN.md`).
+1. Installer vom Nutzer testen lassen (`docs/WINDOWS-TESTEN.md`).
 2. Phase W2: IMAP-Anbindung (imapflow), Konto-Einrichtung iCloud, MIME, sichere HTML-Anzeige.
-3. Offene Frage an den Nutzer für S1: Heimserver-Hardware / Docker?
+3. Hardware ist bekannt (N97, PC mit RTX 2070 Super, i5-14600K – Rollenvorschlag in `docs/ROADMAP-WINDOWS.md`).
+   Offen: Alltags-PC, Betriebssystem/Docker auf dem N97.
 
 ## iPad/Mac (ruht)
 Grund: Ohne Mac und ohne bezahlten Apple-Developer-Account (99 €/Jahr) kann der Nutzer die App nicht auf
@@ -61,7 +65,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 
 ## Offene Entscheidungen (aus Spezifikation, Abschnitt 12)
 
-- Heimserver: Hardware, Betriebssystem, Docker? (für Phase S1)
+- Heimserver: Rollen der drei Rechner, Betriebssystem/Docker auf dem N97 (für Phase S1)
 
 - App-Name (Arbeitsname „StinkyMa“), Bundle-ID `de.stinkyma.*` ist Platzhalter
 - Private Nutzung oder App-Store-Release
@@ -110,3 +114,5 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - Phase W1 umgesetzt (siehe Überblick). Gefundener und behobener Fehler beim E2E-Test: Escape schloss das
   Rechtsklick-Menü nicht, weil das App-weite Tastenkürzel ein Neu-Rendern auslöste, das den Listener des
   Menüs während desselben Ereignisses entfernte. Menü behandelt Tasten jetzt selbst (inkl. ↑/↓).
+- Erster Windows-CI-Lauf auf Anhieb grün, Installer-Artefakt verfügbar. Hardware des Nutzers erfasst
+  (N97 12 GB, PC mit RTX 2070 Super/32 GB, i5-14600K/32 GB) und Rollen vorgeschlagen.

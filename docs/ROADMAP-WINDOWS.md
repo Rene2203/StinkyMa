@@ -42,6 +42,17 @@ Die Phasen folgen der Spezifikation (Abschnitt 9), angepasst an Windows. ★ = V
 | **S1 – Server & Browser** | `apps/server`: HTTP-API + gleiche Oberfläche im Browser, Login, Docker Compose, Zugriff nur im Heimnetz/VPN | offen |
 | danach | Spezifikation Phasen 6–15 (eigene Modelle, Assistent, Alleinstellungsmerkmale …) für Windows & Server | offen |
 
+## Hardware des Nutzers (Stand 30.09.2026)
+
+| Rechner | Ausstattung | Vorgeschlagene Rolle |
+|---|---|---|
+| **Intel N97** | 12 GB DDR5 (geteilt mit der Grafik) | **Dauerläufer-Server** (sparsam): Mail-Sync rund um die Uhr, Datenbank, Web-Oberfläche, später Push (Phase 13). KI nur für kleine Aufgaben (1–3B-Modelle auf der CPU, langsam, eher nachts). |
+| **PC mit RTX 2070 Super** | 8 GB VRAM, 32 GB DDR4, 1 TB M.2 | **KI-Server** mit Ollama/llama.cpp: 7–8B-Modelle (4-Bit) passen komplett in die Grafikkarte und laufen flott; 13B nur teilweise auf der GPU (spürbar langsamer). Wenn er aus ist, stellt die App KI-Aufgaben zurück (5.3) – nie Fallback in die Cloud. |
+| **Intel i5-14600K** | 32 GB, 2 TB M.2 | Stark genug für Windows-App plus lokale Modelle auf der CPU (7B mit einigen Wörtern pro Sekunde). Rolle hängt davon ab, ob das der Alltags-PC ist. |
+
+Alle drei zusammen decken die Spezifikation gut ab: „Eigener Server“ (5.3) und Server-Version (11.3) laufen im Heimnetz.
+
 ## Offene Fragen an den Nutzer
-- Heimserver: Welche Hardware/Betriebssystem, ist Docker vorhanden? (für S1)
+- Welcher Rechner ist der Windows-Alltags-PC? Welche laufen dauerhaft?
+- Betriebssystem auf dem N97 (Linux/Windows)? Docker vorhanden?
 - App-Name (Arbeitsname „StinkyMa“)
