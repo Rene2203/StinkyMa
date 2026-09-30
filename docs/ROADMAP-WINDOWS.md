@@ -1,5 +1,17 @@
 # Roadmap Windows & Server
 
+## Leitplanken (vom Nutzer bestätigt, 30.09.2026)
+
+1. **Das ursprüngliche Ziel bleibt:** iPadOS/macOS, Windows **und** Server mit Browser. Windows kommt nur
+   zuerst, weil es sich sofort testen lässt. Alles wird so gebaut, dass die anderen Plattformen folgen können
+   (gleiches Datenmodell, gleiche Schnittstellen, Prompts/Kategorien als plattformneutrale Dateien).
+2. **Maßstab ist schwache Hardware:** Alle KI-Kernfunktionen müssen mit einem **~3B-Modell** gut funktionieren
+   (Spezifikation 5.7) – auf einem Low-End-PC, dem N97-Server und später dem iPad. Größere Modelle (7B, 13B)
+   sind eine Option für bessere Qualität, **nie Voraussetzung**. Der leistungsstarke Haupt-PC des Nutzers
+   ist ausdrücklich **nicht** der Standard, gegen den entwickelt oder getestet wird.
+3. Daraus folgt: Prompts kurz, Eingaben bereinigt, strukturierte Ausgaben, „Code rechnet, KI versteht“ (5.7);
+   Test-Set und Benchmark messen immer zuerst mit einem 3B-Modell.
+
 **Entscheidung vom 30.09.2026:** Die iPad-/Mac-Version ruht vorerst, weil sie ohne Mac bzw. ohne bezahlten
 Apple-Developer-Account nicht auf echten Geräten testbar ist. Zuerst entsteht die **Windows-App**, danach
 die **Server-Version mit Browser-Zugriff** (Spezifikation, Abschnitt 11). Die Swift-Module bleiben erhalten
@@ -38,7 +50,7 @@ Die Phasen folgen der Spezifikation (Abschnitt 9), angepasst an Windows. ★ = V
 | **W2 – Ein Konto lesen** | IMAP (imapflow), Konto-Einrichtung mit iCloud (app-spezifisches Passwort), Ordner & Mails laden, MIME parsen, HTML sicher anzeigen (ohne Skripte, externe Bilder blockiert) | offen |
 | **W3 – Mehrere Konten & Senden** | Auto-Discovery, OAuth Gmail/Outlook (Loopback-Redirect + PKCE), SMTP, Composer, Entwürfe, Offline-Warteschlange | offen |
 | **W4 – Suche & Sync** | FTS5-Suche in der Oberfläche, IDLE, Sync im Hintergrund (Infobereich/Tray), Autostart, Anhang-Reader (PDF.js), Textextraktion | offen |
-| **W5 – KI-Basis** | `AIProvider`/`AIRouter` mit Datenschutz-Prüfung in TypeScript, lokales Modell (llama.cpp/Ollama), Zusammenfassung, Kategorisierung | offen |
+| **W5 – KI-Basis** | `AIProvider`/`AIRouter` mit Datenschutz-Prüfung in TypeScript, lokales **3B-Modell als Standard** (llama.cpp, läuft auch nur auf der CPU), optional Ollama/größere Modelle; Test-Set, gemessen mit 3B; Zusammenfassung, Kategorisierung | offen |
 | **S1 – Server & Browser** | `apps/server`: HTTP-API + gleiche Oberfläche im Browser, Login, Docker Compose, Zugriff nur im Heimnetz/VPN | offen |
 | danach | Spezifikation Phasen 6–15 (eigene Modelle, Assistent, Alleinstellungsmerkmale …) für Windows & Server | offen |
 
@@ -46,7 +58,7 @@ Die Phasen folgen der Spezifikation (Abschnitt 9), angepasst an Windows. ★ = V
 
 | Rechner | Ausstattung | Rolle |
 |---|---|---|
-| **Haupt-PC (Windows)** | Ryzen 9 5900X, **RTX 4070 Ti Super (16 GB VRAM)**, 32 GB DDR4 | **Hier läuft die Windows-App.** „On-Device“-KI (5.0) direkt auf dem PC: 7–8B-Modelle sehr schnell, 13–14B (4-Bit) passen komplett in die Grafikkarte. |
+| **Haupt-PC (Windows)** | Ryzen 9 5900X, **RTX 4070 Ti Super (16 GB VRAM)**, 32 GB DDR4 | Hier testet der Nutzer die Windows-App. Kann optional größere Modelle (7–14B) nutzen – **aber nicht Maßstab** (siehe Leitplanke 2). |
 | Server: PC mit RTX 2070 Super | 8 GB VRAM, 32 GB DDR4, 1 TB M.2 | später: KI-Server im Heimnetz (5.3) |
 | Server: Intel N97 | 12 GB DDR5 (geteilt) | später: sparsamer Dauerläufer für Mail-Sync & Browser-Version (S1) |
 | Server: Intel i5-14600K | 32 GB, 2 TB M.2 | später: Reserve / Server-Version / Dienste |

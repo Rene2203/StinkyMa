@@ -14,6 +14,13 @@
 - Datenbank: bestehende Migrationen in `MailSchema.swift` nie ändern, neue anhängen.
 - Testdaten sind erfunden; Adressen enden auf `.example`.
 
+## Leitplanken (vom Nutzer, verbindlich)
+
+- **Ursprüngliches Ziel bleibt:** iPad/Mac, Windows und Server mit Browser. Windows ist nur die erste Plattform.
+  Nichts bauen, was die anderen Plattformen verbaut; Datenmodell und Schnittstellen parallel halten.
+- **KI-Maßstab ist ein ~3B-Modell auf schwacher Hardware** (Low-End-PC, N97-Server, iPad). Größere Modelle
+  sind optional, nie Voraussetzung. Der starke Haupt-PC des Nutzers (RTX 4070 Ti Super) ist nicht der Standard.
+
 ## Aktueller Fokus: Windows (web/)
 
 Seit 30.09.2026: zuerst Windows-App, dann Server mit Browser (`docs/ROADMAP-WINDOWS.md`). Die Swift-App ruht.

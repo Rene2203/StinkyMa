@@ -38,8 +38,8 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 ## Nächste Schritte
 1. Installer vom Nutzer testen lassen (`docs/WINDOWS-TESTEN.md`).
 2. Phase W2: IMAP-Anbindung (imapflow), Konto-Einrichtung iCloud, MIME, sichere HTML-Anzeige.
-3. Hardware: Haupt-PC (Windows) mit RTX 4070 Ti Super 16 GB – dort läuft die App und später die lokale KI.
-   Drei weitere Rechner sind Server (für S1, später).
+3. Hardware: Haupt-PC (Windows) mit RTX 4070 Ti Super 16 GB – dort testet der Nutzer. **Maßstab für die KI
+   bleibt ein 3B-Modell auf schwacher Hardware** (Leitplanken in `docs/ROADMAP-WINDOWS.md`).
 
 ## iPad/Mac (ruht)
 Grund: Ohne Mac und ohne bezahlten Apple-Developer-Account (99 €/Jahr) kann der Nutzer die App nicht auf
@@ -121,3 +121,6 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Lizenz; Weitergabe/Einbettung nur mit entsprechender Lizenz). Auf dem Rechner des Nutzers ungeprüft.
 - Nutzer bestätigt: Windows zuerst. Haupt-PC: Ryzen 9 5900X, RTX 4070 Ti Super (16 GB VRAM), 32 GB –
   geeignet für lokale 7–14B-Modelle (Phase W5). Die drei anderen Rechner sind Server (später, S1).
+- **Leitplanken vom Nutzer bekräftigt:** ursprüngliches Ziel (iPad, Windows, Server) bleibt; KI-Kernfunktionen
+  müssen mit einem 3B-Modell auf Low-End-Hardware funktionieren; der Haupt-PC ist nicht der Maßstab.
+  Festgehalten in `docs/ROADMAP-WINDOWS.md` und `CLAUDE.md`.
