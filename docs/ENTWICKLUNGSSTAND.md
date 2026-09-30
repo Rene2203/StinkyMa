@@ -5,14 +5,14 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W2 – Ein Konto lesen (umgesetzt und gegen Testserver geprüft; Windows-CI-Lauf und Test mit echtem Konto stehen aus)
+**Aktuelle Phase:** W2 – Ein Konto lesen (fertig, auf Windows in der CI geprüft; Test mit echtem Konto beim Nutzer steht aus)
 
 ## Überblick
 
 | Phase | Status |
 |---|---|
 | **W1 – Fundament Windows** | 🟢 fertig: 65 Unit-Tests + 2 E2E-Tests grün unter Linux **und Windows**; Installer wird gebaut |
-| W2 – Ein Konto lesen (IMAP, iCloud) | 🟢 umgesetzt: Konto-Dialog, IMAP-Abgleich, Server-Aktionen, sichere HTML-Anzeige; Tests gegen GreenMail grün (Linux). Offen: Windows-CI, echtes iCloud-Konto |
+| W2 – Ein Konto lesen (IMAP, iCloud) | 🟢 fertig: Konto-Dialog, IMAP-Abgleich, Server-Aktionen, sichere HTML-Anzeige; Windows-CI Lauf #14 grün (95 Tests inkl. IMAP-Integration, 3 E2E inkl. Konto-Einrichtung mit DPAPI). Offen: echtes iCloud-Konto |
 | W3–W5, S1 (Server & Browser) | ⚪ offen |
 | iPad/Mac Phase 1 | ⏸️ fertig und im Simulator abgenommen, **ruht** (siehe unten) |
 
@@ -36,9 +36,8 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 - `EncryptedFileSecretStore` mit echter DPAPI (wird erst ab W2 genutzt).
 
 ## Nächste Schritte
-1. Windows-CI mit GreenMail auswerten (jetzt inkl. Konto-Einrichtung auf echtem Windows mit DPAPI).
-2. Nutzer: Installer testen und ein echtes Konto (z. B. iCloud mit app-spezifischem Passwort) einrichten.
-3. Phase W3: Senden (SMTP), Composer, Entwürfe, OAuth für Gmail/Outlook, Offline-Warteschlange.
+1. Nutzer: Installer aus Windows-CI **Lauf #14** testen und ein echtes Konto (z. B. iCloud mit app-spezifischem Passwort) einrichten.
+2. Phase W3: Senden (SMTP), Composer, Entwürfe, OAuth für Gmail/Outlook, Offline-Warteschlange.
 3. Hardware: Haupt-PC (Windows) mit RTX 4070 Ti Super 16 GB – dort testet der Nutzer. **Maßstab für die KI
    bleibt ein 3B-Modell auf schwacher Hardware** (Leitplanken in `docs/ROADMAP-WINDOWS.md`).
 
@@ -154,3 +153,6 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   das Aufräumen: Windows sperrte den temporären Testordner (EBUSY), weil Electron-Prozesse nach dem Test noch
   liefen. Ursache in der App behoben: Beim Beenden trennt der `MailService` offene IMAP-Verbindungen sofort
   (`dispose()`), keine neuen mehr. Aufräumen im Test ist jetzt „bestmöglich“.
+- **Windows-CI Lauf #14: komplett grün.** 95 Tests inkl. 6 IMAP-Integrationstests gegen GreenMail, 3 E2E-Tests
+  inkl. Konto-Einrichtung mit echter Windows-DPAPI, Archivieren auf dem Server und Abruf-Knopf; Installer gebaut.
+  Keine verwaisten Electron-Prozesse mehr – das sofortige Beenden wirkt.
