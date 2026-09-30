@@ -67,7 +67,11 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 ### 30.09.2026
 - UI-Test für die Abnahme von Phase 1 (`App/UITests`) und CI-Schritt, der die iPad-App im
   Simulator startet und Screenshots erzeugt. Accessibility-Kennungen für Liste, Seitenleiste
-  und Konversation ergänzt. **Status: erster Lauf steht aus.**
+  und Konversation ergänzt.
+- Erster UI-Testlauf im iPad-Simulator (iOS 26.5): **App startet, Mock-Posteingang erscheint,
+  Mail öffnen zeigt die Konversation** ✅. Fehlgeschlagen beim Tippen auf „Markiert“ in der
+  Seitenleiste: Die Test-Kennung hing am Symbol statt an der Zeile. Behoben; außerdem exportiert
+  das Skript Screenshots jetzt auch bei fehlgeschlagenem Test. **Zweiter Lauf steht aus.**
 - Swift-Playgrounds-Export (`scripts/make-playground.sh`): kopiert alle Module in ein App-Target.
   Unter Linux geprüft, dass die Kernmodule als ein Modul kompilieren; Playground-Build in der CI
   (Xcode) und Öffnen auf dem iPad **noch ungeprüft**.

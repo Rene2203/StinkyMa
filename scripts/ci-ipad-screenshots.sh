@@ -22,12 +22,14 @@ trap 'xcrun simctl delete "$UDID" >/dev/null 2>&1 || true' EXIT
 xcrun simctl boot "$UDID"
 xcrun simctl bootstatus "$UDID" -b >/dev/null
 
+# Screenshots auch bei fehlgeschlagenem Test exportieren – gerade dann helfen sie bei der Fehlersuche.
+TEST_STATUS=0
 xcodebuild test \
   -project StinkyMa.xcodeproj \
   -scheme StinkyMa-iOS \
   -destination "id=$UDID" \
   -resultBundlePath "$OUT/UITests.xcresult" \
-  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGNING_ALLOWED=NO || TEST_STATUS=$?
 
 # Screenshots mit sprechenden Namen aus dem Ergebnis-Bundle holen.
 xcrun xcresulttool export attachments --path "$OUT/UITests.xcresult" --output-path "$OUT/screenshots"
@@ -45,3 +47,5 @@ for test in manifest:
         os.replace(os.path.join(folder, attachment["exportedFileName"]), os.path.join(folder, base))
         print("Screenshot:", base)
 PY
+
+exit $TEST_STATUS

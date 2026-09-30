@@ -29,13 +29,9 @@ final class NavigationUITests: XCTestCase {
 
         // 3. Seitenleiste: „Markiert“
         let flagged = app.descendants(matching: .any).matching(identifier: "sidebar.flagged").firstMatch
-        #if os(iOS)
-        if !flagged.exists {
-            // Im Hochformat ist die Seitenleiste eingeklappt: über den Zurück-Knopf öffnen.
-            app.navigationBars.buttons.firstMatch.tap()
-        }
-        #endif
+        showSidebarIfNeeded(app, element: flagged)
         XCTAssertTrue(flagged.waitForExistence(timeout: 10), "Seitenleiste nicht erreichbar")
+        XCTAssertTrue(flagged.isHittable, "Eintrag „Markiert“ ist nicht antippbar")
         click(flagged)
         let flaggedRow = rows.firstMatch
         XCTAssertTrue(flaggedRow.waitForExistence(timeout: 10), "Keine markierten Mails")
@@ -43,11 +39,23 @@ final class NavigationUITests: XCTestCase {
 
         // 4. Ordner eines einzelnen Kontos: Entwürfe im Arbeitskonto
         let drafts = app.descendants(matching: .any).matching(identifier: "sidebar.mailbox.mock-work-drafts").firstMatch
+        showSidebarIfNeeded(app, element: drafts)
         XCTAssertTrue(drafts.waitForExistence(timeout: 10))
         click(drafts)
         let oneDraft = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 1"), object: rows)
         XCTAssertEqual(XCTWaiter().wait(for: [oneDraft], timeout: 10), .completed, "Im Entwurfsordner liegt genau ein Entwurf")
         snapshot(app, "04-Entwuerfe")
+    }
+
+    /// Blendet die Seitenleiste ein, falls das iPad sie nach der Auswahl einer Mail eingeklappt hat.
+    private func showSidebarIfNeeded(_ app: XCUIApplication, element: XCUIElement) {
+        #if os(iOS)
+        guard !(element.exists && element.isHittable) else { return }
+        let toggle = app.buttons["ToggleSidebar"]
+        if toggle.waitForExistence(timeout: 3) {
+            toggle.tap()
+        }
+        #endif
     }
 
     private func click(_ element: XCUIElement) {
