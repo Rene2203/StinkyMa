@@ -40,6 +40,19 @@ jobs:
           -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO
       - name: iPadOS-App im Simulator testen (UI-Tests mit Screenshots)
         run: scripts/ci-ipad-screenshots.sh
+      - name: Swift-Playgrounds-Paket erzeugen und bauen
+        run: |
+          scripts/make-playground.sh build/playground/StinkyMa.swiftpm
+          # In einer Kopie bauen, damit keine Build-Dateien im Download landen.
+          rm -rf build/playground-check && cp -R build/playground/StinkyMa.swiftpm build/playground-check
+          cd build/playground-check
+          xcodebuild build -scheme StinkyMa -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ../playground-dd CODE_SIGNING_ALLOWED=NO
+      - name: Swift-Playgrounds-Paket hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: StinkyMa-Playground
+          path: build/playground
       - name: Screenshots hochladen
         if: always()
         uses: actions/upload-artifact@v4

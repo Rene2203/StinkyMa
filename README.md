@@ -46,6 +46,11 @@ brew install xcodegen
 xcodegen generate
 ```
 
+### Ohne Mac: Swift Playgrounds auf dem iPad
+
+Siehe [`docs/IPAD-TESTEN.md`](docs/IPAD-TESTEN.md). Die CI erzeugt dafür bei jedem Push ein
+App-Playground zum Herunterladen.
+
 ## Tests
 
 ```sh

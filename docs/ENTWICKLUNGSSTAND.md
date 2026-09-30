@@ -37,7 +37,11 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 Der Nutzer hat keinen Mac. Deshalb startet die CI die iPad-App im Simulator, klickt sich per
 UI-Test durch (Posteingang → Mail öffnen → „Markiert“ → Entwürfe) und lädt Screenshots als
 Artefakt `ipad-screenshots` hoch (Skript: `scripts/ci-ipad-screenshots.sh`).
-Für eigenes Ausprobieren auf dem iPad kommen Swift Playgrounds oder TestFlight infrage (siehe Verlauf).
+Zum Selbst-Ausprobieren erzeugt die CI außerdem ein **App-Playground für Swift Playgrounds auf dem
+iPad** (Artefakt `StinkyMa-Playground`, Anleitung: `docs/IPAD-TESTEN.md`). TestFlight scheidet
+vorerst aus: Der Nutzer hat nur einen kostenlosen Developer-Account.
+Konsequenz für die Planung: Features, die eine signierte App brauchen (Widgets, Hintergrund-Sync,
+App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht auf dem Gerät testen.
 
 ## Nächste Schritte
 
@@ -64,3 +68,6 @@ Für eigenes Ausprobieren auf dem iPad kommen Swift Playgrounds oder TestFlight 
 - UI-Test für die Abnahme von Phase 1 (`App/UITests`) und CI-Schritt, der die iPad-App im
   Simulator startet und Screenshots erzeugt. Accessibility-Kennungen für Liste, Seitenleiste
   und Konversation ergänzt. **Status: erster Lauf steht aus.**
+- Swift-Playgrounds-Export (`scripts/make-playground.sh`): kopiert alle Module in ein App-Target.
+  Unter Linux geprüft, dass die Kernmodule als ein Modul kompilieren; Playground-Build in der CI
+  (Xcode) und Öffnen auf dem iPad **noch ungeprüft**.
