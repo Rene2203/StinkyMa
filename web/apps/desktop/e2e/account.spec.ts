@@ -1,9 +1,10 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { ImapFlow } from "imapflow";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { removeQuietly } from "./helpers";
 
 // Konto einrichten gegen einen lokalen GreenMail-Testserver (nie gegen echte Konten).
 // Start: java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -jar greenmail-standalone.jar
@@ -63,7 +64,7 @@ test.afterAll(async () => {
     await Promise.race([app.close().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 10_000))]);
     if (child && child.exitCode === null) child.kill();
   }
-  rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+  removeQuietly(dataDir);
 });
 
 test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {

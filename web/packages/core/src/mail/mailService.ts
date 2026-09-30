@@ -43,6 +43,8 @@ export class MailService implements MailRepository, AccountsApi {
   #running: Promise<void> | null = null;
   #lastRunAt: string | null = null;
   readonly #accountLocks = new Map<string, Promise<unknown>>();
+  readonly #openClients = new Set<ImapFlow>();
+  #disposed = false;
 
   constructor(
     private readonly repository: SqliteMailRepository,
@@ -227,6 +229,13 @@ export class MailService implements MailRepository, AccountsApi {
     }
   }
 
+  /** Beim Beenden: offene Verbindungen sofort schließen, keine neuen mehr öffnen. */
+  dispose(): void {
+    this.#disposed = true;
+    for (const client of this.#openClients) client.close();
+    this.#openClients.clear();
+  }
+
   // --- Hilfen ---
 
   /** Eine Verbindung pro Vorgang, Vorgänge pro Konto nacheinander. Ein Verbindungs-Pool folgt mit IDLE in W4. */
@@ -237,10 +246,13 @@ export class MailService implements MailRepository, AccountsApi {
       if (!account) throw new Error("Konto nicht gefunden");
       const password = await this.secrets.get(SecretKeys.accountPassword(accountId));
       if (password === null) throw new MailConnectionError("Kein Passwort gespeichert. Bitte das Konto neu einrichten.");
+      if (this.#disposed) throw new MailConnectionError("Die App wird beendet.");
       const client = await connectImap(loginFor(account, password));
+      this.#openClients.add(client);
       try {
         return await work(client);
       } finally {
+        this.#openClients.delete(client);
         await client.logout().catch(() => client.close());
       }
     });

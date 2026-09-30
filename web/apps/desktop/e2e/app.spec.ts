@@ -1,7 +1,8 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { removeQuietly } from "./helpers";
 
 // Abnahme Phase W1: App startet, zeigt den Mock-Posteingang, Navigation und Aktionen funktionieren.
 // Screenshots landen in test-results/screenshots (CI lädt sie als Artefakt hoch).
@@ -28,7 +29,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await app?.close();
-  rmSync(dataDir, { recursive: true, force: true });
+  removeQuietly(dataDir);
 });
 
 const shot = (name: string) => page.screenshot({ path: join(screenshotDir, `${name}.png`) });

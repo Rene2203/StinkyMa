@@ -149,3 +149,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   (Screenshots). Danach schlug der E2E-Test fehl, und das Schließen der App hing – dadurch war die eigentliche
   Fehlermeldung verdeckt. Test jetzt in benannte Schritte gegliedert, robustes Schließen, vollständiger
   Testbericht (Trace) wird bei Fehlern hochgeladen. Die iPad/Mac-CI mit der Swift-Migration v2 ist grün.
+- **Windows-CI Lauf #12 ausgewertet (Testbericht):** Alle Funktionsschritte des Konto-Tests liefen auf Windows
+  durch (Einrichtung mit DPAPI, Abgleich, HTML, gelesen, Archivieren per E, Abruf-Knopf). Fehlgeschlagen ist nur
+  das Aufräumen: Windows sperrte den temporären Testordner (EBUSY), weil Electron-Prozesse nach dem Test noch
+  liefen. Ursache in der App behoben: Beim Beenden trennt der `MailService` offene IMAP-Verbindungen sofort
+  (`dispose()`), keine neuen mehr. Aufräumen im Test ist jetzt „bestmöglich“.

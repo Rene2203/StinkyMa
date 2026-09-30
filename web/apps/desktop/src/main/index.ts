@@ -147,5 +147,8 @@ app.whenReady().then(() => {
 
 app.on("before-quit", () => {
   if (syncTimer) clearInterval(syncTimer);
+  if (notifyTimer) clearTimeout(notifyTimer);
+  // Offene IMAP-Verbindungen sofort trennen, damit die App ohne Verzögerung beendet wird.
+  service?.dispose();
 });
 }
