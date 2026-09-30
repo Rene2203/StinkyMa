@@ -1,4 +1,4 @@
-import type { MailRepository } from "@stinkyma/core";
+import type { AccountsApi, MailRepository } from "@stinkyma/core";
 import { useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { MessageList } from "./components/MessageList.js";
@@ -10,16 +10,22 @@ import { BrowserStore, selectedMessage } from "./store.js";
 export interface AppProps {
   repository: MailRepository;
   locale: Locale;
+  /** Kontoverwaltung & Abgleich (Windows-App). Fehlt in der reinen Browser-Vorschau. */
+  accounts?: AccountsApi;
+  /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
+  subscribeChanges?: (onChange: () => void) => () => void;
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository), [repository]);
+export function App({ repository, locale, accounts, subscribeChanges }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts }), [repository, accounts]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
     void store.start();
   }, [store]);
+
+  useEffect(() => subscribeChanges?.(() => void store.reload()), [store, subscribeChanges]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -60,7 +66,13 @@ function useKeyboardShortcuts() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
+      if (document.querySelector("dialog[open]")) return; // Kürzel nicht im Dialog
+      if (event.key === "F5") {
+        event.preventDefault();
+        void store.syncNow();
+        return;
+      }
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       const message = selectedMessage(store.getState());
       switch (event.key) {

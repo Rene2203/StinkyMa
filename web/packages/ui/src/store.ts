@@ -5,6 +5,8 @@ import {
   isRead,
   scopeKey,
   type Account,
+  type AccountSettings,
+  type AccountsApi,
   type Attachment,
   type Mailbox,
   type MailRepository,
@@ -43,6 +45,10 @@ export interface BrowserState {
   thread: Message[];
   attachmentsByMessageId: Record<string, Attachment[]>;
   error: string | null;
+  /** Läuft gerade ein Abgleich mit den Mailservern? */
+  syncing: boolean;
+  /** Zeitpunkt des letzten abgeschlossenen Abgleichs (ISO-8601). */
+  lastSyncAt: string | null;
 }
 
 export const initialState: BrowserState = {
@@ -55,6 +61,8 @@ export const initialState: BrowserState = {
   thread: [],
   attachmentsByMessageId: {},
   error: null,
+  syncing: false,
+  lastSyncAt: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -100,9 +108,17 @@ export class BrowserStore {
   #messagesRequest = 0;
   #threadRequest = 0;
 
-  constructor(repository: MailRepository, pageSize = 500) {
+  readonly #accounts: AccountsApi | undefined;
+
+  constructor(repository: MailRepository, options: { pageSize?: number; accounts?: AccountsApi } = {}) {
     this.#repository = repository;
-    this.pageSize = pageSize;
+    this.pageSize = options.pageSize ?? 500;
+    this.#accounts = options.accounts;
+  }
+
+  /** Kann die Oberfläche Konten verwalten (Windows-App) oder nur anzeigen (Browser-Vorschau)? */
+  get canManageAccounts(): boolean {
+    return this.#accounts !== undefined;
   }
 
   getState = (): BrowserState => this.#state;
@@ -120,7 +136,60 @@ export class BrowserStore {
   // --- Laden ---
 
   async start(): Promise<void> {
-    await Promise.all([this.loadSidebar(), this.loadMessages()]);
+    await Promise.all([this.loadSidebar(), this.loadMessages(), this.#loadSyncStatus()]);
+  }
+
+  /** Nach Änderungen von außen (Abgleich, andere Fenster): alles neu laden, Auswahl behalten, nichts als gelesen markieren. */
+  async reload(): Promise<void> {
+    await Promise.all([this.loadSidebar(), this.loadMessages(), this.#loadSyncStatus()]);
+    const selected = this.#state.selectedMessageId;
+    const message = selected ? this.#state.messages.find((m) => m.id === selected) : undefined;
+    if (!message) return;
+    const request = ++this.#threadRequest;
+    await this.#guard(async () => {
+      const thread = await this.#repository.thread(message.threadId);
+      if (request === this.#threadRequest) this.#set({ thread: thread.length ? thread : [message] });
+    });
+  }
+
+  // --- Konten & Abgleich ---
+
+  async syncNow(): Promise<void> {
+    if (!this.#accounts) return;
+    this.#set({ syncing: true });
+    await this.#guard(() => this.#accounts!.syncNow());
+    await this.reload();
+  }
+
+  async testConnection(settings: AccountSettings, password: string) {
+    if (!this.#accounts) throw new Error("Kontoverwaltung ist hier nicht verfügbar.");
+    return this.#accounts.testConnection(settings, password);
+  }
+
+  /** Richtet ein Konto ein. Fehler werden an den Dialog weitergegeben (nicht als Banner). */
+  async addAccount(settings: AccountSettings, password: string, removeDemoAccounts: boolean): Promise<Account> {
+    if (!this.#accounts) throw new Error("Kontoverwaltung ist hier nicht verfügbar.");
+    const account = await this.#accounts.addAccount(settings, password, { removeDemoAccounts });
+    await this.selectScope({ kind: "unifiedInbox" });
+    await this.reload();
+    return account;
+  }
+
+  async removeAccount(accountId: string): Promise<void> {
+    if (!this.#accounts) return;
+    await this.#guard(() => this.#accounts!.removeAccount(accountId));
+    if (this.#state.selectedScope.kind === "mailbox" && this.#state.selectedScope.mailboxId.startsWith(accountId)) {
+      await this.selectScope({ kind: "unifiedInbox" });
+    }
+    await this.reload();
+  }
+
+  async #loadSyncStatus(): Promise<void> {
+    if (!this.#accounts) return;
+    await this.#guard(async () => {
+      const status = await this.#accounts!.syncStatus();
+      this.#set({ syncing: status.running, lastSyncAt: status.lastRunAt });
+    });
   }
 
   async loadSidebar(): Promise<void> {

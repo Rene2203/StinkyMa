@@ -6,6 +6,7 @@ import { formatBytes, formatFullDate, formatList } from "../format.js";
 import { attachmentIcon } from "../icons.js";
 import { selectedMessage, threadFor } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
+import { SafeHtml } from "./SafeHtml.js";
 
 export function MessageDetail() {
   const { store, t } = useUi();
@@ -86,8 +87,11 @@ function ThreadMessage({ message, attachments, initiallyExpanded }: { message: M
       </button>
       {expanded && (
         <>
-          {/* Phase W1 zeigt nur Text. HTML-Mails (abgesichert, ohne Skripte und externe Inhalte) folgen mit echten Konten. */}
-          <div className="card-body">{message.bodyText ?? message.snippet}</div>
+          {message.bodyHtml ? (
+            <SafeHtml html={message.bodyHtml} />
+          ) : (
+            <div className="card-body">{message.bodyText ?? message.snippet}</div>
+          )}
           {attachments.length > 0 && (
             <ul className="attachments" role="list">
               {attachments.map((a) => {

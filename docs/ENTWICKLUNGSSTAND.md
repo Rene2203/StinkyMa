@@ -5,14 +5,14 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W2 – Ein Konto lesen (in Arbeit: Kern fertig und getestet, Oberfläche & Windows-App folgen)
+**Aktuelle Phase:** W2 – Ein Konto lesen (umgesetzt und gegen Testserver geprüft; Windows-CI-Lauf und Test mit echtem Konto stehen aus)
 
 ## Überblick
 
 | Phase | Status |
 |---|---|
 | **W1 – Fundament Windows** | 🟢 fertig: 65 Unit-Tests + 2 E2E-Tests grün unter Linux **und Windows**; Installer wird gebaut |
-| W2 – Ein Konto lesen (IMAP, iCloud) | 🟡 in Arbeit: IMAP-Abgleich, Aktionen auf dem Server, Kontoverwaltung im Kern fertig (Integrationstests gegen GreenMail); Oberfläche folgt |
+| W2 – Ein Konto lesen (IMAP, iCloud) | 🟢 umgesetzt: Konto-Dialog, IMAP-Abgleich, Server-Aktionen, sichere HTML-Anzeige; Tests gegen GreenMail grün (Linux). Offen: Windows-CI, echtes iCloud-Konto |
 | W3–W5, S1 (Server & Browser) | ⚪ offen |
 | iPad/Mac Phase 1 | ⏸️ fertig und im Simulator abgenommen, **ruht** (siehe unten) |
 
@@ -36,8 +36,9 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 - `EncryptedFileSecretStore` mit echter DPAPI (wird erst ab W2 genutzt).
 
 ## Nächste Schritte
-1. Installer vom Nutzer testen lassen (`docs/WINDOWS-TESTEN.md`).
-2. Phase W2: IMAP-Anbindung (imapflow), Konto-Einrichtung iCloud, MIME, sichere HTML-Anzeige.
+1. Windows-CI mit GreenMail auswerten (jetzt inkl. Konto-Einrichtung auf echtem Windows mit DPAPI).
+2. Nutzer: Installer testen und ein echtes Konto (z. B. iCloud mit app-spezifischem Passwort) einrichten.
+3. Phase W3: Senden (SMTP), Composer, Entwürfe, OAuth für Gmail/Outlook, Offline-Warteschlange.
 3. Hardware: Haupt-PC (Windows) mit RTX 4070 Ti Super 16 GB – dort testet der Nutzer. **Maßstab für die KI
    bleibt ein 3B-Modell auf schwacher Hardware** (Leitplanken in `docs/ROADMAP-WINDOWS.md`).
 
@@ -136,3 +137,10 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Fehlermeldungen ohne Zugangsdaten.
 - Tests: 83 Unit-Tests + 6 Integrationstests gegen einen lokalen **GreenMail**-Testserver (nie gegen echte
   Konten). Ohne Testserver werden die Integrationstests übersprungen.
+- **W2, Teil 2 (App):** Windows-App nutzt jetzt `MailService` (Datenbank `mail.sqlite`, Beispielkonten bis zum
+  ersten echten Konto), IPC-Kanal „accounts“, Änderungs-Meldungen an die Oberfläche, Abgleich alle 5 Minuten.
+  Oberfläche: Dialog „Konto hinzufügen“, Abruf-Status und Knopf (F5), Fehler-Symbol pro Konto, Konto entfernen,
+  HTML-Mails im Sandbox-Frame mit DOMPurify und Tracker-Blockade. E2E-Test „Konto einrichten“ gegen GreenMail
+  grün (inkl. Server-Archivierung und „gelesen“ auf dem Server). Beobachtet: Ohne Schlüsselbund (Linux-Container)
+  verweigert die App das Speichern des Passworts – gewollt; Windows hat immer DPAPI.
+  Windows-CI startet jetzt ebenfalls GreenMail und testet den kompletten Ablauf.

@@ -1,8 +1,11 @@
-import { scopeKey } from "@stinkyma/core";
+import { AlertTriangle, Plus, RefreshCw, X } from "lucide-react";
+import { isDemoAccount, scopeKey } from "@stinkyma/core";
+import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { sidebarIcon } from "../icons.js";
 import type { SidebarItem } from "../store.js";
 import type { Translate } from "../i18n.js";
+import { AccountDialog } from "./AccountDialog.js";
 
 export function sidebarTitle(item: SidebarItem, t: Translate): string {
   switch (item.kind.type) {
@@ -22,9 +25,16 @@ export function sidebarTestId(item: SidebarItem): string {
 }
 
 export function Sidebar() {
-  const { store, t } = useUi();
+  const { store, t, locale } = useUi();
   const state = useBrowserState();
   const selectedKey = scopeKey(state.selectedScope);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const accounts = Object.values(state.accountsById);
+  const onlyDemo = accounts.length > 0 && accounts.every(isDemoAccount);
+
+  const removeAccount = (id: string, name: string) => {
+    if (window.confirm(t("account.removeConfirm", { name }))) void store.removeAccount(id);
+  };
 
   return (
     <nav className="sidebar" aria-label={t("sidebar.title")}>
@@ -35,7 +45,28 @@ export function Sidebar() {
             {section.account ? (
               <>
                 <span className={`account-dot color-${section.account.color}`} aria-hidden="true" />
-                {section.account.displayName}
+                <span className="sidebar-heading-label">{section.account.displayName}</span>
+                {section.account.syncError && (
+                  <AlertTriangle
+                    className="sync-warning"
+                    size={14}
+                    aria-label={t("sync.accountError", { error: section.account.syncError })}
+                    data-testid="account-sync-error"
+                  >
+                    <title>{t("sync.accountError", { error: section.account.syncError })}</title>
+                  </AlertTriangle>
+                )}
+                {store.canManageAccounts && !isDemoAccount(section.account) && (
+                  <button
+                    type="button"
+                    className="icon-button heading-action"
+                    title={t("account.remove")}
+                    aria-label={`${t("account.remove")}: ${section.account.displayName}`}
+                    onClick={() => removeAccount(section.account!.id, section.account!.displayName)}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </>
             ) : (
               t("sidebar.overview")
@@ -65,6 +96,35 @@ export function Sidebar() {
           </ul>
         </section>
       ))}
+      {store.canManageAccounts && (
+        <footer className="sidebar-footer">
+          {onlyDemo && <p className="demo-hint">{t("account.demoHint")}</p>}
+          <button type="button" className="sidebar-button" data-testid="add-account" onClick={() => setDialogOpen(true)}>
+            <Plus size={16} aria-hidden="true" /> {t("account.add")}
+          </button>
+          <div className="sync-row">
+            <span className="muted small" data-testid="sync-status">
+              {state.syncing
+                ? t("sync.running")
+                : state.lastSyncAt
+                  ? t("sync.last", { time: new Date(state.lastSyncAt).toLocaleTimeString(locale === "de" ? "de-DE" : "en-GB", { hour: "2-digit", minute: "2-digit" }) })
+                  : t("sync.never")}
+            </span>
+            <button
+              type="button"
+              className={`icon-button${state.syncing ? " spinning" : ""}`}
+              title={`${t("sync.now")} (F5)`}
+              aria-label={t("sync.now")}
+              data-testid="sync-now"
+              disabled={state.syncing}
+              onClick={() => void store.syncNow()}
+            >
+              <RefreshCw size={15} />
+            </button>
+          </div>
+        </footer>
+      )}
+      {dialogOpen && <AccountDialog onClose={() => setDialogOpen(false)} />}
     </nav>
   );
 }

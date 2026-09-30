@@ -1,4 +1,4 @@
-export * from "./providers.js";
+export * from "../providers.js";
 export * from "./roles.js";
 export * from "./threading.js";
 export * from "./parse.js";

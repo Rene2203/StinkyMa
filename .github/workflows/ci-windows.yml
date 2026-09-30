@@ -34,12 +34,28 @@ jobs:
         run: npm ci
       - name: Typen prüfen
         run: npm run typecheck
-      - name: Tests (Kern & Oberfläche)
+      # Lokaler Test-Mailserver (IMAP/SMTP) – Integrations- und E2E-Tests laufen nie gegen echte Konten.
+      - name: Test-Mailserver starten (GreenMail)
+        shell: pwsh
+        run: |
+          $jar = Join-Path $env:RUNNER_TEMP "greenmail.jar"
+          Invoke-WebRequest -Uri "https://repo1.maven.org/maven2/com/icegreen/greenmail-standalone/2.1.14/greenmail-standalone-2.1.14.jar" -OutFile $jar
+          Start-Process -FilePath "java" -ArgumentList "-Dgreenmail.setup.test.all","-Dgreenmail.auth.disabled","-Dgreenmail.hostname=127.0.0.1","-jar",$jar -WindowStyle Hidden
+          for ($i = 0; $i -lt 60; $i++) {
+            if ((Test-NetConnection 127.0.0.1 -Port 3143 -WarningAction SilentlyContinue).TcpTestSucceeded) { Write-Host "GreenMail bereit"; exit 0 }
+            Start-Sleep -Seconds 1
+          }
+          throw "GreenMail ist nicht gestartet"
+      - name: Tests (Kern, Oberfläche, IMAP-Integration)
         run: npm test
+        env:
+          GREENMAIL_IMAP_PORT: "3143"
       - name: App bauen
         run: npm run build
-      - name: E2E-Test der Windows-App (mit Screenshots)
+      - name: E2E-Test der Windows-App (mit Screenshots, Konto-Einrichtung gegen den Test-Mailserver)
         run: npm run e2e
+        env:
+          GREENMAIL_IMAP_PORT: "3143"
       - name: Screenshots hochladen
         if: success() || failure()
         uses: actions/upload-artifact@v4

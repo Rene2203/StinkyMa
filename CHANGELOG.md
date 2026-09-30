@@ -1,5 +1,35 @@
 # Changelog
 
+## Phase W2 – Ein Konto lesen (Windows)
+
+### Fertig
+- **Konto einrichten:** Dialog mit Anbieter-Erkennung (iCloud, Gmail, Yahoo, GMX, WEB.DE, T-Online, Posteo,
+  mailbox.org; sonst Vorschlag imap./smtp.<domain>), Hinweis und Link zum app-spezifischen Passwort,
+  aufklappbare Servereinstellungen, Verbindungstest vor dem Speichern, verständliche Fehlermeldungen,
+  Beispielkonten werden auf Wunsch entfernt. Konto entfernen über die Seitenleiste.
+- **Passwörter** verschlüsselt mit Windows-DPAPI (Electron `safeStorage`); ohne verfügbare Verschlüsselung
+  wird nichts gespeichert. Nie im Log, nie im Klartext auf der Platte.
+- **Abgleich (IMAP, imapflow):** Ordner mit Rollen (SPECIAL-USE bzw. Namen), Mails der letzten 30 Tage,
+  Flags, auf dem Server gelöschte Mails, UIDVALIDITY-Wechsel. Beim Start, alle 5 Minuten, per F5/Knopf.
+  Status und Fehler pro Konto in der Seitenleiste.
+- **MIME** (mailparser): Text, HTML, Anhänge (Metadaten), Umlaute/Kodierungen; Vorschau ohne Zitate und Signatur.
+- **Konversationen** aus References/In-Reply-To (deterministisch, auch bei ungeordnetem Abruf).
+- **Aktionen auf dem Server:** Gelesen/ungelesen, Markieren, Archivieren, Papierkorb (IMAP STORE/MOVE);
+  Beispielkonten bleiben lokal.
+- **HTML-Mails sicher:** DOMPurify (keine Skripte, Formulare, Frames, Ereignis-Handler), externe Bilder und
+  Hintergründe blockiert (mit Hinweis „Schutz vor Tracking“), Anzeige in einem Sandbox-Frame ohne Skripte,
+  Links öffnen im Standardbrowser.
+- **Datenmodell:** Migration `v2-account-connection` (Anmeldename, Verschlüsselung, Sync-Status) in
+  TypeScript **und** Swift.
+- **Tests:** 89 Unit-Tests, 6 IMAP-Integrationstests und 1 E2E-Test „Konto einrichten“ gegen einen lokalen
+  GreenMail-Testserver (auch in der Windows-CI), 2 weitere E2E-Tests.
+
+### Offen
+- Senden, Entwürfe, OAuth (Gmail/Outlook), Offline-Warteschlange → W3.
+- Sofortige Zustellung (IDLE), Volltextsuche in der Oberfläche, Anhänge öffnen → W4.
+- Externe Bilder auf Wunsch laden, Link-Prüfer → später (7.6).
+- Mit einem echten iCloud-Konto noch **ungetestet** (nur gegen den Testserver).
+
 ## Phase W1 – Fundament Windows
 
 ### Fertig

@@ -20,7 +20,7 @@ test.beforeAll(async () => {
   if (process.platform === "linux") args.push("--no-sandbox");
   app = await electron.launch({
     args,
-    env: { ...process.env, STINKYMA_DB: join(dataDir, "e2e.sqlite"), LANG: "de_DE.UTF-8" },
+    env: { ...process.env, STINKYMA_DB: join(dataDir, "e2e.sqlite"), STINKYMA_USER_DATA: dataDir, LANG: "de_DE.UTF-8" },
   });
   page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
@@ -92,7 +92,7 @@ test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await app.close();
   const args = [join(__dirname, ".."), "--lang=de-DE"];
   if (process.platform === "linux") args.push("--no-sandbox");
-  app = await electron.launch({ args, env: { ...process.env, STINKYMA_DB: join(dataDir, "e2e.sqlite") } });
+  app = await electron.launch({ args, env: { ...process.env, STINKYMA_DB: join(dataDir, "e2e.sqlite"), STINKYMA_USER_DATA: dataDir } });
   page = await app.firstWindow();
 
   await expect(rows().first()).toBeVisible({ timeout: 15_000 });

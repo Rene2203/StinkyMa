@@ -1,4 +1,4 @@
-import type { ConnectionSecurity, MailProvider } from "../models.js";
+import type { ConnectionSecurity, MailProvider } from "./models.js";
 
 // Bekannte Anbieter (Spezifikation 4.1). Plattformneutral – später auch für Server und iPad nutzbar.
 // Auto-Discovery über Mozilla-ISPDB und DNS-SRV folgt in Phase W3.

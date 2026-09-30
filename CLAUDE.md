@@ -38,6 +38,16 @@ npm run build                             # Electron-App bauen
 cd apps/desktop && xvfb-run -a npx playwright test   # E2E unter Linux (Windows: npx playwright test)
 ```
 
+IMAP-Tests laufen **nie gegen echte Konten**, sondern gegen GreenMail (Java, Maven Central
+`com.icegreen:greenmail-standalone`):
+```sh
+java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -Dgreenmail.hostname=127.0.0.1 -jar greenmail-standalone.jar &
+GREENMAIL_IMAP_PORT=3143 npx vitest run
+cd apps/desktop && GREENMAIL_IMAP_PORT=3143 xvfb-run -a npx playwright test
+```
+Ohne `GREENMAIL_IMAP_PORT` werden diese Tests übersprungen. Im Linux-Container gibt es keinen Schlüsselbund;
+der E2E-Test setzt deshalb `STINKYMA_TEST_PLAINTEXT_SECRETS=1` (wirkt nur unter Linux, nie unter Windows).
+
 ## Befehle (iPad/Mac)
 
 ```sh

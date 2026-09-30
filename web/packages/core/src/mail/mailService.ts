@@ -6,7 +6,6 @@ import {
   type Account,
   type AccountColor,
   type Attachment,
-  type ConnectionSecurity,
   type Mailbox,
   type MailboxRole,
   type Message,
@@ -20,41 +19,10 @@ import type { MailWriter } from "../sqlite/writer.js";
 import { messageIdFor, syncAccount, type SyncResult } from "./accountSync.js";
 import { connectImap, describeConnectionError, loginFor, MailConnectionError, testImapLogin } from "./connection.js";
 import { imapFlagName } from "./flags.js";
+import type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus } from "../accounts.js";
 
-/** Eingaben aus dem Dialog „Konto hinzufügen“. */
-export interface AccountSettings {
-  email: string;
-  displayName: string;
-  provider: Account["provider"];
-  username: string;
-  imapHost: string;
-  imapPort: number;
-  imapSecurity: ConnectionSecurity;
-  smtpHost: string;
-  smtpPort: number;
-  smtpSecurity: ConnectionSecurity;
-}
-
-export interface AddAccountOptions {
-  /** Beispielkonten beim ersten echten Konto entfernen. */
-  removeDemoAccounts: boolean;
-}
-
-export interface SyncStatus {
-  running: boolean;
-  lastRunAt: string | null;
-}
-
-/** Verwaltung von Konten und Abgleich – die Oberfläche ruft das über eine Brücke (IPC/HTTP) auf. */
-export interface AccountsApi {
-  addAccount(settings: AccountSettings, password: string, options: AddAccountOptions): Promise<Account>;
-  testConnection(settings: AccountSettings, password: string): Promise<{ ok: true } | { ok: false; error: string }>;
-  removeAccount(accountId: string): Promise<void>;
-  syncNow(): Promise<void>;
-  syncStatus(): Promise<SyncStatus>;
-}
-
-export const accountsApiMethods = ["addAccount", "testConnection", "removeAccount", "syncNow", "syncStatus"] as const satisfies readonly (keyof AccountsApi)[];
+export type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus };
+export { accountsApiMethods } from "../accounts.js";
 
 const accountColors: AccountColor[] = ["blue", "green", "orange", "purple", "pink", "teal", "red", "yellow"];
 

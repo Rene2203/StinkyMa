@@ -103,9 +103,39 @@ describe("BrowserStore", () => {
       ...repo,
       accounts: () => Promise.reject(new Error("Datenbank nicht erreichbar")),
     } as MailRepository);
+    expect(failing.canManageAccounts).toBe(false);
     await failing.loadSidebar();
     expect(failing.getState().error).toBe("Datenbank nicht erreichbar");
     failing.dismissError();
     expect(failing.getState().error).toBeNull();
+  });
+
+  it("reload behält die Auswahl und markiert nichts als gelesen", async () => {
+    const message = store.getState().messages.find((m) => isRead(m))!;
+    await store.selectMessage(message.id);
+    const unreadBefore = sidebarItem(store.getState(), { kind: "unifiedInbox" })!.unreadCount;
+    await store.reload();
+    expect(store.getState().selectedMessageId).toBe(message.id);
+    expect(store.getState().thread.length).toBeGreaterThan(0);
+    expect(sidebarItem(store.getState(), { kind: "unifiedInbox" })!.unreadCount).toBe(unreadBefore);
+  });
+
+  it("Abgleich und Konten über die Konto-Schnittstelle", async () => {
+    const calls: string[] = [];
+    const accounts = {
+      syncNow: async () => { calls.push("sync"); },
+      syncStatus: async () => ({ running: false, lastRunAt: "2026-09-30T10:00:00.000Z" }),
+      testConnection: async () => ({ ok: true as const }),
+      addAccount: async () => { calls.push("add"); return (await repo.accounts())[0]!; },
+      removeAccount: async (id: string) => { calls.push(`remove:${id}`); },
+    };
+    const managed = new BrowserStore(repo, { accounts });
+    await managed.start();
+    expect(managed.canManageAccounts).toBe(true);
+    expect(managed.getState().lastSyncAt).toBe("2026-09-30T10:00:00.000Z");
+    await managed.syncNow();
+    await managed.removeAccount(MockIds.gmail);
+    expect(calls).toEqual(["sync", `remove:${MockIds.gmail}`]);
+    expect(managed.getState().syncing).toBe(false);
   });
 });
