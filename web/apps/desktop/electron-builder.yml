@@ -1,0 +1,29 @@
+# Windows-Installer (NSIS). Arbeitsname „StinkyMa“ – der endgültige App-Name ist noch offen.
+appId: de.stinkyma.app
+productName: StinkyMa
+executableName: StinkyMa
+copyright: Copyright © 2026 StinkyMa
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/*.node"
+# better-sqlite3 nutzt Node-API mit fertigen Binärdateien pro Plattform – kein Neubau für Electron nötig.
+npmRebuild: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: StinkyMa-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: StinkyMa
+  language: "1031"
+  installerLanguages: [de_DE, en_US]
