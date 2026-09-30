@@ -52,6 +52,8 @@ jobs:
           name: StinkyMa-Playground
           path: build/playground
       - name: iPadOS-App im Simulator testen (UI-Tests mit Screenshots)
+        # Unabhängig vom Playground-Schritt ausführen.
+        if: success() || failure()
         run: scripts/ci-ipad-screenshots.sh
       - name: Screenshots hochladen
         if: always()

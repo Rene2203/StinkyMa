@@ -38,7 +38,7 @@ let package = Package(
             bundleIdentifier: "de.stinkyma.playground",
             displayVersion: "0.1",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .mail),
+            appIcon: .placeholder(icon: .leaf),
             accentColor: .presetColor(.blue),
             supportedDeviceFamilies: [
                 .pad,

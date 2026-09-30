@@ -77,7 +77,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Test nutzt jetzt den Gmail-Posteingang. Außerdem: Artefakt-Upload scheiterte an Dateinamen mit
   Anführungszeichen (Debug-Anhänge) → nur eigene Screenshots + Bildschirmaufnahme behalten.
   Playground-Schritt läuft jetzt vor dem UI-Test, damit das Paket auch bei rotem UI-Test entsteht.
-  **Dritter Lauf steht aus.**
+- Dritter Lauf (#11): Playground-Paket ließ sich nicht auflösen – Platzhalter-Icon `.mail` gibt es
+  in AppleProductTypes nicht → `.leaf`. UI-Test läuft jetzt auch, wenn der Playground-Schritt
+  scheitert. **Vierter Lauf steht aus.**
 - Swift-Playgrounds-Export (`scripts/make-playground.sh`): kopiert alle Module in ein App-Target.
   Unter Linux geprüft, dass die Kernmodule als ein Modul kompilieren; Playground-Build in der CI
   (Xcode) und Öffnen auf dem iPad **noch ungeprüft**.
