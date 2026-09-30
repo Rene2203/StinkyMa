@@ -4,6 +4,18 @@ import { accountFromRow, mailboxFromRow } from "./repository.js";
 
 type Row = Record<string, unknown>;
 
+export type PendingActionKind = "flag" | "move";
+
+export interface PendingAction {
+  id: number;
+  accountId: string;
+  messageId: string;
+  kind: PendingActionKind;
+  payload: Record<string, unknown>;
+  attempts: number;
+  lastError: string | null;
+}
+
 export interface NewMessage {
   id: string;
   accountId: string;
@@ -172,6 +184,8 @@ export class MailWriter {
       // Die neue ID ist aus Ordner + UID abgeleitet; Anhänge hängen per Fremdschlüssel an der alten ID.
       const row = this.db.prepare("SELECT * FROM message WHERE id = ?").get(id) as Row | undefined;
       if (!row) return;
+      // Wartende Aktionen folgen der Mail auf ihre neue ID.
+      this.db.prepare("UPDATE pendingAction SET messageId = ? WHERE messageId = ?").run(target.newId, id);
       if (target.newId === id) {
         this.db.prepare("UPDATE message SET mailboxId = ?, uid = ? WHERE id = ?").run(target.mailboxId, target.uid, id);
         return;
@@ -197,6 +211,46 @@ export class MailWriter {
         insertAttachment.run(`${target.newId}/a${i}`, target.newId, a.filename, a.mimeType, a.size, a.isInline, a.contentId, a.pageCount),
       );
     });
+  }
+
+  // --- Warteschlange für Server-Aktionen ---
+
+  enqueueAction(action: { accountId: string; messageId: string; kind: PendingActionKind; payload: unknown; createdAt: string }): void {
+    this.db
+      .prepare("INSERT INTO pendingAction (accountId, messageId, kind, payload, createdAt) VALUES (?, ?, ?, ?, ?)")
+      .run(action.accountId, action.messageId, action.kind, JSON.stringify(action.payload), action.createdAt);
+  }
+
+  pendingActions(accountId: string): PendingAction[] {
+    return (this.db.prepare("SELECT * FROM pendingAction WHERE accountId = ? ORDER BY id").all(accountId) as Row[]).map((r) => ({
+      id: Number(r.id),
+      accountId: String(r.accountId),
+      messageId: String(r.messageId),
+      kind: String(r.kind) as PendingActionKind,
+      payload: JSON.parse(String(r.payload)) as Record<string, unknown>,
+      attempts: Number(r.attempts),
+      lastError: (r.lastError as string | null) ?? null,
+    }));
+  }
+
+  pendingActionCount(accountId?: string): number {
+    const row = (accountId
+      ? this.db.prepare("SELECT COUNT(*) AS n FROM pendingAction WHERE accountId = ?").get(accountId)
+      : this.db.prepare("SELECT COUNT(*) AS n FROM pendingAction").get()) as { n: number };
+    return row.n;
+  }
+
+  completeAction(id: number): void {
+    this.db.prepare("DELETE FROM pendingAction WHERE id = ?").run(id);
+  }
+
+  failAction(id: number, error: string): void {
+    this.db.prepare("UPDATE pendingAction SET attempts = attempts + 1, lastError = ? WHERE id = ?").run(error, id);
+  }
+
+  /** Lokal sofort verschieben; die UID im Zielordner kennt erst der Server (bis dahin `NULL`). */
+  moveLocally(messageId: string, mailboxId: string): void {
+    this.db.prepare("UPDATE message SET mailboxId = ?, uid = NULL WHERE id = ?").run(mailboxId, messageId);
   }
 
   messageLocation(id: string): { accountId: string; mailboxId: string; uid: number | null; flags: number } | null {

@@ -11,6 +11,8 @@ export interface SyncOptions {
   since: Date;
   /** Wie viele Mails pro FETCH geholt werden. */
   batchSize?: number;
+  /** Nach jedem Ordner – damit die Oberfläche neue Mails sofort zeigt, nicht erst am Ende. */
+  onMailboxSynced?: (counts: { added: number; removed: number; flagsChanged: number }) => void;
 }
 
 export interface SyncResult {
@@ -35,8 +37,11 @@ export async function syncAccount(client: ImapFlow, writer: MailWriter, account:
   }
   for (const folder of folders) writer.upsertMailbox(folder.mailbox);
 
-  for (const folder of folders) {
+  // Posteingang zuerst – dort erwartet man neue Mails.
+  const ordered = [...folders].sort((a, b) => Number(b.mailbox.role === "inbox") - Number(a.mailbox.role === "inbox"));
+  for (const folder of ordered) {
     const counts = await syncMailbox(client, writer, account, folder, options);
+    options.onMailboxSynced?.(counts);
     result.mailboxes += 1;
     result.added += counts.added;
     result.removed += counts.removed;
@@ -124,6 +129,8 @@ async function syncMailbox(
           attachments: parsed.attachments,
         });
         added += 1;
+        // Dem Main-Prozess Luft lassen: Oberfläche und Aktionen bleiben während des Abgleichs bedienbar.
+        await new Promise((resolve) => setImmediate(resolve));
       }
     }
 

@@ -192,34 +192,27 @@ export class BrowserStore {
     });
   }
 
+  /** Seitenleiste mit einem einzigen Aufruf (Konten, Ordner, Zähler) – wichtig für Tempo über IPC/HTTP. */
   async loadSidebar(): Promise<void> {
     await this.#guard(async () => {
-      const repo = this.#repository;
-      const accounts = await repo.accounts();
-      const smartScopes: [SidebarItemKind, MessageScope][] = [
-        [{ type: "unifiedInbox" }, { kind: "unifiedInbox" }],
-        [{ type: "unread" }, { kind: "unread" }],
-        [{ type: "flagged" }, { kind: "flagged" }],
+      const { accounts, mailboxesByAccount, counts } = await this.#repository.overview();
+      const smart: [SidebarItemKind, MessageScope, number][] = [
+        [{ type: "unifiedInbox" }, { kind: "unifiedInbox" }, counts.unifiedInbox],
+        [{ type: "unread" }, { kind: "unread" }, counts.unread],
+        [{ type: "flagged" }, { kind: "flagged" }, counts.flagged],
       ];
       const sections: SidebarSection[] = [
-        {
-          id: "smart",
-          account: null,
-          items: await Promise.all(
-            smartScopes.map(async ([kind, scope]) => ({ kind, scope, unreadCount: await repo.unreadCount(scope) })),
-          ),
-        },
+        { id: "smart", account: null, items: smart.map(([kind, scope, unreadCount]) => ({ kind, scope, unreadCount })) },
+        ...accounts.map((account) => ({
+          id: `account-${account.id}`,
+          account,
+          items: (mailboxesByAccount[account.id] ?? []).map((mailbox): SidebarItem => ({
+            kind: { type: "mailbox", mailbox },
+            scope: { kind: "mailbox", mailboxId: mailbox.id },
+            unreadCount: counts.mailboxes[mailbox.id] ?? 0,
+          })),
+        })),
       ];
-      for (const account of accounts) {
-        const mailboxes = await repo.mailboxes(account.id);
-        const items = await Promise.all(
-          mailboxes.map(async (mailbox): Promise<SidebarItem> => {
-            const scope: MessageScope = { kind: "mailbox", mailboxId: mailbox.id };
-            return { kind: { type: "mailbox", mailbox }, scope, unreadCount: await repo.unreadCount(scope) };
-          }),
-        );
-        sections.push({ id: `account-${account.id}`, account, items });
-      }
       this.#set({ sections, accountsById: Object.fromEntries(accounts.map((a) => [a.id, a])) });
     });
   }
@@ -308,24 +301,50 @@ export class BrowserStore {
   async #move(ids: string[], role: "archive" | "trash"): Promise<void> {
     if (ids.length === 0) return;
     const next = this.#selectionAfterRemoving(ids);
+    const selected = this.#state.selectedMessageId;
+    // Sofort aus der Liste nehmen – nicht auf Datenbank oder Server warten.
+    this.#set({ messages: this.#state.messages.filter((m) => !ids.includes(m.id)) });
+    if (selected !== null && ids.includes(selected)) void this.selectMessage(next);
     await this.#guard(async () => {
       await this.#repository.move(ids, role);
-      const selected = this.#state.selectedMessageId;
-      await this.loadMessages();
-      if (selected !== null && ids.includes(selected)) await this.selectMessage(next);
-      await this.loadSidebar();
+      await Promise.all([this.loadMessages(), this.loadSidebar()]);
     });
   }
 
   async #setFlag(flag: MessageFlagName, enabled: boolean, ids: string[]): Promise<void> {
-    await this.#repository.setFlag(flag, enabled, ids);
     const bit = MessageFlag[flag];
     const apply = (list: Message[]) =>
       list.map((m) => (ids.includes(m.id) ? { ...m, flags: enabled ? m.flags | bit : m.flags & ~bit } : m));
-    // Aus „Ungelesen“ bzw. „Markiert“ verschwinden Mails erst beim nächsten Laden,
-    // damit die Liste beim Lesen nicht unter dem Mauszeiger wegspringt.
+    // Sofort anzeigen (auch die Zähler), dann speichern. Aus „Ungelesen“/„Markiert“ verschwinden Mails
+    // erst beim nächsten Laden, damit die Liste beim Lesen nicht unter dem Mauszeiger wegspringt.
+    const before = this.#state.messages.concat(this.#state.thread).filter((m) => ids.includes(m.id));
     this.#set({ messages: apply(this.#state.messages), thread: apply(this.#state.thread) });
+    if (flag === "seen") this.#adjustUnreadCounts(before, enabled);
+    await this.#repository.setFlag(flag, enabled, ids);
     await this.loadSidebar();
+  }
+
+  /** Zähler in der Seitenleiste sofort anpassen, bevor die Datenbank antwortet. */
+  #adjustUnreadCounts(messages: Message[], markRead: boolean): void {
+    const unique = new Map(messages.map((m) => [m.id, m]));
+    let sections = this.#state.sections;
+    for (const m of unique.values()) {
+      if (isRead(m) === markRead) continue; // ändert sich nichts
+      const delta = markRead ? -1 : 1;
+      const box = sections.flatMap((s) => s.items).find((i) => i.kind.type === "mailbox" && i.kind.mailbox.id === m.mailboxId);
+      const role = box && box.kind.type === "mailbox" ? box.kind.mailbox.role : null;
+      sections = sections.map((section) => ({
+        ...section,
+        items: section.items.map((item) => {
+          const hit =
+            (item.kind.type === "mailbox" && item.kind.mailbox.id === m.mailboxId) ||
+            ((item.kind.type === "unifiedInbox" || item.kind.type === "unread") && role === "inbox") ||
+            (item.kind.type === "flagged" && isFlagged(m) && role !== "trash");
+          return hit ? { ...item, unreadCount: Math.max(0, item.unreadCount + delta) } : item;
+        }),
+      }));
+    }
+    this.#set({ sections });
   }
 
   #find(id: string): Message | undefined {

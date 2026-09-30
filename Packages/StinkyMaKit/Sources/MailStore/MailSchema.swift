@@ -7,6 +7,7 @@ enum MailSchema {
         migrator.registerMigration("v1-core", migrate: createCoreTables)
         migrator.registerMigration("v1-fts", migrate: createFullTextSearch)
         migrator.registerMigration("v2-account-connection", migrate: addAccountConnection)
+        migrator.registerMigration("v3-pending-actions", migrate: createPendingActions)
         return migrator
     }
 
@@ -179,6 +180,22 @@ enum MailSchema {
             t.add(column: "lastSyncAt", .datetime)
             t.add(column: "syncError", .text)
         }
+    }
+
+    /// Warteschlange für Aktionen, die noch zum Mailserver müssen (offline-fähig, Spezifikation 4.3).
+    /// Gleich in web/packages/core/src/sqlite/schema.ts.
+    private static func createPendingActions(_ db: Database) throws {
+        try db.create(table: "pendingAction") { t in
+            t.autoIncrementedPrimaryKey("id")
+            t.belongsTo("account", onDelete: .cascade).notNull()
+            t.column("messageId", .text).notNull()
+            t.column("kind", .text).notNull()
+            t.column("payload", .jsonText).notNull()
+            t.column("createdAt", .datetime).notNull()
+            t.column("attempts", .integer).notNull().defaults(to: 0)
+            t.column("lastError", .text)
+        }
+        try db.create(index: "pendingAction_on_accountId_id", on: "pendingAction", columns: ["accountId", "id"])
     }
 
     /// Volltextindex über Betreff, Absender und Text. Wird per Trigger aktuell gehalten.

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeQuietly } from "./helpers";
+import { expectScrollable, removeQuietly } from "./helpers";
 
 // Konto einrichten gegen einen lokalen GreenMail-Testserver (nie gegen echte Konten).
 // Start: java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -jar greenmail-standalone.jar
@@ -45,6 +45,15 @@ test.beforeAll(async () => {
     [],
     new Date(),
   );
+  // Genug Mails, dass die Liste scrollen muss
+  for (let i = 1; i <= 40; i++) {
+    await admin.append(
+      "INBOX",
+      [`From: Shop ${i} <shop${i}@example.test>`, `To: ${email}`, `Subject: Angebot Nummer ${i}`, `Date: ${new Date(Date.now() - i * 3_600_000).toUTCString()}`, `Message-ID: <a${i}@example.test>`, "", `Text ${i}`, ""].join("\r\n"),
+      ["\\Seen"],
+      new Date(Date.now() - i * 3_600_000),
+    );
+  }
   await admin.logout();
 
   const args = [join(__dirname, ".."), "--lang=de-DE"];
@@ -85,7 +94,8 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   // Dialog schließt, Beispielkonten sind weg, die Mails vom Server erscheinen.
   await expect(dialog).toHaveCount(0, { timeout: 20_000 });
   await expect(page.getByText("Ihre Rechnung als HTML")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId("message-row")).toHaveCount(2);
+  await expect(page.getByTestId("message-row")).toHaveCount(42);
+  await expectScrollable(page, ".rows");
   await expect(page.getByRole("heading", { name: "Privat" })).toHaveCount(0);
 
   // HTML-Mail: Inhalt da, Skript nicht ausgeführt, Tracker blockiert
@@ -94,7 +104,7 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await expect(frame.getByRole("heading", { name: "Ihre Rechnung" })).toBeVisible();
   await expect(page.getByText("Externe Inhalte wurden blockiert")).toBeVisible();
   // Geöffnet = gelesen, auch auf dem Server
-  await expect(page.getByTestId("sidebar-unifiedInbox").locator(".badge")).toHaveText("1");
+  await expect(page.getByTestId("sidebar-unifiedInbox").locator(".badge")).toHaveText("1", { timeout: 1_000 });
   expect(await page.title()).toBe("StinkyMa");
   await expect(frame.locator("script")).toHaveCount(0);
   await expect(frame.locator("img[src*='tracker']")).toHaveCount(0);
@@ -109,12 +119,18 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await test.step("Archivieren per Taste E wirkt auf dem Server", async () => {
     await page.getByTestId("thread-subject").click(); // Fokus in die App (nicht in den Mail-Frame)
     await page.keyboard.press("e");
-    await expect(page.getByTestId("message-row")).toHaveCount(1);
-    const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
-    await admin.connect();
-    const status = await admin.status("Archiv", { messages: true });
-    await admin.logout();
-    expect(status && status.messages).toBe(1);
+    // Sofort weg aus der Liste – ohne auf den Server zu warten
+    await expect(page.getByTestId("message-row")).toHaveCount(41, { timeout: 1_000 });
+    // Kurz danach auch auf dem Server (Warteschlange im Hintergrund)
+    await expect
+      .poll(async () => {
+        const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+        await admin.connect();
+        const status = await admin.status("Archiv", { messages: true });
+        await admin.logout();
+        return status && status.messages;
+      }, { timeout: 10_000 })
+      .toBe(1);
   });
 
   await test.step("Abruf per Knopf", async () => {

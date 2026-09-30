@@ -14,6 +14,7 @@ struct MailDatabaseTests {
         for table in [
             "account", "mailbox", "thread", "message", "attachment", "attachmentAnalysis", "attachmentText",
             "embedding", "behaviorEvent", "senderProfile", "styleProfile", "reminder", "aiModel", "messageFTS",
+            "pendingAction",
         ] {
             #expect(tables.contains(table), "Tabelle \(table) fehlt")
         }
@@ -24,7 +25,7 @@ struct MailDatabaseTests {
         _ = try MailDatabase(writer: queue)
         _ = try MailDatabase(writer: queue)
         let applied = try queue.read { db in try MailSchema.migrator.appliedMigrations(db) }
-        #expect(applied == ["v1-core", "v1-fts", "v2-account-connection"])
+        #expect(applied == ["v1-core", "v1-fts", "v2-account-connection", "v3-pending-actions"])
     }
 
     @Test func fileDatabaseIsCreatedWithIntermediateDirectories() throws {

@@ -97,7 +97,15 @@ button {
 .app {
   display: grid;
   grid-template-columns: minmax(200px, 250px) minmax(300px, 400px) 1fr;
+  grid-template-rows: 100%;
   height: 100%;
+}
+
+/* Spalten dürfen kleiner als ihr Inhalt werden – sonst wird nicht gescrollt, sondern abgeschnitten. */
+.app > *,
+.rows,
+.detail-scroll {
+  min-height: 0;
 }
 
 /* ---------- Seitenleiste ---------- */

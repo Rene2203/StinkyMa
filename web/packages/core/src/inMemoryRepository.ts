@@ -1,6 +1,6 @@
 import type { Account, Attachment, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
 import { MessageFlag, mailboxRoleRank } from "./models.js";
-import type { MailRepository } from "./repository.js";
+import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
 
 /** `MailRepository` im Arbeitsspeicher – für UI-Tests und Vorschauen, ohne Datenbank. */
@@ -49,6 +49,24 @@ export class InMemoryMailRepository implements MailRepository {
 
   async unreadCount(scope: MessageScope): Promise<number> {
     return this.#inScope(scope).filter((m) => (m.flags & MessageFlag.seen) === 0).length;
+  }
+
+  async overview(): Promise<MailOverview> {
+    const accounts = await this.accounts();
+    const mailboxesByAccount: Record<string, Mailbox[]> = {};
+    for (const account of accounts) mailboxesByAccount[account.id] = await this.mailboxes(account.id);
+    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {} };
+    for (const m of this.#data.messages) {
+      if ((m.flags & MessageFlag.seen) !== 0) continue;
+      const role = this.#roleOf(m.mailboxId);
+      counts.mailboxes[m.mailboxId] = (counts.mailboxes[m.mailboxId] ?? 0) + 1;
+      if (role === "inbox") {
+        counts.unifiedInbox += 1;
+        counts.unread += 1;
+      }
+      if (role !== "trash" && (m.flags & MessageFlag.flagged) !== 0) counts.flagged += 1;
+    }
+    return { accounts, mailboxesByAccount, counts };
   }
 
   async setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void> {

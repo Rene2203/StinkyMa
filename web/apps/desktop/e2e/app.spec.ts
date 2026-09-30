@@ -2,7 +2,7 @@ import { _electron as electron, expect, test, type ElectronApplication, type Pag
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { removeQuietly } from "./helpers";
+import { expectScrollable, removeQuietly } from "./helpers";
 
 // Abnahme Phase W1: App startet, zeigt den Mock-Posteingang, Navigation und Aktionen funktionieren.
 // Screenshots landen in test-results/screenshots (CI lädt sie als Artefakt hoch).
@@ -41,6 +41,7 @@ test("Mock-Posteingang, Navigation und Aktionen", async () => {
   expect(await rows().count()).toBeGreaterThan(10);
   await expect(page.getByRole("heading", { name: "Alle Posteingänge" })).toBeVisible();
   await shot("01-Posteingang");
+  await expectScrollable(page, ".rows");
 
   // 2. Mail öffnen → Konversation, Ungelesen-Zähler sinkt
   const unifiedBadge = page.getByTestId("sidebar-unifiedInbox").locator(".badge");

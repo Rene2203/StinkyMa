@@ -100,9 +100,8 @@ describe("BrowserStore", () => {
 
   it("Fehler landen im Zustand statt abzustürzen", async () => {
     const failing = new BrowserStore({
-      ...repo,
-      accounts: () => Promise.reject(new Error("Datenbank nicht erreichbar")),
-    } as MailRepository);
+      overview: () => Promise.reject(new Error("Datenbank nicht erreichbar")),
+    } as unknown as MailRepository);
     expect(failing.canManageAccounts).toBe(false);
     await failing.loadSidebar();
     expect(failing.getState().error).toBe("Datenbank nicht erreichbar");
@@ -137,5 +136,50 @@ describe("BrowserStore", () => {
     await managed.removeAccount(MockIds.gmail);
     expect(calls).toEqual(["sync", `remove:${MockIds.gmail}`]);
     expect(managed.getState().syncing).toBe(false);
+  });
+
+  it("Zähler sinken sofort beim Öffnen, noch bevor gespeichert ist", async () => {
+    let release: () => void = () => undefined;
+    const slow = new Proxy(repo, {
+      get(target, prop, receiver) {
+        if (prop === "setFlag") {
+          return (...args: Parameters<MailRepository["setFlag"]>) =>
+            new Promise<void>((resolve) => { release = () => resolve(target.setFlag(...args)); });
+        }
+        return Reflect.get(target, prop, receiver).bind(target);
+      },
+    });
+    const s = new BrowserStore(slow);
+    await s.start();
+    const unread = s.getState().messages.find((m) => !isRead(m))!;
+    const before = sidebarItem(s.getState(), { kind: "unifiedInbox" })!.unreadCount;
+    const opening = s.selectMessage(unread.id);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(sidebarItem(s.getState(), { kind: "unifiedInbox" })!.unreadCount).toBe(before - 1);
+    expect(isRead(s.getState().messages.find((m) => m.id === unread.id)!)).toBe(true);
+    release();
+    await opening;
+    expect(sidebarItem(s.getState(), { kind: "unifiedInbox" })!.unreadCount).toBe(before - 1);
+  });
+
+  it("Archivieren nimmt die Mail sofort aus der Liste", async () => {
+    let release: () => void = () => undefined;
+    const slow = new Proxy(repo, {
+      get(target, prop, receiver) {
+        if (prop === "move") {
+          return (...args: Parameters<MailRepository["move"]>) =>
+            new Promise<void>((resolve) => { release = () => resolve(target.move(...args)); });
+        }
+        return Reflect.get(target, prop, receiver).bind(target);
+      },
+    });
+    const s = new BrowserStore(slow);
+    await s.start();
+    const first = s.getState().messages[0]!;
+    const archiving = s.archive([first.id]);
+    expect(s.getState().messages.some((m) => m.id === first.id)).toBe(false);
+    release();
+    await archiving;
+    expect(s.getState().messages.some((m) => m.id === first.id)).toBe(false);
   });
 });

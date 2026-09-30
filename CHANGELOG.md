@@ -1,5 +1,28 @@
 # Changelog
 
+## W2.1 – Korrekturen nach dem ersten Praxistest (Windows)
+
+Rückmeldung des Nutzers mit echtem iCloud-Konto: Zahlen in der Seitenleiste nicht aktuell, App träge,
+Archivieren/Löschen erst nach Wegklicken sichtbar, Scrollen geht nicht.
+
+### Behoben
+- **Scrollen:** Spalten durften nicht kleiner als ihr Inhalt werden (fehlendes `min-height: 0` im Grid) –
+  Listen wurden abgeschnitten statt gescrollt. E2E-Test prüft jetzt das Scrollen (schlägt ohne Fix nachweislich fehl).
+- **Aktionen sofort:** Gelesen, Markieren, Archivieren, Papierkorb wirken sofort in Liste und Zählern.
+  Übertragung zum Server im Hintergrund über eine **dauerhafte Warteschlange** (Tabelle `pendingAction`,
+  Migration `v3-pending-actions` in TypeScript und Swift) – überlebt Neustart und fehlendes Internet
+  (vorgezogen aus W3). Vor jedem Abruf wird die Warteschlange zuerst übertragen.
+- **Verbindung wiederverwenden:** eine IMAP-Verbindung pro Konto bleibt bis zu 2 Minuten offen, statt für
+  jede Aktion neu anzumelden (bei iCloud 1–2 s pro Aktion gespart).
+- **Zähler:** Seitenleiste mit einem einzigen Aufruf (`overview`) statt einer Anfrage pro Ordner; beim Öffnen
+  einer Mail sinkt der Zähler sofort.
+- **Abruf blockiert nicht:** Posteingang zuerst, Oberfläche wird nach jedem Ordner aktualisiert, der
+  Main-Prozess bekommt zwischen Mails Luft.
+
+### Tests
+101 Unit-/Integrationstests (neu: Warteschlange offline und nach Neustart, `overview`, sofortige Zähler und
+Listen im Oberflächen-Modell), 3 E2E-Tests (neu: Scrollen, 42 Mails, Archivieren innerhalb 1 s sichtbar).
+
 ## Phase W2 – Ein Konto lesen (Windows)
 
 ### Fertig

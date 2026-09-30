@@ -120,6 +120,19 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
     expect((await repo.attachments(invoice.id)).map((a) => a.filename)).toEqual(["AGB.pdf", "Rechnung_2026-10.pdf"]);
   });
 
+  it("overview liefert Konten, Ordner und dieselben Zähler wie unreadCount", async () => {
+    const repo = make();
+    const { accounts, mailboxesByAccount, counts } = await repo.overview();
+    expect(accounts.map((a) => a.id)).toEqual((await repo.accounts()).map((a) => a.id));
+    expect(mailboxesByAccount[MockIds.iCloud]?.map((m) => m.id)).toEqual((await repo.mailboxes(MockIds.iCloud)).map((m) => m.id));
+    expect(counts.unifiedInbox).toBe(await repo.unreadCount({ kind: "unifiedInbox" }));
+    expect(counts.unread).toBe(await repo.unreadCount({ kind: "unread" }));
+    expect(counts.flagged).toBe(await repo.unreadCount({ kind: "flagged" }));
+    for (const box of Object.values(mailboxesByAccount).flat()) {
+      expect(counts.mailboxes[box.id] ?? 0, box.id).toBe(await repo.unreadCount({ kind: "mailbox", mailboxId: box.id }));
+    }
+  });
+
   it("unbekannte Mail ergibt null", async () => {
     expect(await make().message("gibt-es-nicht")).toBeNull();
   });

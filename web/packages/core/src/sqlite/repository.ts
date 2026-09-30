@@ -11,7 +11,7 @@ import type {
   MessageScope,
 } from "../models.js";
 import { MessageFlag, mailboxRoleRank } from "../models.js";
-import type { MailRepository } from "../repository.js";
+import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 
 type Row = Record<string, unknown>;
 
@@ -124,6 +124,36 @@ export class SqliteMailRepository implements MailRepository {
       .prepare(`SELECT COUNT(*) AS n FROM message JOIN mailbox ON mailbox.id = message.mailboxId WHERE ${sql} AND (message.flags & ?) = 0`)
       .get(...params, MessageFlag.seen) as { n: number };
     return row.n;
+  }
+
+  async overview(): Promise<MailOverview> {
+    const accounts = await this.accounts();
+    const allMailboxes = (this.db.prepare("SELECT * FROM mailbox").all() as Row[]).map(mailboxFromRow);
+    const mailboxesByAccount: Record<string, Mailbox[]> = {};
+    for (const account of accounts) {
+      mailboxesByAccount[account.id] = allMailboxes
+        .filter((m) => m.accountId === account.id)
+        .sort((a, b) => mailboxRoleRank[a.role] - mailboxRoleRank[b.role] || a.name.localeCompare(b.name));
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT message.mailboxId AS mailboxId, mailbox.role AS role,
+                SUM(CASE WHEN (message.flags & @seen) = 0 THEN 1 ELSE 0 END) AS unread,
+                SUM(CASE WHEN (message.flags & @seen) = 0 AND (message.flags & @flagged) <> 0 THEN 1 ELSE 0 END) AS flaggedUnread
+         FROM message JOIN mailbox ON mailbox.id = message.mailboxId
+         GROUP BY message.mailboxId`,
+      )
+      .all({ seen: MessageFlag.seen, flagged: MessageFlag.flagged }) as { mailboxId: string; role: string; unread: number; flaggedUnread: number }[];
+    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {} };
+    for (const r of rows) {
+      if (r.unread > 0) counts.mailboxes[r.mailboxId] = r.unread;
+      if (r.role === "inbox") {
+        counts.unifiedInbox += r.unread;
+        counts.unread += r.unread;
+      }
+      if (r.role !== "trash") counts.flagged += r.flaggedUnread;
+    }
+    return { accounts, mailboxesByAccount, counts };
   }
 
   async setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void> {

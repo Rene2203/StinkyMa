@@ -202,6 +202,24 @@ export const migrations: Migration[] = [
       ALTER TABLE account ADD COLUMN syncError TEXT;
     `,
   },
+  {
+    name: "v3-pending-actions",
+    // Warteschlange für Aktionen, die noch zum Mailserver müssen (Spezifikation 4.3: offline-fähig).
+    // Die Oberfläche zeigt Änderungen sofort; übertragen wird im Hintergrund. Gleich in MailSchema.swift.
+    sql: `
+      CREATE TABLE pendingAction (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        accountId TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+        messageId TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        lastError TEXT
+      );
+      CREATE INDEX pendingAction_on_accountId_id ON pendingAction(accountId, id);
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W2 – Ein Konto lesen (fertig, auf Windows in der CI geprüft; Test mit echtem Konto beim Nutzer steht aus)
+**Aktuelle Phase:** W2.1 – Korrekturen nach dem ersten Praxistest (umgesetzt, lokal getestet; Windows-CI und erneuter Test beim Nutzer stehen aus)
 
 ## Überblick
 
@@ -156,3 +156,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - **Windows-CI Lauf #14: komplett grün.** 95 Tests inkl. 6 IMAP-Integrationstests gegen GreenMail, 3 E2E-Tests
   inkl. Konto-Einrichtung mit echter Windows-DPAPI, Archivieren auf dem Server und Abruf-Knopf; Installer gebaut.
   Keine verwaisten Electron-Prozesse mehr – das sofortige Beenden wirkt.
+- **Erster Praxistest des Nutzers (echtes iCloud-Konto):** Verbinden klappt, Mails werden angezeigt und lassen
+  sich öffnen. Probleme: Zähler nicht aktuell, App träge, Archivieren/Löschen erst nach Wegklicken sichtbar,
+  Scrollen geht nicht.
+- **W2.1 – Ursachen und Korrekturen:** (1) CSS: Grid-Spalten ohne `min-height: 0` → kein Scrollen. (2) Jede
+  Aktion öffnete eine neue IMAP-Verbindung und wartete auf den Server – und hinter einem laufenden Abruf.
+  Jetzt: sofort lokal + dauerhafte Warteschlange (`pendingAction`, Migration v3 in TS **und** Swift),
+  wiederverwendete Verbindung. (3) Seitenleiste lud jeden Zähler einzeln → ein Aufruf `overview`; Zähler
+  sinken sofort. (4) Abruf meldet nach jedem Ordner, Posteingang zuerst, gibt dem Main-Prozess Luft.
+  Lokal: 101 Tests + 3 E2E grün (Scroll-Test fällt ohne Fix nachweislich durch). Swift: 43 Tests grün.
+  **Ungeprüft:** Verhalten mit echtem iCloud-Konto und großen Postfächern; Windows-CI steht aus.

@@ -38,6 +38,7 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
   let repository: SqliteMailRepository;
   let secrets: InMemorySecretStore;
   let changes = 0;
+  let db: ReturnType<typeof openDatabase>;
 
   const settings = (): AccountSettings => ({
     email: user, displayName: "Test", provider: "imap", username: user,
@@ -57,7 +58,7 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     await admin.append(inbox, rfc822({ from: "Newsletter <news@shop.example>", subject: "Wochenangebote", date: daysAgo(2), messageId: "<n1@shop.example>", body: "Alles reduziert." }), ["\\Seen"], daysAgo(2));
     await admin.append(inbox, rfc822({ from: "Alt <alt@example.test>", subject: "Uralt", date: daysAgo(90), messageId: "<old@example.test>", body: "Sehr alt." }), [], daysAgo(90));
 
-    const db = openDatabase(":memory:");
+    db = openDatabase(":memory:");
     seedIfEmpty(db, createMockData(now));
     repository = new SqliteMailRepository(db);
     secrets = new InMemorySecretStore();
@@ -66,8 +67,17 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
   });
 
   afterEach(async () => {
+    service.dispose();
     await admin.logout().catch(() => admin.close());
   });
+
+  async function serverFlags(subject: string, mailbox = "INBOX"): Promise<string[] | undefined> {
+    await admin.mailboxOpen(mailbox);
+    for await (const msg of admin.fetch("1:*", { flags: true, envelope: true })) {
+      if (msg.envelope?.subject === subject) return [...(msg.flags ?? [])];
+    }
+    return undefined;
+  }
 
   async function addAndSync() {
     const account = await service.addAccount(settings(), "geheim", { removeDemoAccounts: true });
@@ -127,31 +137,74 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     expect(second.some((m) => m.subject === "Neu")).toBe(true);
   });
 
-  it("gelesen markieren und archivieren wirken auf dem Server", async () => {
+  it("Aktionen wirken sofort lokal und gehen über die Warteschlange zum Server", async () => {
     await addAndSync();
     const inbox = await service.messages({ kind: "unifiedInbox" }, 100);
     const target = inbox.find((m) => m.subject === "Grüße aus München")!;
 
+    // Sofort lokal – ohne auf den Server zu warten
     await service.setFlag("seen", true, [target.id]);
-    await admin.mailboxOpen("INBOX");
-    const flags: string[][] = [];
-    for await (const msg of admin.fetch("1:*", { flags: true, envelope: true })) {
-      if (msg.envelope?.subject === "Grüße aus München") flags.push([...(msg.flags ?? [])]);
-    }
-    expect(flags[0]).toContain("\\Seen");
+    expect(isRead((await service.message(target.id))!)).toBe(true);
+    expect((await service.overview()).counts.unifiedInbox).toBe(1);
 
     await service.move([target.id], "archive");
-    const archived = await service.messages({ kind: "mailbox", mailboxId: `${target.accountId}/Archiv` }, 100);
-    expect(archived.map((m) => m.subject)).toEqual(["Grüße aus München"]);
+    const archivedLocal = await service.messages({ kind: "mailbox", mailboxId: `${target.accountId}/Archiv` }, 100);
+    expect(archivedLocal.map((m) => m.subject)).toEqual(["Grüße aus München"]);
     expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Grüße aus München")).toBe(false);
 
+    // Dann auf dem Server
+    await service.flushNow(target.accountId);
+    expect(service.pendingChanges()).toBe(0);
+    expect(await serverFlags("Grüße aus München", "Archiv")).toContain("\\Seen");
     const status = await admin.status("Archiv", { messages: true });
     expect(status && status.messages).toBe(1);
 
-    // Nach erneutem Abgleich keine Dubletten
+    // Nach erneutem Abgleich keine Dubletten, Anhänge bleiben
     await service.syncAccountNow(target.accountId);
-    expect(await service.messages({ kind: "mailbox", mailboxId: `${target.accountId}/Archiv` }, 100)).toHaveLength(1);
+    const archived = await service.messages({ kind: "mailbox", mailboxId: `${target.accountId}/Archiv` }, 100);
+    expect(archived).toHaveLength(1);
     expect((await service.attachments(archived[0]!.id)).map((a) => a.filename)).toEqual(["Angebot.pdf"]);
+  });
+
+  it("offline: Änderungen bleiben in der Warteschlange und werden später übertragen", async () => {
+    const account = await addAndSync();
+    const inbox = await service.messages({ kind: "unifiedInbox" }, 100);
+    const target = inbox.find((m) => m.subject === "Angebot?")!;
+
+    // Server „weg“: offene Verbindung schließen, Port ins Leere zeigen lassen
+    service.dispose();
+    db.prepare("UPDATE account SET imapPort = 1 WHERE id = ?").run(account.id);
+    service = new MailService(repository, new MailWriter(db), secrets, { now: () => now });
+
+    await service.setFlag("flagged", true, [target.id]);
+    expect(service.pendingChanges(account.id)).toBe(1);
+    await expect(service.syncAccountNow(account.id)).rejects.toThrow();
+    expect(service.pendingChanges(account.id)).toBe(1); // nichts verloren
+    expect((await service.message(target.id))?.flags).toBe(target.flags | 4); // lokal weiterhin markiert
+
+    // Server wieder da: der nächste Abruf überträgt zuerst die Warteschlange
+    db.prepare("UPDATE account SET imapPort = ? WHERE id = ?").run(port, account.id);
+    await service.syncAccountNow(account.id);
+    expect(service.pendingChanges(account.id)).toBe(0);
+    expect(await serverFlags("Angebot?")).toContain("\\Flagged");
+    expect((await service.accounts())[0]?.syncError).toBeNull();
+  });
+
+  it("Warteschlange überlebt einen Neustart der App", async () => {
+    const account = await addAndSync();
+    const target = (await service.messages({ kind: "unifiedInbox" }, 100)).find((m) => m.subject === "Angebot?")!;
+    service.dispose(); // App beendet, bevor übertragen wurde
+    const restarted = new MailService(repository, new MailWriter(db), secrets, { now: () => now });
+    // Aktion direkt in die Warteschlange (wie vor dem Beenden gespeichert)
+    await restarted.setFlag("seen", true, [target.id]);
+    restarted.dispose();
+    const again = new MailService(repository, new MailWriter(db), secrets, { now: () => now });
+    expect(again.pendingChanges(account.id)).toBe(1);
+    await again.syncNow();
+    expect(again.pendingChanges(account.id)).toBe(0);
+    expect(await serverFlags("Angebot?")).toContain("\\Seen");
+    again.dispose();
+    service = again;
   });
 
   it("Konto entfernen löscht Mails und Passwort", async () => {
