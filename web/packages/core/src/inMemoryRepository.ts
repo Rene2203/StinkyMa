@@ -1,9 +1,9 @@
-import type { Account, Attachment, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
+import type { Account, Attachment, EmailAddress, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
 import { MessageFlag, mailboxRoleRank } from "./models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
 import { requireRemoteContentException } from "./remoteContent.js";
-import { draftFromMessage, localDraftMessage, localSentMessage, type ComposeDraft, type OutgoingMail } from "./compose.js";
+import { draftFromMessage, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "./compose.js";
 
 /** `MailRepository` im Arbeitsspeicher – für UI-Tests und Vorschauen, ohne Datenbank. */
 export class InMemoryMailRepository implements MailRepository {
@@ -165,6 +165,27 @@ export class InMemoryMailRepository implements MailRepository {
     const draft: ComposeDraft = { ...draftFromMessage(message), draftId: id };
     this.#drafts.set(id, { draft, messageId });
     return draft;
+  }
+
+  async suggestAddresses(query: string, limit: number): Promise<EmailAddress[]> {
+    const contacts = new Map<string, ContactUsage>();
+    const note = (a: EmailAddress, date: string, sent: boolean) => {
+      const key = a.address.toLowerCase();
+      const c = contacts.get(key) ?? { address: key, name: null, sent: 0, received: 0, last: "" };
+      if (sent) c.sent += 1;
+      else c.received += 1;
+      if (date >= c.last) {
+        c.last = date;
+        if (a.name) c.name = a.name;
+      }
+      contacts.set(key, c);
+    };
+    for (const m of this.#data.messages) {
+      const role = this.#roleOf(m.mailboxId);
+      if (role === "sent") for (const a of [...m.to, ...m.cc]) note(a, m.date, true);
+      else if (role !== "drafts" && role !== "trash" && role !== "spam") note(m.from, m.date, false);
+    }
+    return rankContacts([...contacts.values()], { query, ownAddresses: this.#data.accounts.map((a) => a.email), limit });
   }
 
   #removeMessage(id: string): void {

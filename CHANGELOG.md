@@ -14,6 +14,9 @@
   Ordner „Entwürfe“; Doppelklick oder „Entwurf bearbeiten“ öffnet sie wieder. Auf dem Server (IMAP, \\Draft) liegt
   immer nur die aktuelle Fassung – hochgeladen nach 8 s Schreibpause bzw. beim Abruf. Entwürfe von anderen Geräten
   lassen sich weiterschreiben. Senden löscht den Entwurf. Migration `v6-drafts`.
+- **Adressvorschläge** in An/Cc/Bcc: passend zu Name oder Adresse; wem man geschrieben hat, steht oben (5-fach),
+  dann Absender empfangener Mails, bei Gleichstand der zuletzt genutzte. ↑/↓, Enter/Tab übernimmt, Esc schließt nur
+  die Liste. Eigene Adressen werden nicht vorgeschlagen. Enter in einem Feld sendet nicht mehr (nur Knopf/Strg+Enter).
 
 ## W3 (Teil 1) – Mails schreiben und senden
 

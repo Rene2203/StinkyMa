@@ -15,6 +15,7 @@ import {
   type MessageFlagName,
   type MessageScope,
   type ComposeDraft,
+  type EmailAddress,
   type ComposeLabels,
   type ComposeMode,
   type OutboxItem,
@@ -239,6 +240,15 @@ export class BrowserStore {
         const replace = (list: Message[]) => list.map((m) => (m.id === updated.id ? updated : m));
         this.#set({ messages: replace(this.#state.messages), thread: replace(this.#state.thread) });
       }
+    }
+  }
+
+  /** Adressvorschläge für die Empfängerfelder (Fehler → keine Vorschläge, nie ein Banner). */
+  async suggestAddresses(query: string): Promise<EmailAddress[]> {
+    try {
+      return await this.#repository.suggestAddresses(query, 8);
+    } catch {
+      return [];
     }
   }
 

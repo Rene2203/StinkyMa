@@ -8,6 +8,7 @@ import {
   replySubject,
   emailHtml,
   textToHtml,
+  rankContacts,
   type ComposeLabels,
   type Message,
 } from "../src/index.js";
@@ -131,6 +132,23 @@ describe("HTML für formatierte Mails", () => {
     expect(html).toContain('<p style="margin:0;text-align: center">Mitte</p>');
     expect(html).toContain('<blockquote style="margin:0 0 0 0.8ex;border-left:2px solid #c8c8c8');
     expect(html).toContain('<ul style="margin:0;padding-left:1.6em">');
+  });
+});
+
+describe("Adressvorschläge ordnen", () => {
+  const contacts = [
+    { address: "news@shop.example", name: "Shop Newsletter", sent: 0, received: 40, last: "2026-09-30" },
+    { address: "jonas@example.test", name: "Jonas Weber", sent: 12, received: 3, last: "2026-09-01" },
+    { address: "jo@example.test", name: null, sent: 0, received: 1, last: "2026-09-29" },
+    { address: "ich@example.test", name: "Ich", sent: 99, received: 0, last: "2026-09-30" },
+  ];
+  it("wem man schreibt, steht vor Newslettern; eigene Adresse fehlt; Name und Adresse zählen", () => {
+    expect(rankContacts(contacts, { query: "e", ownAddresses: ["Ich@example.test"], limit: 5 }).map((c) => c.address)).toEqual([
+      "jonas@example.test", "news@shop.example", "jo@example.test",
+    ]);
+    expect(rankContacts(contacts, { query: "weber", ownAddresses: [], limit: 5 })).toEqual([{ name: "Jonas Weber", address: "jonas@example.test" }]);
+    expect(rankContacts(contacts, { query: "  ", ownAddresses: [], limit: 5 })).toEqual([]);
+    expect(rankContacts(contacts, { query: "o", ownAddresses: [], limit: 1 })).toHaveLength(1);
   });
 });
 

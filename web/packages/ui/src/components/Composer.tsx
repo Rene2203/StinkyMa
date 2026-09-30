@@ -13,6 +13,7 @@ import { formatBytes } from "../format.js";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { RichTextEditor } from "./RichTextEditor.js";
+import { AddressInput } from "./AddressInput.js";
 
 const titles = { new: "compose.new", reply: "compose.reply", replyAll: "compose.replyAll", forward: "compose.forward" } as const;
 
@@ -193,7 +194,11 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
       event.preventDefault();
       event.stopPropagation();
       void send();
-    } else if (event.key === "Escape" && !(event.target as HTMLElement).closest(".link-field")) {
+    } else if (
+      event.key === "Escape" &&
+      !(event.target as HTMLElement).closest(".link-field") &&
+      (event.target as HTMLElement).dataset.suggesting !== "true"
+    ) {
       event.preventDefault();
       event.stopPropagation();
       void close();
@@ -226,7 +231,8 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
         void addFiles(e.dataTransfer.files);
       }}
     >
-      <form onSubmit={send}>
+      {/* Kein Senden per Enter in einem Feld – nur per Knopf oder Strg+Enter. */}
+      <form onSubmit={(e) => e.preventDefault()}>
         <header className="dialog-header">
           <h2 id="composer-title">{t(titles[draft.mode])}</h2>
           <button type="button" className="icon-button" aria-label={t("compose.close")} title={t("compose.closeKeeps")} onClick={() => void close()} disabled={busy}>
@@ -249,14 +255,13 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
           )}
           <label className="composer-row">
             <span>{t("compose.to")}</span>
-            <input
+            <AddressInput
               ref={toField}
               value={to}
-              onChange={(e) => { setTo(e.target.value); setError(null); }}
+              onChange={(v) => { setTo(v); setError(null); }}
               placeholder={t("compose.addressHint")}
-              data-testid="compose-to"
-              autoComplete="off"
-              spellCheck={false}
+              testId="compose-to"
+              label={t("compose.to")}
             />
             {!showCcBcc && (
               <button type="button" className="link-button" onClick={() => setShowCcBcc(true)}>
@@ -268,11 +273,11 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
             <>
               <label className="composer-row">
                 <span>{t("compose.cc")}</span>
-                <input value={cc} onChange={(e) => { setCc(e.target.value); setError(null); }} data-testid="compose-cc" autoComplete="off" spellCheck={false} />
+                <AddressInput value={cc} onChange={(v) => { setCc(v); setError(null); }} testId="compose-cc" label={t("compose.cc")} />
               </label>
               <label className="composer-row">
                 <span>{t("compose.bcc")}</span>
-                <input value={bcc} onChange={(e) => { setBcc(e.target.value); setError(null); }} data-testid="compose-bcc" autoComplete="off" spellCheck={false} />
+                <AddressInput value={bcc} onChange={(v) => { setBcc(v); setError(null); }} testId="compose-bcc" label={t("compose.bcc")} />
               </label>
             </>
           )}
@@ -342,7 +347,7 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
             {draftStatus === "saving" ? t("draft.saving") : draftStatus === "saved" && !dirty ? t("draft.saved") : draftStatus === "error" ? t("draft.error") : ""}
           </span>
           <button type="button" onClick={() => void discard()} disabled={busy} data-testid="compose-discard">{t("compose.discard")}</button>
-          <button type="submit" className="primary" disabled={busy} data-testid="compose-send" title={`${t("compose.send")} (Strg+Enter)`}>
+          <button type="button" className="primary" disabled={busy} data-testid="compose-send" onClick={() => void send()} title={`${t("compose.send")} (Strg+Enter)`}>
             <Send size={15} aria-hidden="true" /> {busy ? t("compose.sending") : t("compose.send")}
           </button>
         </footer>

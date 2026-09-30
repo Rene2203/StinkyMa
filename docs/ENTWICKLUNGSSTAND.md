@@ -225,3 +225,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   nach Senden, iPhone-Entwurf weiterschreiben), E2E (Speichern, Wiederfinden, Server, Verwerfen). Lokal 166 + 3 E2E grün.
   **Ungeprüft:** Verhalten mit iCloud (UIDPLUS wird vorausgesetzt; ohne UIDPLUS könnte eine alte Server-Fassung
   liegen bleiben); Entwürfe mit großen Anhängen (werden bei jeder Server-Fassung komplett hochgeladen).
+- **W3 Teil 2, Baustein 3 – Adressvorschläge:** `suggestAddresses` (SQLite: eine Abfrage mit json_each über
+  „Gesendet“ + Absender; gleiche Rangfolge `rankContacts` in beiden Speichern), Komponente `AddressInput`
+  (Combobox, Tastatur). Nebenbei behoben: Enter in einem Feld hat die Mail sofort gesendet. Tests: Rangfolge,
+  Vertragstests (inkl. Sonderzeichen %), Token-Logik, E2E (Jonas nach Antwort oben, Enter übernimmt, Esc).
+  Lokal alle Tests + 3 E2E grün. **Ungeprüft:** Tempo bei sehr großen Postfächern (> 50 000 Mails) auf schwacher Hardware.

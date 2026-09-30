@@ -295,3 +295,30 @@ function htmlBodyContent(html: string): string {
   const body = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html)?.[1] ?? html;
   return body.replace(/<(script|style|head)[^>]*>[\s\S]*?<\/\1>/gi, "");
 }
+
+/** Ein Kontakt mit Nutzungszählern – Grundlage für Adressvorschläge. */
+export interface ContactUsage {
+  address: string;
+  name: string | null;
+  /** Wie oft man diesem Kontakt geschrieben hat (Ordner „Gesendet“). */
+  sent: number;
+  /** Wie oft Mails von diesem Kontakt kamen. */
+  received: number;
+  /** Zuletzt gesehen (ISO-8601). */
+  last: string;
+}
+
+/** Sortiert und filtert Kontakte für die Vorschlagsliste (gleiche Regeln in allen Speichern). */
+export function rankContacts(contacts: ContactUsage[], options: { query: string; ownAddresses: string[]; limit: number }): EmailAddress[] {
+  const query = options.query.trim().toLowerCase();
+  if (!query) return [];
+  const own = new Set(options.ownAddresses.map((a) => a.toLowerCase()));
+  const wordStart = (text: string) => text.toLowerCase().split(/[\s.@_-]+/).some((word) => word.startsWith(query));
+  return contacts
+    .filter((c) => !own.has(c.address.toLowerCase()) && c.address.includes("@"))
+    .filter((c) => c.address.toLowerCase().includes(query) || (c.name ?? "").toLowerCase().includes(query))
+    .map((c) => ({ c, score: c.sent * 5 + c.received + (wordStart(c.name ?? "") || c.address.toLowerCase().startsWith(query) ? 3 : 0) }))
+    .sort((a, b) => b.score - a.score || b.c.last.localeCompare(a.c.last))
+    .slice(0, options.limit)
+    .map(({ c }) => ({ name: c.name, address: c.address }));
+}

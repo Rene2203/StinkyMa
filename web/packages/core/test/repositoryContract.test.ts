@@ -201,5 +201,15 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
     await repo.deleteDraft(id);
     expect((await repo.messages({ kind: "mailbox", mailboxId: draftsId }, 50)).some((m) => m.subject === "Weg damit")).toBe(false);
   });
+
+  it("Adressvorschläge: Name oder Adresse, eigene Adressen fehlen, Grenzen und Sonderzeichen", async () => {
+    const repo = make();
+    expect(await repo.suggestAddresses("jonas", 5)).toEqual([{ name: "Jonas Weber", address: "jonas.weber@post.example" }]);
+    expect((await repo.suggestAddresses("schulz", 5))[0]?.address).toBe("p.schulz@moebelhaus-schulz.example");
+    expect((await repo.suggestAddresses("anna.beispiel", 5)).map((a) => a.address)).not.toContain("anna.beispiel@icloud.example");
+    expect(await repo.suggestAddresses("", 5)).toEqual([]);
+    expect(await repo.suggestAddresses("%", 5)).toEqual([]);
+    expect((await repo.suggestAddresses("example", 3)).length).toBeLessThanOrEqual(3);
+  });
 });
 

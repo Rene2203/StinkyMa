@@ -1420,3 +1420,52 @@ button.attachment-open:hover {
 .dialog-footer .footer-start .icon-button:hover {
   background: var(--bg-hover);
 }
+
+/* Adressvorschläge */
+
+.address-input {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.dialog .composer-row .address-input input {
+  flex: 1;
+}
+
+.address-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.address-suggestions li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.address-suggestions li.active,
+.address-suggestions li:hover {
+  background: var(--bg-selected);
+}
+
+.address-suggestions strong {
+  font-weight: 600;
+}

@@ -6,6 +6,7 @@ import {
   type Account,
   type AccountColor,
   type Attachment,
+  type EmailAddress,
   type Mailbox,
   type MailboxRole,
   type Message,
@@ -135,6 +136,10 @@ export class MailService implements MailRepository, AccountsApi {
     await this.repository.deleteDraft(draftId);
     this.options.onChange?.();
     if (accountId && !isDemoAccount({ id: accountId })) this.#scheduleFlush(accountId);
+  }
+
+  suggestAddresses(query: string, limit: number): Promise<EmailAddress[]> {
+    return this.repository.suggestAddresses(query, limit);
   }
 
   openDraft(messageId: string): Promise<ComposeDraft | null> {

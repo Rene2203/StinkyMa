@@ -337,6 +337,28 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect(page.getByTestId("outbox")).toHaveCount(0);
   });
 
+  await test.step("Adressvorschläge: wem man geschrieben hat, steht oben; Esc schließt nur die Liste", async () => {
+    await page.getByTestId("compose-new").click();
+    const composer = page.getByTestId("composer");
+    const to = composer.getByTestId("compose-to");
+    await expect(to).toBeFocused();
+    await page.keyboard.type("jon");
+    const list = composer.getByTestId("address-suggestions");
+    await expect(list.getByRole("option").first()).toContainText("jonas@example.test");
+    await page.screenshot({ path: join(screenshotDir, "13-Adressvorschlaege.png") });
+    await page.keyboard.press("Enter");
+    await expect(to).toHaveValue("Jonas <jonas@example.test>, ");
+    await expect(composer).toBeVisible(); // Enter hat nicht gesendet
+    await page.keyboard.type("jo");
+    await expect(list).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(list).toHaveCount(0);
+    await expect(composer).toBeVisible();
+    await composer.getByTestId("compose-discard").click();
+    await composer.getByTestId("compose-confirm-discard").click();
+    await expect(composer).toHaveCount(0);
+  });
+
   await test.step("Abruf per Knopf", async () => {
     await page.getByTestId("sync-now").click();
     await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });

@@ -13,7 +13,7 @@ import type {
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 import { requireRemoteContentException } from "../remoteContent.js";
-import { draftFromMessage, formatAddressList, localDraftMessage, localSentMessage, type ComposeDraft, type OutgoingMail } from "../compose.js";
+import { draftFromMessage, formatAddressList, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "../compose.js";
 import type { OutboxItem } from "../repository.js";
 
 type Row = Record<string, unknown>;
@@ -262,6 +262,39 @@ export class SqliteMailRepository implements MailRepository {
       "INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId) VALUES (?, ?, ?, ?, ?, 0, NULL)",
     );
     (mail.attachments ?? []).forEach((a, i) => insertAttachment.run(`${message.id}/a${i}`, message.id, a.filename, a.mimeType, a.size));
+  }
+
+  // --- Adressvorschläge ---
+
+  async suggestAddresses(query: string, limit: number): Promise<EmailAddress[]> {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const rows = this.db
+      .prepare(
+        `WITH people AS (
+           SELECT lower(message.fromAddress) AS address, message.fromName AS name, message.date AS date, 0 AS sent
+             FROM message JOIN mailbox ON mailbox.id = message.mailboxId
+            WHERE mailbox.role NOT IN ('sent', 'drafts', 'trash', 'spam')
+           UNION ALL
+           SELECT lower(json_extract(r.value, '$.address')), json_extract(r.value, '$.name'), message.date, 1
+             FROM message JOIN mailbox ON mailbox.id = message.mailboxId, json_each(message."to") AS r
+            WHERE mailbox.role = 'sent'
+           UNION ALL
+           SELECT lower(json_extract(r.value, '$.address')), json_extract(r.value, '$.name'), message.date, 1
+             FROM message JOIN mailbox ON mailbox.id = message.mailboxId, json_each(message.cc) AS r
+            WHERE mailbox.role = 'sent'
+         )
+         SELECT address, name, MAX(date) AS last, SUM(sent) AS sent, COUNT(*) - SUM(sent) AS received
+           FROM people
+          WHERE address LIKE @like ESCAPE '\\' OR lower(coalesce(name, '')) LIKE @like ESCAPE '\\'
+          GROUP BY address
+          ORDER BY SUM(sent) * 5 + COUNT(*) DESC
+          LIMIT 200`,
+      )
+      .all({ like }) as ContactUsage[];
+    const own = (await this.accounts()).map((a) => a.email);
+    return rankContacts(rows, { query: q, ownAddresses: own, limit });
   }
 
   // --- Entwürfe ---

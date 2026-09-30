@@ -1,4 +1,4 @@
-import type { Account, Attachment, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
+import type { Account, Attachment, EmailAddress, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
 import type { ComposeDraft, OutgoingMail } from "./compose.js";
 
 /**
@@ -40,6 +40,11 @@ export interface MailRepository {
   deleteDraft(draftId: string): Promise<void>;
   /** Öffnet eine Mail aus dem Ordner „Entwürfe“ zum Weiterschreiben (auch Entwürfe von anderen Geräten). */
   openDraft(messageId: string): Promise<ComposeDraft | null>;
+  /**
+   * Adressvorschläge für den Composer: passend zu Name oder Adresse; wem man geschrieben hat, steht oben,
+   * dann häufige und zuletzt genutzte Kontakte. Eigene Adressen fehlen.
+   */
+  suggestAddresses(query: string, limit: number): Promise<EmailAddress[]>;
 }
 
 /** Eine Mail im Postausgang (noch nicht gesendet). */
@@ -94,6 +99,7 @@ export const mailRepositoryMethods = [
   "saveDraft",
   "deleteDraft",
   "openDraft",
+  "suggestAddresses",
 ] as const satisfies readonly (keyof MailRepository)[];
 
 export type MailRepositoryMethod = (typeof mailRepositoryMethods)[number];
