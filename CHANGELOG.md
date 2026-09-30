@@ -1,5 +1,15 @@
 # Changelog
 
+## W3 (Teil 2) – Schreiben alltagstauglich
+
+### Neu
+- **Anhänge empfangen:** Klick öffnet mit dem Standardprogramm, das Download-Symbol speichert („Speichern unter“).
+  Der Inhalt wird erst dann vom Server geholt (nichts vorab auf der Platte). Programme, Skripte, Makro-Dokumente
+  und Abbilder (.exe, .ps1, .lnk, .xlsm, .iso …) werden nie geöffnet – nur speichern. Geöffnete Anhänge liegen in
+  einem Temp-Ordner, der beim nächsten Start geleert wird; Dateinamen werden bereinigt (keine Pfade, keine
+  reservierten Windows-Namen).
+- **Anhänge senden:** Büroklammer im Mail-Fenster oder Dateien hineinziehen; Hinweis ab 18 MB, Grenze 40 MB.
+
 ## W3 (Teil 1) – Mails schreiben und senden
 
 ### Neu

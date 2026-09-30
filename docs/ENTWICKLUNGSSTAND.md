@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W3 Teil 1 – Mails schreiben und senden (lokal geprüft, Windows-CI steht aus; Test mit echtem iCloud-Konto steht aus)
+**Aktuelle Phase:** W3 Teil 2 – Entwürfe, Anhänge, Adressvorschläge, Signatur, Weiterleiten (in Arbeit; Nutzer testet später gesammelt)
 
 ## Überblick
 
@@ -211,3 +211,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   E2E prüft beim Empfänger: <strong>, Liste, Schriftart Georgia, Zitat, Nur-Text. Mail-Fenster wird nachgeladen
   (Startpaket 0,85 MB statt 1,7 MB). Lokal: 154 Tests + 3 E2E grün.
   **Ungeprüft:** Darstellung beim Empfänger in echten Programmen (Outlook, Apple Mail, Gmail); Windows-CI.
+- **W3 Teil 2, Baustein 1 – Anhänge:** Öffnen/Speichern empfangener Anhänge (Inhalt bei Bedarf per IMAP geholt,
+  `attachmentContent`), riskante Endungen nur speichern, IPC-Kanal „files“ (Preload-Liste per Test geprüft).
+  Anhängen im Composer (Knopf, Drag & Drop), Grenzen 18/40 MB. Tests: Dateinamen/Endungen, MIME mit Umlaut-Namen
+  (Rundreise durch den Parser), GreenMail: Anhang holen + mit Anhang senden, E2E: Speichern und Öffnen (Dialoge
+  im Test ersetzt), .exe ohne Öffnen, Anhang im Composer kommt beim Empfänger an. Lokal 159 Tests + 3 E2E grün.
+  **Ungeprüft:** echte Windows-Dialoge und Standardprogramme (im Test ersetzt), Drag & Drop (im Test nicht simuliert).

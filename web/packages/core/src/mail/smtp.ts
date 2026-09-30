@@ -39,6 +39,11 @@ export async function buildMessage(mail: OutgoingMail, options: { from: EmailAdd
     date: options.date,
     inReplyTo: mail.inReplyTo ?? undefined,
     references: mail.references?.length ? mail.references : undefined,
+    attachments: (mail.attachments ?? []).map((a) => ({
+      filename: a.filename,
+      contentType: a.mimeType || "application/octet-stream",
+      content: Buffer.from(a.contentBase64, "base64"),
+    })),
     headers: { "X-Mailer": "StinkyMa" },
     // Keine Dateien oder URLs nachladen – der Inhalt kommt ausschließlich aus dem Composer.
     disableFileAccess: true,

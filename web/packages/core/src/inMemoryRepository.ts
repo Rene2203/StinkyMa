@@ -120,6 +120,12 @@ export class InMemoryMailRepository implements MailRepository {
         messageId: `<${id}@stinkyma.local>`,
       }),
     );
+    (mail.attachments ?? []).forEach((a, i) =>
+      this.#data.attachments.push({
+        id: `${id}/a${i}`, messageId: id, filename: a.filename, mimeType: a.mimeType, size: a.size,
+        isInline: false, isEncrypted: false, analysisStatus: "pending", riskFlags: 0,
+      }),
+    );
     if (original) original.flags |= MessageFlag.answered;
   }
 

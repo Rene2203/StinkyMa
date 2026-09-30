@@ -1,5 +1,5 @@
-import { Archive, Flag, FlagOff, Forward, Mail as MailIcon, Reply, ReplyAll, Trash2 } from "lucide-react";
-import { displayName, initials, isFlagged, type Attachment, type Message } from "@stinkyma/core";
+import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, Reply, ReplyAll, ShieldAlert, Trash2 } from "lucide-react";
+import { displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { formatBytes, formatFullDate, formatList } from "../format.js";
@@ -102,25 +102,67 @@ function ThreadMessage({ message, attachments, initiallyExpanded }: { message: M
           )}
           {attachments.length > 0 && (
             <ul className="attachments" role="list">
-              {attachments.map((a) => {
-                const Icon = attachmentIcon(a.filename);
-                return (
-                  <li key={a.id} className="attachment">
-                    <Icon size={22} strokeWidth={1.5} aria-hidden="true" />
-                    <span>
-                      <span className="attachment-name">{a.filename}</span>
-                      <span className="muted small">
-                        {formatBytes(a.size, locale)}
-                        {a.pageCount ? ` · ${t("detail.pages", { count: a.pageCount })}` : ""}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
+              {attachments.map((a) => (
+                <AttachmentItem key={a.id} attachment={a} />
+              ))}
             </ul>
           )}
         </>
       )}
     </article>
+  );
+}
+
+/** Anhang: Klick öffnet (Standardprogramm), Download-Symbol speichert. Ausführbares nur speichern. */
+function AttachmentItem({ attachment: a }: { attachment: Attachment }) {
+  const { store, t, locale } = useUi();
+  const state = useBrowserState();
+  const Icon = attachmentIcon(a.filename);
+  const risky = isRiskyAttachment(a.filename);
+  const busy = state.attachmentBusy === a.id;
+  const canOpen = store.canOpenAttachments && !risky;
+  const info = (
+    <>
+      {busy ? <Loader2 size={22} className="spinning" aria-hidden="true" /> : risky ? <ShieldAlert size={22} strokeWidth={1.5} aria-hidden="true" className="risky" /> : <Icon size={22} strokeWidth={1.5} aria-hidden="true" />}
+      <span>
+        <span className="attachment-name">{a.filename}</span>
+        <span className="muted small">
+          {formatBytes(a.size, locale)}
+          {a.pageCount ? ` · ${t("detail.pages", { count: a.pageCount })}` : ""}
+          {risky ? ` · ${t("attachment.riskyShort")}` : ""}
+        </span>
+      </span>
+    </>
+  );
+  return (
+    <li className="attachment" data-testid="attachment" title={risky ? t("attachment.risky") : undefined}>
+      {canOpen ? (
+        <button
+          type="button"
+          className="attachment-open"
+          onClick={() => void store.openAttachment(a.id)}
+          disabled={busy}
+          title={t("attachment.open")}
+          aria-label={`${t("attachment.open")}: ${a.filename}`}
+        >
+          {info}
+        </button>
+      ) : (
+        <span className="attachment-open">{info}</span>
+      )}
+      {store.canOpenAttachments && (
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={`${t("attachment.save")}: ${a.filename}`}
+          title={t("attachment.save")}
+          data-testid="attachment-save"
+          disabled={busy}
+          onClick={() => void store.saveAttachment(a.id)}
+        >
+          <Download size={16} />
+        </button>
+      )}
+    </li>
   );
 }

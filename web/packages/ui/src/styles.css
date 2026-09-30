@@ -555,18 +555,47 @@ button {
 .attachment {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: 4px;
+  padding: 4px 6px 4px 4px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--accent);
 }
 
-.attachment > span {
+.attachment-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.attachment-open {
+  cursor: pointer;
+}
+
+button.attachment-open:hover {
+  background: var(--bg-hover);
+}
+
+.attachment-open > span {
   display: flex;
   flex-direction: column;
   color: var(--fg);
+}
+
+.attachment .risky {
+  color: var(--orange);
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
 }
 
 .attachment-name {
@@ -1308,4 +1337,49 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Composer: Anhänge */
+
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.composer-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  font-size: 12px;
+}
+
+.composer-attachment .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer.dragging form {
+  outline: 2px dashed var(--accent);
+  outline-offset: -8px;
+}
+
+.dialog-footer .footer-start {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint.warning.attachment-warning {
+  margin: 0;
 }

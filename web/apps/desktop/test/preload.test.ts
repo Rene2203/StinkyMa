@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { accountsApiMethods, mailRepositoryMethods } from "@stinkyma/core";
+import { accountsApiMethods, attachmentFilesMethods, mailRepositoryMethods } from "@stinkyma/core";
 
 // Der Preload listet die erlaubten Methoden fest auf (er soll den Kern nicht einbündeln).
 // Dieser Test sorgt dafür, dass die Liste nicht von den Schnittstellen abweicht.
@@ -19,5 +19,9 @@ describe("Preload-Brücke", () => {
 
   it("reicht genau die Methoden von AccountsApi durch", () => {
     expect(listed("accountMethods").sort()).toEqual([...accountsApiMethods].sort());
+  });
+
+  it("reicht genau die Methoden für Anhänge durch", () => {
+    expect(listed("fileMethods").sort()).toEqual([...attachmentFilesMethods].sort());
   });
 });

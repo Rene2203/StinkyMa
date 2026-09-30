@@ -8,3 +8,4 @@ export * from "./providers.js";
 export * from "./accounts.js";
 export * from "./remoteContent.js";
 export * from "./compose.js";
+export * from "./files.js";

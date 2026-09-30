@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMessage, classifySmtpError, MailConnectionError, plainTextFromEditorHtml, SmtpRejectedError } from "../src/mail/index.js";
+import { buildMessage, classifySmtpError, extractAttachment, MailConnectionError, parseMessage, plainTextFromEditorHtml, SmtpRejectedError } from "../src/mail/index.js";
 
 describe("MIME-Nachricht bauen", () => {
   it("Bcc nur im Umschlag, Antwort-Kopfzeilen gesetzt, Umlaute korrekt", async () => {
@@ -54,6 +54,29 @@ describe("Formatierte Mail", () => {
     expect(
       plainTextFromEditorHtml('<p>Hallo</p><p></p><p>Zeile</p><ul><li><p>Eins</p></li></ul><ol><li><p>A</p></li></ol><blockquote><p>alt</p></blockquote><p><a href="https://x.example">Link</a></p>'),
     ).toBe("Hallo\n\nZeile\n • Eins\n 1. A\n> alt\nLink <https://x.example>\n");
+  });
+});
+
+describe("Mail mit Anhang", () => {
+  it("multipart/mixed mit Dateiname (auch mit Umlauten) und Inhalt", async () => {
+    const built = await buildMessage(
+      {
+        accountId: "a",
+        to: [{ address: "anna@example.test" }],
+        cc: [],
+        bcc: [],
+        subject: "Anbei",
+        bodyText: "Siehe Anhang.",
+        attachments: [{ filename: "Übersicht.txt", mimeType: "text/plain", size: 5, contentBase64: Buffer.from("Hallo").toString("base64") }],
+      },
+      { from: { address: "bernd@example.test" }, messageId: "<att@example.test>", date: new Date("2026-09-30T12:00:00Z") },
+    );
+    const raw = built.raw.toString("utf8");
+    expect(raw).toMatch(/Content-Type: multipart\/mixed/);
+    // Beim Einlesen (wie beim Empfänger) kommen Name und Inhalt unverändert heraus
+    const parsed = await parseMessage(built.raw);
+    expect(parsed.attachments).toEqual([expect.objectContaining({ filename: "Übersicht.txt", mimeType: "text/plain", size: 5 })]);
+    expect((await extractAttachment(built.raw, 0))?.content.toString("utf8")).toBe("Hallo");
   });
 });
 

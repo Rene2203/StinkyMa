@@ -241,13 +241,18 @@ export class SqliteMailRepository implements MailRepository {
         .prepare(
           `INSERT INTO message (id, accountId, mailboxId, uid, messageId, threadId, fromName, fromAddress, "to", cc,
              subject, date, snippet, bodyText, bodyHTML, flags, hasAttachments)
-           VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0)`,
+           VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           message.id, message.accountId, message.mailboxId, message.messageId, message.threadId,
           message.from.name ?? null, message.from.address, JSON.stringify(message.to), JSON.stringify(message.cc),
-          message.subject, message.date, message.snippet, message.bodyText, message.flags,
+          message.subject, message.date, message.snippet, message.bodyText, message.bodyHtml ?? null, message.flags,
+          message.hasAttachments ? 1 : 0,
         );
+      const insertAttachment = this.db.prepare(
+        "INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId) VALUES (?, ?, ?, ?, ?, 0, NULL)",
+      );
+      (mail.attachments ?? []).forEach((a, i) => insertAttachment.run(`${message.id}/a${i}`, message.id, a.filename, a.mimeType, a.size));
       if (original) this.db.prepare("UPDATE message SET flags = flags | ? WHERE id = ?").run(MessageFlag.answered, original.id);
     })();
   }

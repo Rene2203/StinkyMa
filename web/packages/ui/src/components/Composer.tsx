@@ -1,5 +1,14 @@
-import { Send, X } from "lucide-react";
-import { formatAddressList, parseAddressList, textToHtml, type ComposeDraft } from "@stinkyma/core";
+import { Paperclip, Send, X } from "lucide-react";
+import {
+  attachmentLimitBytes,
+  attachmentWarningBytes,
+  formatAddressList,
+  parseAddressList,
+  textToHtml,
+  type ComposeDraft,
+  type OutgoingAttachment,
+} from "@stinkyma/core";
+import { formatBytes } from "../format.js";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { RichTextEditor } from "./RichTextEditor.js";
@@ -11,7 +20,7 @@ const titles = { new: "compose.new", reply: "compose.reply", replyAll: "compose.
  * Die Mail geht in den Postausgang; der Composer schließt sofort.
  */
 export default function Composer({ draft }: { draft: ComposeDraft }) {
-  const { store, t } = useUi();
+  const { store, t, locale } = useUi();
   const state = useBrowserState();
   const accounts = useMemo(() => Object.values(state.accountsById).sort((a, b) => a.sortOrder - b.sortOrder), [state.accountsById]);
 
@@ -28,6 +37,10 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
   const [warnedNoSubject, setWarnedNoSubject] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [attachments, setAttachments] = useState<OutgoingAttachment[]>(draft.attachments ?? []);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const totalSize = attachments.reduce((sum, a) => sum + a.size, 0);
   const dialog = useRef<HTMLDialogElement>(null);
   const toField = useRef<HTMLInputElement>(null);
   const isReply = draft.mode === "reply" || draft.mode === "replyAll";
@@ -40,7 +53,13 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
 
   const changed =
     to !== formatAddressList(draft.to) || cc !== formatAddressList(draft.cc) || bcc !== formatAddressList(draft.bcc) ||
-    subject !== draft.subject || bodyTouched;
+    subject !== draft.subject || bodyTouched || attachments.length !== (draft.attachments?.length ?? 0);
+
+  const addFiles = async (files: FileList | File[]) => {
+    const added = await Promise.all([...files].map(readAttachment));
+    setAttachments((current) => [...current, ...added]);
+    setError(null);
+  };
 
   const close = () => {
     if (busy) return;
@@ -66,6 +85,10 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
       toField.current?.focus();
       return;
     }
+    if (totalSize > attachmentLimitBytes) {
+      setError(t("attachment.tooLarge", { size: formatBytes(totalSize, locale), limit: formatBytes(attachmentLimitBytes, locale) }));
+      return;
+    }
     if (subject.trim() === "" && !warnedNoSubject) {
       setWarnedNoSubject(true);
       setError(t("compose.noSubject"));
@@ -82,6 +105,7 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
         subject: subject.trim(),
         bodyText: body.text,
         bodyHtml: body.html,
+        attachments,
         inReplyTo: draft.inReplyTo ?? null,
         references: draft.references ?? [],
         answeredMessageId: draft.answeredMessageId ?? null,
@@ -104,7 +128,7 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
   return (
     <dialog
       ref={dialog}
-      className="dialog composer"
+      className={`dialog composer${dragging ? " dragging" : ""}`}
       aria-labelledby="composer-title"
       data-testid="composer"
       onCancel={(e) => {
@@ -112,6 +136,20 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
         close();
       }}
       onKeyDownCapture={onKeyDownCapture}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        setDragging(false);
+        void addFiles(e.dataTransfer.files);
+      }}
     >
       <form onSubmit={send}>
         <header className="dialog-header">
@@ -178,6 +216,28 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
           }}
         />
 
+        {attachments.length > 0 && (
+          <ul className="composer-attachments" aria-label={t("attachment.add")}>
+            {attachments.map((a, i) => (
+              <li key={`${a.filename}-${i}`} className="composer-attachment" data-testid="compose-attachment">
+                <Paperclip size={13} aria-hidden="true" />
+                <span className="name" title={a.filename}>{a.filename}</span>
+                <span className="muted">{formatBytes(a.size, locale)}</span>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t("attachment.remove", { name: a.filename })}
+                  onClick={() => setAttachments((current) => current.filter((_, index) => index !== i))}
+                >
+                  <X size={12} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {totalSize > attachmentWarningBytes && totalSize <= attachmentLimitBytes && (
+          <p className="hint warning attachment-warning">{t("attachment.large", { size: formatBytes(totalSize, locale) })}</p>
+        )}
         {error && <p className="dialog-error" role="alert">{error}</p>}
         {confirmDiscard && (
           <p className="composer-confirm" role="alert">
@@ -190,6 +250,22 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
         )}
 
         <footer className="dialog-footer">
+          <span className="footer-start">
+            <button type="button" className="icon-button" onClick={() => fileInput.current?.click()} title={`${t("attachment.add")} – ${t("attachment.dropHint")}`} aria-label={t("attachment.add")} data-testid="compose-attach">
+              <Paperclip size={17} />
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              hidden
+              data-testid="compose-file-input"
+              onChange={(e) => {
+                if (e.target.files) void addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </span>
           <button type="button" onClick={close} disabled={busy}>{t("compose.discard")}</button>
           <button type="submit" className="primary" disabled={busy} data-testid="compose-send" title={`${t("compose.send")} (Strg+Enter)`}>
             <Send size={15} aria-hidden="true" /> {busy ? t("compose.sending") : t("compose.send")}
@@ -198,4 +274,22 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
       </form>
     </dialog>
   );
+}
+
+/** Liest eine Datei als Base64 (für IPC und den Postausgang). */
+function readAttachment(file: File): Promise<OutgoingAttachment> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Datei konnte nicht gelesen werden."));
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve({
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        contentBase64: result.slice(result.indexOf(",") + 1),
+      });
+    };
+    reader.readAsDataURL(file);
+  });
 }

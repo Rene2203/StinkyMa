@@ -93,3 +93,11 @@ export async function parseMessage(source: Buffer | string): Promise<ParsedMessa
     })),
   };
 }
+
+/** Inhalt eines Anhangs aus der Rohmail – Index wie in `parseMessage` (gleiche Reihenfolge wie beim Abgleich). */
+export async function extractAttachment(source: Buffer | string, index: number): Promise<{ filename: string; mimeType: string; content: Buffer } | null> {
+  const mail = await simpleParser(source, { skipImageLinks: true, skipTextToHtml: true, skipHtmlToText: true });
+  const attachment = mail.attachments[index];
+  if (!attachment) return null;
+  return { filename: attachment.filename ?? "Anhang", mimeType: attachment.contentType, content: attachment.content };
+}

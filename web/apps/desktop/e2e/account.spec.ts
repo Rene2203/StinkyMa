@@ -2,7 +2,7 @@ import { _electron as electron, expect, test, type ElectronApplication, type Pag
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expectScrollable, removeQuietly } from "./helpers";
@@ -46,6 +46,23 @@ test.beforeAll(async () => {
     ["From: Jonas <jonas@example.test>", `To: ${email}`, "Subject: Grillen?", `Date: ${new Date().toUTCString()}`, "Message-ID: <g1@example.test>", "", "Kommst du Samstag?", ""].join("\r\n"),
     [],
     new Date(),
+  );
+  // Mail mit Anhängen: ein PDF (öffnen/speichern) und eine .exe (nur speichern)
+  const boundary = "grenze42";
+  await admin.append(
+    "INBOX",
+    [
+      "From: Büro <buero@example.test>", `To: ${email}`, "Subject: Unterlagen", `Date: ${new Date(Date.now() - 60_000).toUTCString()}`,
+      "Message-ID: <u1@example.test>", "MIME-Version: 1.0", `Content-Type: multipart/mixed; boundary="${boundary}"`, "",
+      `--${boundary}`, "Content-Type: text/plain; charset=utf-8", "", "Anbei die Unterlagen.",
+      `--${boundary}`, 'Content-Type: application/pdf; name="Vertrag.pdf"', 'Content-Disposition: attachment; filename="Vertrag.pdf"',
+      "Content-Transfer-Encoding: base64", "", Buffer.from("%PDF-1.4 Vertrag").toString("base64"),
+      `--${boundary}`, 'Content-Type: application/octet-stream; name="setup.exe"', 'Content-Disposition: attachment; filename="setup.exe"',
+      "Content-Transfer-Encoding: base64", "", Buffer.from("MZ").toString("base64"),
+      `--${boundary}--`, "",
+    ].join("\r\n"),
+    ["\\Seen"],
+    new Date(Date.now() - 60_000),
   );
   // Genug Mails, dass die Liste scrollen muss
   for (let i = 1; i <= 40; i++) {
@@ -99,7 +116,7 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   // Dialog schließt, Beispielkonten sind weg, die Mails vom Server erscheinen.
   await expect(dialog).toHaveCount(0, { timeout: 20_000 });
   await expect(page.getByText("Ihre Rechnung als HTML")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId("message-row")).toHaveCount(42);
+  await expect(page.getByTestId("message-row")).toHaveCount(43);
   await expectScrollable(page, ".rows");
   await expect(page.getByRole("heading", { name: "Privat" })).toHaveCount(0);
 
@@ -156,7 +173,7 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await page.getByTestId("thread-subject").click(); // Fokus in die App (nicht in den Mail-Frame)
     await page.keyboard.press("e");
     // Sofort weg aus der Liste – ohne auf den Server zu warten
-    await expect(page.getByTestId("message-row")).toHaveCount(41, { timeout: 1_000 });
+    await expect(page.getByTestId("message-row")).toHaveCount(42, { timeout: 1_000 });
     // Kurz danach auch auf dem Server (Warteschlange im Hintergrund)
     await expect
       .poll(async () => {
@@ -180,6 +197,36 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await page.waitForTimeout(1_500);
     await expect(page.getByTestId("thread-subject")).toBeVisible();
     await expect(rows).toHaveCount(count);
+  });
+
+  await test.step("Anhänge: speichern und öffnen (vom Server geholt), .exe nur speichern", async () => {
+    const savePath = join(dataDir, "gespeichert.pdf");
+    // Windows-Dialoge im Test durch Attrappen ersetzen
+    await app.evaluate(({ dialog, shell }, target) => {
+      dialog.showSaveDialog = (async () => ({ canceled: false, filePath: target })) as typeof dialog.showSaveDialog;
+      (globalThis as { opened?: string[] }).opened = [];
+      shell.openPath = async (path: string) => {
+        (globalThis as { opened?: string[] }).opened?.push(path);
+        return "";
+      };
+    }, savePath);
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    await page.getByText("Unterlagen", { exact: true }).click();
+    const items = page.getByTestId("attachment");
+    await expect(items).toHaveCount(2);
+    await expect(items.nth(1)).toContainText("nur speichern");
+    await expect(items.nth(1).getByRole("button", { name: /Öffnen/ })).toHaveCount(0);
+
+    await items.nth(0).getByTestId("attachment-save").click();
+    await expect.poll(() => existsSync(savePath)).toBe(true);
+    expect(readFileSync(savePath, "utf8")).toBe("%PDF-1.4 Vertrag");
+
+    await items.nth(0).getByRole("button", { name: /Öffnen/ }).click();
+    await expect.poll(() => app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? [])).toHaveLength(1);
+    const [opened] = await app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? []);
+    expect(opened).toMatch(/Vertrag\.pdf$/);
+    expect(readFileSync(opened!, "utf8")).toBe("%PDF-1.4 Vertrag");
+    await page.screenshot({ path: join(screenshotDir, "11-Anhaenge.png") });
   });
 
   await test.step("Neue E-Mail ohne Empfänger: Hinweis, Verwerfen fragt nach", async () => {
@@ -221,6 +268,8 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await page.keyboard.type("Bis Samstag");
     await expect(editor.locator("strong")).toHaveText("Ja");
     await expect(editor.locator("ul li")).toHaveCount(2);
+    await composer.getByTestId("compose-file-input").setInputFiles({ name: "Einkaufsliste.txt", mimeType: "text/plain", buffer: Buffer.from("Kohle, Senf") });
+    await expect(composer.getByTestId("compose-attachment")).toContainText("Einkaufsliste.txt");
     await page.screenshot({ path: join(screenshotDir, "10-Antworten.png") });
     await page.keyboard.press("Control+Enter");
     await expect(composer).toHaveCount(0, { timeout: 5_000 });
@@ -251,6 +300,7 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     expect(parsed.text).toContain("Ja, ich komme gern! Ich bringe mit:");
     expect(parsed.text).toContain(" • Salat");
     expect(parsed.text).toContain("> Kommst du Samstag?");
+    expect(parsed.attachments.map((a) => [a.filename, a.content.toString("utf8")])).toEqual([["Einkaufsliste.txt", "Kohle, Senf"]]);
     await expect(page.getByTestId("outbox")).toHaveCount(0);
   });
 

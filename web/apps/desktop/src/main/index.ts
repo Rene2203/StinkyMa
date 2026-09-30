@@ -1,6 +1,16 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, safeStorage, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, safeStorage, shell } from "electron";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { accountsApiMethods, createMockData, mailRepositoryMethods } from "@stinkyma/core";
+import {
+  accountsApiMethods,
+  attachmentFilesMethods,
+  createMockData,
+  isRiskyAttachment,
+  mailRepositoryMethods,
+  safeFilename,
+  type AttachmentFiles,
+} from "@stinkyma/core";
 import { MailService } from "@stinkyma/core/mail";
 import { EncryptedFileSecretStore } from "@stinkyma/core/node";
 import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
@@ -61,19 +71,53 @@ function startSync(): void {
   syncTimer = setInterval(() => void service?.syncNow(), syncIntervalMs);
 }
 
-/** IPC-Brücke: der Renderer darf nur die freigegebenen Methoden aufrufen – Mails lesen/ändern und Konten verwalten. */
+/** Geöffnete Anhänge landen in einem eigenen Temp-Ordner, der beim Start geleert wird. */
+function attachmentTempDir(): string {
+  return join(app.getPath("temp"), "StinkyMa-Anhaenge");
+}
+
+/** Anhänge öffnen (Standardprogramm) und speichern (Dialog). Ausführbare Dateien werden nie geöffnet. */
+const attachmentFiles: AttachmentFiles = {
+  async open(attachmentId: string) {
+    if (!service) throw new Error("Datenbank ist noch nicht bereit");
+    const attachment = await service.attachmentContent(attachmentId);
+    const filename = safeFilename(attachment.filename);
+    if (isRiskyAttachment(filename)) {
+      throw new Error(`„${filename}“ kann Programme starten und wird aus Sicherheitsgründen nicht geöffnet. Nur speichern ist möglich.`);
+    }
+    const dir = join(attachmentTempDir(), randomUUID());
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, filename);
+    writeFileSync(path, attachment.content);
+    const error = await shell.openPath(path);
+    if (error) throw new Error(`Der Anhang konnte nicht geöffnet werden: ${error}`);
+  },
+  async save(attachmentId: string) {
+    if (!service) throw new Error("Datenbank ist noch nicht bereit");
+    const attachment = await service.attachmentContent(attachmentId);
+    const options = { defaultPath: join(app.getPath("downloads"), safeFilename(attachment.filename)) };
+    const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return false;
+    writeFileSync(result.filePath, attachment.content);
+    return true;
+  },
+};
+
+/** IPC-Brücke: der Renderer darf nur die freigegebenen Methoden aufrufen – Mails lesen/ändern, Konten, Anhänge. */
 function registerIpc(): void {
-  const channels: [string, ReadonlySet<string>][] = [
-    ["mail", new Set<string>(mailRepositoryMethods)],
-    ["accounts", new Set<string>(accountsApiMethods)],
+  const channels: [string, ReadonlySet<string>, () => object | null][] = [
+    ["mail", new Set<string>(mailRepositoryMethods), () => service],
+    ["accounts", new Set<string>(accountsApiMethods), () => service],
+    ["files", new Set<string>(attachmentFilesMethods), () => attachmentFiles],
   ];
-  for (const [channel, allowed] of channels) {
+  for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {
       if (event.senderFrame?.url && !isAppUrl(event.senderFrame.url)) throw new Error("Unbekannter Absender");
       if (typeof method !== "string" || !allowed.has(method) || !Array.isArray(args)) throw new Error("Ungültiger Aufruf");
-      if (!service) throw new Error("Datenbank ist noch nicht bereit");
-      const fn = (service as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method]!;
-      return fn.apply(service, args);
+      const receiver = target();
+      if (!receiver) throw new Error("Datenbank ist noch nicht bereit");
+      const fn = (receiver as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method]!;
+      return fn.apply(receiver, args);
     });
   }
 }
@@ -138,6 +182,8 @@ app.on("window-all-closed", () => {
 
 app.whenReady().then(() => {
   app.setAppUserModelId("de.stinkyma.app");
+  // Beim letzten Mal geöffnete Anhänge aufräumen (liegen nur temporär auf der Platte).
+  rmSync(attachmentTempDir(), { recursive: true, force: true });
   setUpServices();
   registerIpc();
   Menu.setApplicationMenu(buildMenu(app.getLocale()));

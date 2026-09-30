@@ -318,4 +318,55 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     const account = await addAndSync();
     await expect(service.send({ accountId: account.id, to: [], cc: [], bcc: [], subject: "x", bodyText: "" })).rejects.toThrow(/Empfänger/);
   });
+
+  it("Anhänge: Inhalt wird bei Bedarf vom Server geholt; gesendete Anhänge kommen an", async () => {
+    const boundary = "grenze42";
+    await admin.append(
+      "INBOX",
+      [
+        "From: Stadtwerke <rechnung@stadtwerke.example>",
+        `To: ${user}`,
+        "Subject: Rechnung mit Anhang",
+        `Date: ${now.toUTCString()}`,
+        "Message-ID: <anhang1@stadtwerke.example>",
+        "MIME-Version: 1.0",
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        "",
+        `--${boundary}`,
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        "Anbei die Rechnung.",
+        `--${boundary}`,
+        'Content-Type: application/pdf; name="Rechnung.pdf"',
+        'Content-Disposition: attachment; filename="Rechnung.pdf"',
+        "Content-Transfer-Encoding: base64",
+        "",
+        Buffer.from("%PDF-1.4 Testinhalt").toString("base64"),
+        `--${boundary}--`,
+        "",
+      ].join("\r\n"),
+      [],
+      now,
+    );
+    const account = await addAndSync();
+    const mail = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Rechnung mit Anhang")!;
+    const [attachment] = await service.attachments(mail.id);
+    expect(attachment).toMatchObject({ filename: "Rechnung.pdf", mimeType: "application/pdf" });
+    const content = await service.attachmentContent(attachment!.id);
+    expect(content.filename).toBe("Rechnung.pdf");
+    expect(content.content.toString("utf8")).toBe("%PDF-1.4 Testinhalt");
+    await expect(service.attachmentContent(`${mail.id}/a9`)).rejects.toThrow(/nicht gefunden/);
+
+    // Senden mit Anhang
+    const to = `anhang-${randomUUID().slice(0, 8)}@example.test`;
+    await service.send({
+      accountId: account.id, to: [{ address: to }], cc: [], bcc: [], subject: "Weiter damit", bodyText: "Hier.",
+      attachments: [{ filename: "Notiz.txt", mimeType: "text/plain", size: 4, contentBase64: Buffer.from("Test").toString("base64") }],
+    });
+    await service.flushNow(account.id);
+    const delivered = await receivedBy(to, "Weiter damit");
+    expect(delivered).toMatch(/filename="?Notiz.txt/);
+    expect(delivered).toContain(Buffer.from("Test").toString("base64"));
+  });
 });
+

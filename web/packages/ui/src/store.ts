@@ -7,6 +7,7 @@ import {
   type Account,
   type AccountSettings,
   type AccountsApi,
+  type AttachmentFiles,
   type Attachment,
   type Mailbox,
   type MailRepository,
@@ -64,6 +65,8 @@ export interface BrowserState {
   compose: ComposeDraft | null;
   /** Mails im Postausgang (noch nicht gesendet). */
   outbox: OutboxItem[];
+  /** Anhang, der gerade vom Server geholt wird (Öffnen/Speichern). */
+  attachmentBusy: string | null;
 }
 
 export const initialState: BrowserState = {
@@ -82,6 +85,7 @@ export const initialState: BrowserState = {
   options: null,
   compose: null,
   outbox: [],
+  attachmentBusy: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -128,11 +132,39 @@ export class BrowserStore {
   #threadRequest = 0;
 
   readonly #accounts: AccountsApi | undefined;
+  readonly #files: AttachmentFiles | undefined;
 
-  constructor(repository: MailRepository, options: { pageSize?: number; accounts?: AccountsApi } = {}) {
+  constructor(repository: MailRepository, options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles } = {}) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
     this.#accounts = options.accounts;
+    this.#files = options.files;
+  }
+
+  /** Können Anhänge geöffnet/gespeichert werden (Windows-App)? */
+  get canOpenAttachments(): boolean {
+    return this.#files !== undefined;
+  }
+
+  openAttachment(id: string): Promise<void> {
+    return this.#withAttachment(id, (files) => files.open(id));
+  }
+
+  saveAttachment(id: string): Promise<void> {
+    return this.#withAttachment(id, async (files) => {
+      await files.save(id);
+    });
+  }
+
+  async #withAttachment(id: string, action: (files: AttachmentFiles) => Promise<void>): Promise<void> {
+    const files = this.#files;
+    if (!files || this.#state.attachmentBusy) return;
+    this.#set({ attachmentBusy: id });
+    try {
+      await this.#guard(() => action(files));
+    } finally {
+      this.#set({ attachmentBusy: null });
+    }
   }
 
   /** Kann die Oberfläche Konten verwalten (Windows-App) oder nur anzeigen (Browser-Vorschau)? */

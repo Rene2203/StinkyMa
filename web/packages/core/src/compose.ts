@@ -1,4 +1,5 @@
 import type { Account, EmailAddress, Message } from "./models.js";
+import type { OutgoingAttachment } from "./files.js";
 
 // Mails schreiben: Antworten, Allen antworten, Weiterleiten. Plattformneutral (kein Node, kein DOM),
 // damit Windows-App, Server und später iPad dieselben Regeln nutzen.
@@ -16,6 +17,8 @@ export interface OutgoingMail {
   bodyText: string;
   /** Formatierte Fassung aus dem Editor (HTML-Fragment ohne <html>/<body>); fehlt bei reinen Textmails. */
   bodyHtml?: string | null;
+  /** Angehängte Dateien. */
+  attachments?: OutgoingAttachment[];
   /** Message-ID der beantworteten Mail (für In-Reply-To). */
   inReplyTo?: string | null;
   /** Kette der Message-IDs der Konversation, älteste zuerst (für References). */
@@ -259,6 +262,6 @@ export function localSentMessage(
     bodyText: text,
     bodyHtml: mail.bodyHtml ? emailHtml(mail.bodyHtml) : null,
     flags: 1, // gelesen
-    hasAttachments: false,
+    hasAttachments: (mail.attachments?.length ?? 0) > 0,
   };
 }

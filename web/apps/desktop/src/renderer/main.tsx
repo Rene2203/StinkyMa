@@ -1,4 +1,4 @@
-import { createMockData, InMemoryMailRepository, type AccountsApi, type MailRepository } from "@stinkyma/core";
+import { createMockData, InMemoryMailRepository, type AccountsApi, type AttachmentFiles, type MailRepository } from "@stinkyma/core";
 import { App, pickLocale } from "@stinkyma/ui";
 import "@stinkyma/ui/styles.css";
 import { StrictMode } from "react";
@@ -9,6 +9,7 @@ declare global {
     stinkyma?: {
       mail: MailRepository;
       accounts: AccountsApi;
+      files: AttachmentFiles;
       onMailChanged: (callback: () => void) => () => void;
       platform: string;
     };
@@ -25,7 +26,7 @@ const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <App repository={repository} locale={locale} accounts={bridge?.accounts} subscribeChanges={bridge?.onMailChanged} />
+      <App repository={repository} locale={locale} accounts={bridge?.accounts} files={bridge?.files} subscribeChanges={bridge?.onMailChanged} />
     </StrictMode>,
   );
 }

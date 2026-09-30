@@ -22,6 +22,7 @@ import { imapFlagName } from "./flags.js";
 import type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus } from "../accounts.js";
 import type { OutgoingMail } from "../compose.js";
 import { buildMessage, sendRaw, smtpLoginFor, SmtpRejectedError } from "./smtp.js";
+import { extractAttachment } from "./parse.js";
 
 export type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus };
 export { accountsApiMethods } from "../accounts.js";
@@ -119,6 +120,33 @@ export class MailService implements MailRepository, AccountsApi {
     const mail = await this.repository.reopenOutgoing(id);
     this.options.onChange?.();
     return mail;
+  }
+
+  /**
+   * Inhalt eines empfangenen Anhangs – wird bei Bedarf vom Server geholt (nicht vorab gespeichert, spart Platz).
+   * Anhang-IDs haben die Form `<Mail-ID>/a<Index>`.
+   */
+  async attachmentContent(attachmentId: string): Promise<{ filename: string; mimeType: string; content: Buffer }> {
+    const match = /^(.*)\/a(\d+)$/.exec(attachmentId);
+    const messageId = match?.[1];
+    const index = Number(match?.[2]);
+    const location = messageId ? this.writer.messageLocation(messageId) : null;
+    if (!messageId || !location) throw new Error("Die Mail zu diesem Anhang gibt es nicht mehr.");
+    if (isDemoAccount({ id: location.accountId })) throw new Error("Das ist eine Beispielmail – der Anhang hat keinen Inhalt.");
+    if (location.uid === null) throw new Error("Die Mail wird gerade verschoben. Bitte gleich noch einmal versuchen.");
+    const uid = location.uid;
+    return this.#withAccount(location.accountId, async (client) => {
+      const lock = await client.getMailboxLock(this.#pathOf(location.accountId, location.mailboxId));
+      try {
+        const message = await client.fetchOne(String(uid), { source: true }, { uid: true });
+        if (!message || !message.source) throw new Error("Die Mail ist auf dem Server nicht mehr vorhanden.");
+        const attachment = await extractAttachment(message.source, index);
+        if (!attachment) throw new Error("Anhang nicht gefunden.");
+        return attachment;
+      } finally {
+        lock.release();
+      }
+    });
   }
 
   /** Wie viele Mails noch im Postausgang warten (ohne endgültig abgelehnte). */
