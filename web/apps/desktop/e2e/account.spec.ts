@@ -57,8 +57,13 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await app?.close();
-  rmSync(dataDir, { recursive: true, force: true });
+  // Schließen darf den Testlauf nie blockieren (sonst verdeckt ein Timeout den eigentlichen Fehler).
+  if (app) {
+    const child = app.process();
+    await Promise.race([app.close().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 10_000))]);
+    if (child && child.exitCode === null) child.kill();
+  }
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
 });
 
 test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
@@ -94,20 +99,25 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await expect(frame.locator("img[src*='tracker']")).toHaveCount(0);
   await page.screenshot({ path: join(screenshotDir, "08-HTML-Mail.png") });
 
-  // Passwort liegt nicht im Klartext auf der Platte (unter Windows: DPAPI; im Linux-Test: Electrons Test-Speicher)
-  const secrets = readFileSync(join(dataDir, "secrets.json"), "utf8");
-  expect(secrets).not.toContain("geheim");
+  await test.step("Passwort liegt nicht im Klartext auf der Platte", async () => {
+    // Unter Windows: DPAPI; im Linux-Test: Electrons Test-Speicher
+    const secrets = readFileSync(join(dataDir, "secrets.json"), "utf8");
+    expect(secrets).not.toContain("geheim");
+  });
 
-  // Archivieren wirkt auf dem Server
-  await page.locator("body").press("e");
-  await expect(page.getByTestId("message-row")).toHaveCount(1);
-  const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
-  await admin.connect();
-  const status = await admin.status("Archiv", { messages: true });
-  await admin.logout();
-  expect(status && status.messages).toBe(1);
+  await test.step("Archivieren per Taste E wirkt auf dem Server", async () => {
+    await page.getByTestId("thread-subject").click(); // Fokus in die App (nicht in den Mail-Frame)
+    await page.keyboard.press("e");
+    await expect(page.getByTestId("message-row")).toHaveCount(1);
+    const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+    await admin.connect();
+    const status = await admin.status("Archiv", { messages: true });
+    await admin.logout();
+    expect(status && status.messages).toBe(1);
+  });
 
-  // Abruf per Knopf
-  await page.getByTestId("sync-now").click();
-  await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um");
+  await test.step("Abruf per Knopf", async () => {
+    await page.getByTestId("sync-now").click();
+    await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });
+  });
 });

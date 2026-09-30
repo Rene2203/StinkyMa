@@ -144,3 +144,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   grün (inkl. Server-Archivierung und „gelesen“ auf dem Server). Beobachtet: Ohne Schlüsselbund (Linux-Container)
   verweigert die App das Speichern des Passworts – gewollt; Windows hat immer DPAPI.
   Windows-CI startet jetzt ebenfalls GreenMail und testet den kompletten Ablauf.
+- **Windows-CI für W2 (Lauf #10): teilweise grün.** Auf echtem Windows funktionieren Konto-Einrichtung mit
+  DPAPI, Abgleich gegen GreenMail, HTML-Anzeige mit Tracker-Blockade und „gelesen“ auf dem Server
+  (Screenshots). Danach schlug der E2E-Test fehl, und das Schließen der App hing – dadurch war die eigentliche
+  Fehlermeldung verdeckt. Test jetzt in benannte Schritte gegliedert, robustes Schließen, vollständiger
+  Testbericht (Trace) wird bei Fehlern hochgeladen. Die iPad/Mac-CI mit der Swift-Migration v2 ist grün.

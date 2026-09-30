@@ -63,6 +63,15 @@ jobs:
           name: windows-screenshots
           path: web/apps/desktop/test-results/screenshots
           if-no-files-found: warn
+      - name: Testbericht bei Fehlern hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-bericht
+          path: |
+            web/apps/desktop/test-results
+            web/apps/desktop/playwright-report
+          if-no-files-found: ignore
       - name: Installer erzeugen
         working-directory: web/apps/desktop
         run: npx electron-builder --win --x64 --publish never
