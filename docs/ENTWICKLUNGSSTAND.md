@@ -166,3 +166,4 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   sinken sofort. (4) Abruf meldet nach jedem Ordner, Posteingang zuerst, gibt dem Main-Prozess Luft.
   Lokal: 101 Tests + 3 E2E grün (Scroll-Test fällt ohne Fix nachweislich durch). Swift: 43 Tests grün.
   **Ungeprüft:** Verhalten mit echtem iCloud-Konto und großen Postfächern; Windows-CI steht aus.
+- **Entscheidung Nutzer:** Die Zahlen in der Seitenleiste zeigen weiterhin die **ungelesenen** Mails (nicht die Gesamtzahl).
