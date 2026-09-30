@@ -1,4 +1,4 @@
-import { Archive, Flag, FlagOff, Mail, MailOpen, Paperclip, Search, Trash2 } from "lucide-react";
+import { Archive, Flag, FlagOff, Mail, MailOpen, Paperclip, Search, SquarePen, Trash2 } from "lucide-react";
 import { displayName, isFlagged, isRead, type Message } from "@stinkyma/core";
 import { useState, type MouseEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -6,10 +6,11 @@ import { formatListDate } from "../format.js";
 import { showsAccountIndicator, sidebarItem, visibleMessages } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
 import { ContextMenu, type ContextMenuState } from "./ContextMenu.js";
+import { composeLabels } from "./Composer.js";
 import { sidebarTitle } from "./Sidebar.js";
 
 export function MessageList() {
-  const { store, t } = useUi();
+  const { store, t, locale } = useUi();
   const state = useBrowserState();
   const messages = visibleMessages(state);
   const withAccount = showsAccountIndicator(state);
@@ -24,7 +25,19 @@ export function MessageList() {
   return (
     <section className="message-list" aria-label={item ? sidebarTitle(item, t) : undefined}>
       <header className="list-header">
-        <h2 className="list-title">{item ? sidebarTitle(item, t) : ""}</h2>
+        <div className="list-title-row">
+          <h2 className="list-title">{item ? sidebarTitle(item, t) : ""}</h2>
+          <button
+            type="button"
+            className="icon-button"
+            title={`${t("compose.new")} (N)`}
+            aria-label={t("compose.new")}
+            data-testid="compose-new"
+            onClick={() => store.openCompose("new", composeLabels(t, locale))}
+          >
+            <SquarePen size={17} />
+          </button>
+        </div>
         <label className="search">
           <Search size={16} aria-hidden="true" />
           <input

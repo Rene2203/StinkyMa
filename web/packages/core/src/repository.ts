@@ -1,4 +1,5 @@
 import type { Account, Attachment, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
+import type { OutgoingMail } from "./compose.js";
 
 /**
  * Zugriff auf den lokalen Mail-Bestand. Die Oberfläche spricht nur mit dieser Schnittstelle –
@@ -24,6 +25,27 @@ export interface MailRepository {
   /** Fügt eine Ausnahme hinzu (wird vereinheitlicht, siehe `normalizeRemoteContentException`) und gibt sie zurück. */
   addRemoteContentException(input: string): Promise<string>;
   removeRemoteContentException(exception: string): Promise<void>;
+  /**
+   * Sendet eine Mail – nur auf ausdrücklichen Wunsch des Nutzers (Klick auf „Senden“). Die Mail landet sofort im
+   * dauerhaften Postausgang und geht raus, sobald der Server erreichbar ist; danach liegt sie in „Gesendet“.
+   */
+  send(mail: OutgoingMail): Promise<void>;
+  /** Holt eine noch nicht gesendete Mail aus dem Postausgang zurück (zum Bearbeiten); sie wird dann nicht gesendet. */
+  reopenOutgoing(id: string): Promise<OutgoingMail | null>;
+}
+
+/** Eine Mail im Postausgang (noch nicht gesendet). */
+export interface OutboxItem {
+  id: string;
+  accountId: string;
+  subject: string;
+  /** Empfänger zur Anzeige. */
+  to: string;
+  createdAt: string;
+  /** queued: wird gesendet, sobald möglich · failed: vom Server abgelehnt, muss bearbeitet werden. */
+  status: "queued" | "failed";
+  /** Letzte Fehlermeldung (z. B. offline) – auch bei „queued“ möglich. */
+  error: string | null;
 }
 
 export interface UnreadCounts {
@@ -40,6 +62,8 @@ export interface MailOverview {
   /** Ordner pro Konto, in Anzeige-Reihenfolge. */
   mailboxesByAccount: Record<string, Mailbox[]>;
   counts: UnreadCounts;
+  /** Mails im Postausgang, älteste zuerst. */
+  outbox: OutboxItem[];
 }
 
 /** Liste der Methoden – für IPC-/HTTP-Brücken, die Aufrufe weiterreichen. */
@@ -57,6 +81,8 @@ export const mailRepositoryMethods = [
   "remoteContentExceptions",
   "addRemoteContentException",
   "removeRemoteContentException",
+  "send",
+  "reopenOutgoing",
 ] as const satisfies readonly (keyof MailRepository)[];
 
 export type MailRepositoryMethod = (typeof mailRepositoryMethods)[number];

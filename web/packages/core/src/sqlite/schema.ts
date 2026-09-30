@@ -231,6 +231,27 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    name: "v5-outbox",
+    // Postausgang: gesendete Mails bleiben hier, bis der Server sie angenommen hat (offline-fähig, 4.3).
+    // mail = Eingaben aus dem Composer (JSON, zum erneuten Bearbeiten), raw = fertige MIME-Nachricht.
+    // sentAt gesetzt = SMTP hat angenommen, fehlt nur noch die Ablage in „Gesendet“ (nie doppelt senden).
+    sql: `
+      CREATE TABLE outbox (
+        id TEXT PRIMARY KEY NOT NULL,
+        accountId TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+        mail TEXT NOT NULL,
+        raw BLOB NOT NULL,
+        messageId TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        sentAt TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        lastError TEXT,
+        failed INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX outbox_on_accountId_createdAt ON outbox(accountId, createdAt);
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

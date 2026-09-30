@@ -221,4 +221,76 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     await expect(service.addAccount({ ...settings(), imapPort: 1 }, "geheim", { removeDemoAccounts: true })).rejects.toThrow(/abgelehnt/);
     expect((await service.accounts()).every(isDemoAccount)).toBe(true); // nichts verändert
   });
+
+  async function receivedBy(address: string, subject: string): Promise<string | null> {
+    const client = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: address, pass: "x" }, logger: false });
+    await client.connect();
+    try {
+      await client.mailboxOpen("INBOX");
+      for await (const msg of client.fetch("1:*", { envelope: true, source: true })) {
+        if (msg.envelope?.subject === subject) return msg.source?.toString("utf8") ?? "";
+      }
+      return null;
+    } finally {
+      await client.logout();
+    }
+  }
+
+  it("Senden: Antwort geht raus (inkl. Bcc), liegt in „Gesendet“, Original wird „beantwortet“", async () => {
+    await admin.mailboxCreate("Sent");
+    const account = await addAndSync();
+    const original = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Angebot?")!;
+    const bcc = `bcc-${randomUUID().slice(0, 8)}@example.test`;
+    const other = `carl-${randomUUID().slice(0, 8)}@example.test`;
+    await service.send({
+      accountId: account.id,
+      to: [{ name: "Carl", address: other }],
+      cc: [],
+      bcc: [{ address: bcc }],
+      subject: "Re: Angebot?",
+      bodyText: "Anbei das Angebot.\n\n> Kannst du mir das Angebot schicken?\n",
+      inReplyTo: original.messageId,
+      references: [original.messageId!],
+      answeredMessageId: original.id,
+    });
+    expect((await service.overview()).outbox).toHaveLength(1); // sofort im Postausgang
+    await service.flushNow(account.id);
+    expect((await service.overview()).outbox).toHaveLength(0);
+    expect(service.outgoingCount()).toBe(0);
+
+    const delivered = await receivedBy(other, "Re: Angebot?");
+    expect(delivered).toContain("Anbei das Angebot.");
+    expect(delivered).toMatch(/In-Reply-To: <m0@example.test>/i);
+    expect(delivered).not.toContain(bcc); // Bcc steht nicht in der Mail
+    expect(await receivedBy(bcc, "Re: Angebot?")).not.toBeNull(); // kommt aber an
+
+    expect(await serverFlags("Re: Angebot?", "Sent")).toContain("\\Seen");
+    await service.flushNow(account.id); // „beantwortet“ über die Warteschlange
+    expect(await serverFlags("Angebot?")).toContain("\\Answered");
+    await service.syncAccountNow(account.id);
+    const sentBox = (await service.mailboxes(account.id)).find((m) => m.role === "sent")!;
+    expect((await service.messages({ kind: "mailbox", mailboxId: sentBox.id }, 10)).map((m) => m.subject)).toEqual(["Re: Angebot?"]);
+  });
+
+  it("Senden ohne erreichbaren SMTP-Server: Mail bleibt im Postausgang und lässt sich zurückholen", async () => {
+    const account = await service.addAccount({ ...settings(), smtpPort: 1 }, "geheim", { removeDemoAccounts: true });
+    await service.syncNow();
+    const mail = { accountId: account.id, to: [{ address: "x@example.test" }], cc: [], bcc: [], subject: "Wartet", bodyText: "Hallo" };
+    await service.send(mail);
+    await service.flushNow(account.id);
+    const [item] = (await service.overview()).outbox;
+    expect(item).toMatchObject({ subject: "Wartet", status: "queued" });
+    expect(item?.error).toMatch(/Postausgang/);
+    expect(service.outgoingCount(account.id)).toBe(1);
+    // Abruf läuft trotzdem (IMAP geht), die Mail bleibt liegen
+    await service.syncAccountNow(account.id);
+    expect(service.outgoingCount(account.id)).toBe(1);
+    expect(await service.reopenOutgoing(item!.id)).toEqual(mail);
+    expect((await service.overview()).outbox).toHaveLength(0);
+  });
+
+  it("Senden ohne Empfänger wird abgelehnt", async () => {
+    const account = await addAndSync();
+    await expect(service.send({ accountId: account.id, to: [], cc: [], bcc: [], subject: "x", bodyText: "" })).rejects.toThrow(/Empfänger/);
+  });
 });

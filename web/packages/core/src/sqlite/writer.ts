@@ -16,6 +16,16 @@ export interface PendingAction {
   lastError: string | null;
 }
 
+export interface OutboxRow {
+  id: string;
+  accountId: string;
+  mail: string;
+  raw: Buffer;
+  messageId: string;
+  sentAt: string | null;
+  attempts: number;
+}
+
 export interface NewMessage {
   id: string;
   accountId: string;
@@ -261,6 +271,42 @@ export class MailWriter {
 
   private deleteOrphanThreads(): void {
     this.db.prepare("DELETE FROM thread WHERE id NOT IN (SELECT DISTINCT threadId FROM message)").run();
+  }
+
+  // --- Postausgang ---
+
+  enqueueOutgoing(row: { id: string; accountId: string; mail: string; raw: Buffer; messageId: string; createdAt: string }): void {
+    this.db
+      .prepare("INSERT INTO outbox (id, accountId, mail, raw, messageId, createdAt) VALUES (@id, @accountId, @mail, @raw, @messageId, @createdAt)")
+      .run(row);
+  }
+
+  /** Was noch zu tun ist: nicht gesendete (ohne endgültig abgelehnte) und gesendete, die noch in „Gesendet“ müssen. */
+  pendingOutgoing(accountId: string): OutboxRow[] {
+    return this.db
+      .prepare("SELECT id, accountId, mail, raw, messageId, sentAt, attempts FROM outbox WHERE accountId = ? AND failed = 0 ORDER BY createdAt")
+      .all(accountId) as OutboxRow[];
+  }
+
+  outgoingCount(accountId?: string): number {
+    const row = accountId
+      ? this.db.prepare("SELECT COUNT(*) AS n FROM outbox WHERE accountId = ? AND failed = 0").get(accountId)
+      : this.db.prepare("SELECT COUNT(*) AS n FROM outbox WHERE failed = 0").get();
+    return (row as { n: number }).n;
+  }
+
+  markOutgoingSent(id: string, sentAt: string): void {
+    this.db.prepare("UPDATE outbox SET sentAt = ?, attempts = 0, lastError = NULL WHERE id = ?").run(sentAt, id);
+  }
+
+  noteOutgoingError(id: string, error: string, options: { failed?: boolean; countAttempt?: boolean } = {}): void {
+    this.db
+      .prepare("UPDATE outbox SET lastError = ?, failed = ?, attempts = attempts + ? WHERE id = ?")
+      .run(error, options.failed ? 1 : 0, options.countAttempt ? 1 : 0, id);
+  }
+
+  completeOutgoing(id: string): void {
+    this.db.prepare("DELETE FROM outbox WHERE id = ?").run(id);
   }
 }
 

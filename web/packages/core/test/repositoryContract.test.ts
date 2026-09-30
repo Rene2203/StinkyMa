@@ -148,4 +148,25 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
     await repo.removeRemoteContentException("news@shop.example");
     expect(await repo.remoteContentExceptions()).toEqual(["zeitung.example"]);
   });
+
+  it("Senden ohne Server (Beispielkonto): landet in „Gesendet“, Original „beantwortet“", async () => {
+    const repo = make();
+    const original = (await repo.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.accountId === MockIds.iCloud)!;
+    await repo.send({
+      accountId: MockIds.iCloud,
+      to: [original.from],
+      cc: [],
+      bcc: [],
+      subject: `Re: ${original.subject}`,
+      bodyText: "Danke!",
+      answeredMessageId: original.id,
+    });
+    const sent = await repo.messages({ kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.iCloud, "sent") }, 50);
+    const copy = sent.find((m) => m.subject === `Re: ${original.subject}`)!;
+    expect(copy.threadId).toBe(original.threadId);
+    expect(isRead(copy)).toBe(true);
+    expect(((await repo.message(original.id))!.flags & 2) !== 0).toBe(true);
+    expect((await repo.overview()).outbox).toEqual([]);
+  });
 });
+

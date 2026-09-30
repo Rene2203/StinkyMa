@@ -20,6 +20,8 @@ import { messageIdFor, syncAccount, type SyncResult } from "./accountSync.js";
 import { connectImap, describeConnectionError, loginFor, MailConnectionError, testImapLogin } from "./connection.js";
 import { imapFlagName } from "./flags.js";
 import type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus } from "../accounts.js";
+import type { OutgoingMail } from "../compose.js";
+import { buildMessage, sendRaw, smtpLoginFor, SmtpRejectedError } from "./smtp.js";
 
 export type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus };
 export { accountsApiMethods } from "../accounts.js";
@@ -78,6 +80,51 @@ export class MailService implements MailRepository, AccountsApi {
   remoteContentExceptions(): Promise<string[]> { return this.repository.remoteContentExceptions(); }
   addRemoteContentException(input: string): Promise<string> { return this.repository.addRemoteContentException(input); }
   removeRemoteContentException(exception: string): Promise<void> { return this.repository.removeRemoteContentException(exception); }
+
+  // --- Senden ---
+
+  /**
+   * Nur auf ausdrücklichen Klick des Nutzers. Die fertige Nachricht kommt sofort in den dauerhaften Postausgang
+   * (übersteht Neustart und Offline-Phasen) und wird im Hintergrund gesendet, danach in „Gesendet“ abgelegt.
+   */
+  async send(mail: OutgoingMail): Promise<void> {
+    const account = this.writer.account(mail.accountId);
+    if (!account) throw new Error("Konto nicht gefunden.");
+    if (mail.to.length + mail.cc.length + mail.bcc.length === 0) throw new Error("Bitte mindestens einen Empfänger angeben.");
+    if (isDemoAccount(account)) {
+      await this.repository.send(mail);
+      this.options.onChange?.();
+      return;
+    }
+    const now = this.#now();
+    const domain = account.email.split("@")[1] ?? "stinkyma.local";
+    const built = await buildMessage(mail, {
+      from: { name: account.displayName, address: account.email },
+      messageId: `<${randomUUID()}@${domain}>`,
+      date: now,
+    });
+    this.writer.enqueueOutgoing({
+      id: randomUUID(),
+      accountId: account.id,
+      mail: JSON.stringify(mail),
+      raw: built.raw,
+      messageId: built.messageId,
+      createdAt: now.toISOString(),
+    });
+    this.options.onChange?.();
+    this.#scheduleFlush(account.id);
+  }
+
+  async reopenOutgoing(id: string): Promise<OutgoingMail | null> {
+    const mail = await this.repository.reopenOutgoing(id);
+    this.options.onChange?.();
+    return mail;
+  }
+
+  /** Wie viele Mails noch im Postausgang warten (ohne endgültig abgelehnte). */
+  outgoingCount(accountId?: string): number {
+    return this.writer.outgoingCount(accountId);
+  }
 
   // --- Aktionen ---
 
@@ -140,7 +187,10 @@ export class MailService implements MailRepository, AccountsApi {
 
   /** Überträgt wartende Aktionen eines Kontos jetzt (wartet auf das Ergebnis). */
   async flushNow(accountId: string): Promise<void> {
-    await this.#withAccount(accountId, (client) => this.#flush(client, accountId));
+    await this.#withAccount(accountId, async (client) => {
+      await this.#flushOutbox(client, accountId);
+      await this.#flush(client, accountId);
+    });
   }
 
   // --- Konten ---
@@ -223,6 +273,7 @@ export class MailService implements MailRepository, AccountsApi {
     const since = new Date(this.#now().getTime() - (this.options.syncDays ?? 30) * 86_400_000);
     try {
       const result = await this.#withAccount(accountId, async (client) => {
+        await this.#flushOutbox(client, accountId);
         await this.#flush(client, accountId);
         if (this.writer.pendingActionCount(accountId) > 0) {
           // Nicht abgleichen, solange lokale Änderungen fehlen – sonst würde der Server sie zurückdrehen.
@@ -306,6 +357,58 @@ export class MailService implements MailRepository, AccountsApi {
         if (action.attempts + 1 >= maxActionAttempts) this.writer.completeAction(action.id);
         else this.writer.failAction(action.id, message);
       }
+    }
+    if (changed) this.options.onChange?.();
+  }
+
+  /**
+   * Postausgang: erst per SMTP senden (danach `sentAt` – nie doppelt senden), dann in „Gesendet“ ablegen.
+   * SMTP nicht erreichbar → Fehler an der Mail vermerken und später erneut; vom Server abgelehnt → „failed“,
+   * der Nutzer muss die Mail bearbeiten. Nichts wird stillschweigend verworfen.
+   */
+  async #flushOutbox(client: ImapFlow, accountId: string): Promise<void> {
+    const rows = this.writer.pendingOutgoing(accountId);
+    if (rows.length === 0) return;
+    const account = this.writer.account(accountId);
+    if (!account) return;
+    let changed = false;
+    for (const row of rows) {
+      if (!row.sentAt) {
+        try {
+          const password = await this.secrets.get(SecretKeys.accountPassword(accountId));
+          if (password === null) throw new MailConnectionError("Kein Passwort gespeichert. Bitte das Konto neu einrichten.");
+          const raw = Buffer.from(row.raw);
+          await sendRaw(smtpLoginFor(account, password), { raw, envelope: envelopeOf(row.mail, account.email) });
+          this.writer.markOutgoingSent(row.id, this.#now().toISOString());
+          changed = true;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.writer.noteOutgoingError(row.id, message, { failed: error instanceof SmtpRejectedError, countAttempt: true });
+          changed = true;
+          if (error instanceof SmtpRejectedError) continue; // nächste Mail versuchen
+          break; // Server nicht erreichbar – später erneut
+        }
+      }
+      // In „Gesendet“ ablegen. Gmail und Outlook legen per SMTP gesendete Mails selbst dort ab.
+      const sent = this.writer.mailboxes(accountId).find((m) => m.role === "sent");
+      if (sent && account.provider !== "gmail" && account.provider !== "outlook") {
+        try {
+          await client.append(this.#pathOf(accountId, sent.id), Buffer.from(row.raw), ["\\Seen"]);
+        } catch (error) {
+          if (!client.usable) throw error;
+          if (row.attempts + 1 < maxActionAttempts) {
+            this.writer.noteOutgoingError(row.id, error instanceof Error ? error.message : String(error), { countAttempt: true });
+            continue;
+          }
+          // Ablage klappt dauerhaft nicht – die Mail ist aber gesendet, also aus dem Postausgang nehmen.
+        }
+      }
+      this.writer.completeOutgoing(row.id);
+      const mail = JSON.parse(row.mail) as OutgoingMail;
+      if (mail.answeredMessageId && this.writer.messageLocation(mail.answeredMessageId)) {
+        await this.setFlag("answered", true, [mail.answeredMessageId]);
+      }
+      changed = true;
     }
     if (changed) this.options.onChange?.();
   }
@@ -437,3 +540,8 @@ export class MailService implements MailRepository, AccountsApi {
   }
 }
 
+/** Umschlag aus den gespeicherten Composer-Eingaben (inkl. Bcc, das nicht in den Kopfzeilen steht). */
+function envelopeOf(mailJson: string, from: string): { from: string; to: string[] } {
+  const mail = JSON.parse(mailJson) as OutgoingMail;
+  return { from, to: [...mail.to, ...mail.cc, ...mail.bcc].map((a) => a.address) };
+}

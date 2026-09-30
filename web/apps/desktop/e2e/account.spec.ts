@@ -38,6 +38,7 @@ test.beforeAll(async () => {
   const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
   await admin.connect();
   await admin.mailboxCreate("Archiv");
+  await admin.mailboxCreate("Sent");
   await admin.append("INBOX", htmlMail, [], new Date());
   await admin.append(
     "INBOX",
@@ -88,6 +89,9 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await page.getByTestId("imap-host").fill(host);
   await page.getByTestId("imap-port").fill(String(port));
   await page.getByTestId("imap-security").selectOption("none");
+  await page.getByTestId("smtp-host").fill(host);
+  await page.getByTestId("smtp-port").fill("3025");
+  await page.getByTestId("smtp-security").selectOption("none");
   await page.screenshot({ path: join(screenshotDir, "07-Konto-hinzufuegen.png") });
   await page.getByTestId("account-connect").click();
 
@@ -175,6 +179,56 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await page.waitForTimeout(1_500);
     await expect(page.getByTestId("thread-subject")).toBeVisible();
     await expect(rows).toHaveCount(count);
+  });
+
+  await test.step("Neue E-Mail ohne Empfänger: Hinweis, Verwerfen fragt nach", async () => {
+    await page.getByTestId("compose-new").click();
+    const composer = page.getByTestId("composer");
+    await expect(composer).toBeVisible();
+    await composer.getByTestId("compose-subject").fill("Test");
+    await composer.getByTestId("compose-send").click();
+    await expect(composer.getByRole("alert")).toContainText("mindestens einen Empfänger");
+    await page.keyboard.press("Escape");
+    await composer.getByTestId("compose-confirm-discard").click();
+    await expect(composer).toHaveCount(0);
+  });
+
+  await test.step("Antworten per Taste R, Senden mit Strg+Enter – kommt beim Empfänger an und liegt in „Gesendet“", async () => {
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    await page.getByText("Grillen?").click();
+    await expect(page.getByTestId("thread-subject")).toHaveText("Grillen?");
+    await page.keyboard.press("r");
+    const composer = page.getByTestId("composer");
+    await expect(composer).toBeVisible();
+    await expect(composer.getByTestId("compose-to")).toHaveValue("Jonas <jonas@example.test>");
+    await expect(composer.getByTestId("compose-subject")).toHaveValue("Re: Grillen?");
+    await expect(composer.getByTestId("compose-body")).toBeFocused();
+    await page.keyboard.type("Ja, ich komme gern!");
+    await page.screenshot({ path: join(screenshotDir, "10-Antworten.png") });
+    await page.keyboard.press("Control+Enter");
+    await expect(composer).toHaveCount(0, { timeout: 5_000 });
+
+    const jonas = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: "jonas@example.test", pass: "x" }, logger: false });
+    await expect
+      .poll(async () => {
+        const mine = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+        await mine.connect();
+        const status = await mine.status("Sent", { messages: true });
+        await mine.logout();
+        return status && status.messages;
+      }, { timeout: 15_000 })
+      .toBe(1);
+    await jonas.connect();
+    await jonas.mailboxOpen("INBOX");
+    let source = "";
+    for await (const msg of jonas.fetch("1:*", { envelope: true, source: true })) {
+      if (msg.envelope?.subject === "Re: Grillen?") source = msg.source?.toString("utf8") ?? "";
+    }
+    await jonas.logout();
+    expect(source).toContain("Ja, ich komme gern!");
+    expect(source).toContain("> Kommst du Samstag?");
+    expect(source).toMatch(/In-Reply-To: <g1@example.test>/i);
+    await expect(page.getByTestId("outbox")).toHaveCount(0);
   });
 
   await test.step("Abruf per Knopf", async () => {

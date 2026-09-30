@@ -2,6 +2,7 @@ import type { AccountsApi, MailRepository } from "@stinkyma/core";
 import { useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
+import { Composer, composeLabels } from "./components/Composer.js";
 import { MessageList } from "./components/MessageList.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { UiContext, useBrowserState, useUi } from "./context.js";
@@ -49,6 +50,7 @@ function Shell() {
       <Sidebar />
       <MessageList />
       <MessageDetail />
+      {state.compose && <Composer draft={state.compose} />}
       {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}
       {state.error && (
         <div className="error-banner" role="alert">
@@ -63,7 +65,7 @@ function Shell() {
 
 /** Tastaturkürzel wie in Spark/Gmail. Nicht aktiv, solange ein Eingabefeld den Fokus hat. */
 function useKeyboardShortcuts() {
-  const { store } = useUi();
+  const { store, t, locale } = useUi();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -73,6 +75,11 @@ function useKeyboardShortcuts() {
       if (event.key === "F5") {
         event.preventDefault();
         void store.syncNow();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        store.openCompose("new", composeLabels(t, locale));
         return;
       }
       if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -101,6 +108,22 @@ function useKeyboardShortcuts() {
         case "u":
           if (message) void store.toggleRead(message.id);
           break;
+        case "n":
+          event.preventDefault();
+          store.openCompose("new", composeLabels(t, locale));
+          break;
+        case "r":
+          event.preventDefault();
+          store.openCompose("reply", composeLabels(t, locale));
+          break;
+        case "a":
+          event.preventDefault();
+          store.openCompose("replyAll", composeLabels(t, locale));
+          break;
+        case "f":
+          event.preventDefault();
+          store.openCompose("forward", composeLabels(t, locale));
+          break;
         case "Escape":
           void store.selectMessage(null);
           break;
@@ -108,7 +131,7 @@ function useKeyboardShortcuts() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [store]);
+  }, [store, t, locale]);
 
   // Ausgewählte Zeile beim Blättern mit der Tastatur sichtbar halten.
   const { selectedMessageId } = useBrowserState();

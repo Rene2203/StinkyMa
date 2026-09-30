@@ -13,6 +13,13 @@ import {
   type Message,
   type MessageFlagName,
   type MessageScope,
+  type ComposeDraft,
+  type ComposeLabels,
+  type ComposeMode,
+  type OutboxItem,
+  type OutgoingMail,
+  isDemoAccount,
+  prepareCompose,
 } from "@stinkyma/core";
 
 // Zustand des Drei-Spalten-Layouts – Gegenstück zu MailboxBrowserModel (Swift). Ohne React testbar.
@@ -53,6 +60,10 @@ export interface BrowserState {
   remoteContentExceptions: string[];
   /** Offener Optionen-Dialog, ggf. mit vorgeschlagener Ausnahme (z. B. Domain der geöffneten Mail). */
   options: { suggestion: string } | null;
+  /** Offener Composer mit seiner Vorbelegung. */
+  compose: ComposeDraft | null;
+  /** Mails im Postausgang (noch nicht gesendet). */
+  outbox: OutboxItem[];
 }
 
 export const initialState: BrowserState = {
@@ -69,6 +80,8 @@ export const initialState: BrowserState = {
   lastSyncAt: null,
   remoteContentExceptions: [],
   options: null,
+  compose: null,
+  outbox: [],
 };
 
 // --- Abgeleitete Werte ---
@@ -158,6 +171,69 @@ export class BrowserStore {
     });
   }
 
+  // --- Schreiben ---
+
+  /**
+   * Öffnet den Composer. Antworten/Weiterleiten beziehen sich auf die geöffnete Mail; ohne geöffnete Mail
+   * gibt es nur „Neue E-Mail“. `labels` kommen aus der Oberfläche (Sprache des Zitat-Kopfs).
+   */
+  openCompose(mode: ComposeMode, labels: ComposeLabels): void {
+    const state = this.#state;
+    const original = selectedMessage(state);
+    if (mode !== "new" && !original) return;
+    const account = this.#composeAccount(original);
+    if (!account) {
+      this.#set({ error: "Bitte zuerst ein Konto hinzufügen." });
+      return;
+    }
+    const ownAddresses = Object.values(state.accountsById).map((a) => a.email);
+    const thread = original ? threadFor(state, original) : [];
+    this.#set({ compose: prepareCompose(mode, { account, original, thread, ownAddresses, labels }) });
+  }
+
+  closeCompose(): void {
+    this.#set({ compose: null });
+  }
+
+  /** Senden – Fehler (z. B. kein Empfänger) gehen an den Composer, nicht ins Banner. */
+  async send(mail: OutgoingMail): Promise<void> {
+    await this.#repository.send(mail);
+    this.#set({ compose: null });
+    await Promise.all([this.loadSidebar(), this.loadMessages()]);
+    // Beantwortete Mail: Pfeil-Symbol aktualisieren
+    if (mail.answeredMessageId) {
+      const updated = await this.#repository.message(mail.answeredMessageId);
+      if (updated) {
+        const replace = (list: Message[]) => list.map((m) => (m.id === updated.id ? updated : m));
+        this.#set({ messages: replace(this.#state.messages), thread: replace(this.#state.thread) });
+      }
+    }
+  }
+
+  /** Holt eine Mail aus dem Postausgang zurück in den Composer (z. B. nach einem Fehler). */
+  async reopenOutgoing(id: string): Promise<void> {
+    await this.#guard(async () => {
+      const mail = await this.#repository.reopenOutgoing(id);
+      await this.loadSidebar();
+      if (mail) this.#set({ compose: { ...mail, mode: mail.inReplyTo ? "reply" : "new" } });
+    });
+  }
+
+  #composeAccount(original: Message | null): Account | undefined {
+    const accounts = Object.values(this.#state.accountsById);
+    if (original) return this.#state.accountsById[original.accountId];
+    const scope = this.#state.selectedScope;
+    if (scope.kind === "mailbox") {
+      const box = this.#state.sections
+        .flatMap((section) => section.items)
+        .find((i) => i.kind.type === "mailbox" && i.kind.mailbox.id === scope.mailboxId);
+      const owner = box?.kind.type === "mailbox" ? this.#state.accountsById[box.kind.mailbox.accountId] : undefined;
+      if (owner) return owner;
+    }
+    const sorted = [...accounts].sort((a, b) => a.sortOrder - b.sortOrder);
+    return sorted.find((a) => !isDemoAccount(a)) ?? sorted[0];
+  }
+
   // --- Optionen ---
 
   openOptions(suggestion = ""): void {
@@ -231,7 +307,7 @@ export class BrowserStore {
   /** Seitenleiste mit einem einzigen Aufruf (Konten, Ordner, Zähler) – wichtig für Tempo über IPC/HTTP. */
   async loadSidebar(): Promise<void> {
     await this.#guard(async () => {
-      const { accounts, mailboxesByAccount, counts } = await this.#repository.overview();
+      const { accounts, mailboxesByAccount, counts, outbox } = await this.#repository.overview();
       const smart: [SidebarItemKind, MessageScope, number][] = [
         [{ type: "unifiedInbox" }, { kind: "unifiedInbox" }, counts.unifiedInbox],
         [{ type: "unread" }, { kind: "unread" }, counts.unread],
@@ -249,7 +325,7 @@ export class BrowserStore {
           })),
         })),
       ];
-      this.#set({ sections, accountsById: Object.fromEntries(accounts.map((a) => [a.id, a])) });
+      this.#set({ sections, accountsById: Object.fromEntries(accounts.map((a) => [a.id, a])), outbox });
     });
   }
 

@@ -3,6 +3,7 @@ import { MessageFlag, mailboxRoleRank } from "./models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
 import { requireRemoteContentException } from "./remoteContent.js";
+import { localSentMessage, type OutgoingMail } from "./compose.js";
 
 /** `MailRepository` im Arbeitsspeicher – für UI-Tests und Vorschauen, ohne Datenbank. */
 export class InMemoryMailRepository implements MailRepository {
@@ -68,7 +69,7 @@ export class InMemoryMailRepository implements MailRepository {
       }
       if (role !== "trash" && (m.flags & MessageFlag.flagged) !== 0) counts.flagged += 1;
     }
-    return { accounts, mailboxesByAccount, counts };
+    return { accounts, mailboxesByAccount, counts, outbox: [] };
   }
 
   async setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void> {
@@ -100,6 +101,30 @@ export class InMemoryMailRepository implements MailRepository {
 
   async removeRemoteContentException(exception: string): Promise<void> {
     this.#remoteContentExceptions.delete(exception);
+  }
+
+  /** Ohne Server: Mail sofort in „Gesendet“ ablegen. */
+  async send(mail: OutgoingMail): Promise<void> {
+    const account = this.#data.accounts.find((a) => a.id === mail.accountId);
+    const sent = this.#data.mailboxes.find((b) => b.accountId === mail.accountId && b.role === "sent");
+    if (!account || !sent) throw new Error("Für dieses Konto gibt es keinen Ordner „Gesendet“.");
+    const original = mail.answeredMessageId ? this.#data.messages.find((m) => m.id === mail.answeredMessageId) : undefined;
+    const id = `local-${globalThis.crypto.randomUUID()}`;
+    this.#data.messages.push(
+      localSentMessage(mail, {
+        id,
+        mailboxId: sent.id,
+        from: { name: account.displayName, address: account.email },
+        threadId: original?.threadId ?? `thread-${id}`,
+        date: new Date().toISOString(),
+        messageId: `<${id}@stinkyma.local>`,
+      }),
+    );
+    if (original) original.flags |= MessageFlag.answered;
+  }
+
+  async reopenOutgoing(): Promise<OutgoingMail | null> {
+    return null; // kein Postausgang ohne Server
   }
 
   #roleOf(mailboxId: string): MailboxRole | undefined {

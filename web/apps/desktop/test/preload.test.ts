@@ -1,0 +1,23 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { accountsApiMethods, mailRepositoryMethods } from "@stinkyma/core";
+
+// Der Preload listet die erlaubten Methoden fest auf (er soll den Kern nicht einbündeln).
+// Dieser Test sorgt dafür, dass die Liste nicht von den Schnittstellen abweicht.
+const preload = readFileSync(join(__dirname, "..", "src", "preload", "index.ts"), "utf8");
+
+function listed(name: string): string[] {
+  const match = new RegExp(`const ${name} = \\[([^\\]]*)\\]`).exec(preload);
+  return [...(match?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1] ?? "");
+}
+
+describe("Preload-Brücke", () => {
+  it("reicht genau die Methoden von MailRepository durch", () => {
+    expect(listed("mailMethods").sort()).toEqual([...mailRepositoryMethods].sort());
+  });
+
+  it("reicht genau die Methoden von AccountsApi durch", () => {
+    expect(listed("accountMethods").sort()).toEqual([...accountsApiMethods].sort());
+  });
+});

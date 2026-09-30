@@ -1,4 +1,4 @@
-import { Archive, Flag, FlagOff, Mail as MailIcon, Reply, Trash2 } from "lucide-react";
+import { Archive, Flag, FlagOff, Forward, Mail as MailIcon, Reply, ReplyAll, Trash2 } from "lucide-react";
 import { displayName, initials, isFlagged, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -6,10 +6,11 @@ import { formatBytes, formatFullDate, formatList } from "../format.js";
 import { attachmentIcon } from "../icons.js";
 import { selectedMessage, threadFor } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
+import { composeLabels } from "./Composer.js";
 import { SafeHtml } from "./SafeHtml.js";
 
 export function MessageDetail() {
-  const { store, t } = useUi();
+  const { store, t, locale } = useUi();
   const state = useBrowserState();
   const message = selectedMessage(state);
 
@@ -30,9 +31,16 @@ export function MessageDetail() {
   return (
     <section className="detail" aria-label={message.subject}>
       <div className="toolbar" role="toolbar">
-        <button type="button" disabled title={t("action.replyLater")}>
-          <Reply size={17} /> <span>{t("action.reply")}</span>
+        <button type="button" title={`${t("compose.reply")} (R)`} data-testid="action-reply" onClick={() => store.openCompose("reply", composeLabels(t, locale))}>
+          <Reply size={17} /> <span>{t("compose.reply")}</span>
         </button>
+        <button type="button" title={`${t("compose.replyAll")} (A)`} aria-label={t("compose.replyAll")} data-testid="action-reply-all" onClick={() => store.openCompose("replyAll", composeLabels(t, locale))}>
+          <ReplyAll size={17} />
+        </button>
+        <button type="button" title={`${t("compose.forward")} (F)`} aria-label={t("compose.forward")} data-testid="action-forward" onClick={() => store.openCompose("forward", composeLabels(t, locale))}>
+          <Forward size={17} />
+        </button>
+        <span className="toolbar-gap" aria-hidden="true" />
         <button type="button" title={`${flagged ? t("action.unflag") : t("action.flag")} (S)`} onClick={() => void store.toggleFlag(message.id)}>
           {flagged ? <FlagOff size={17} /> : <Flag size={17} />}
         </button>

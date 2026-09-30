@@ -1028,3 +1028,153 @@ button {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Postausgang */
+
+.outbox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.outbox-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+  min-width: 0;
+}
+
+.outbox-line.failed {
+  color: var(--danger);
+}
+
+.outbox-line .ellipsis {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Liste: Titel mit „Neue E-Mail“ */
+
+.list-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.list-title-row .list-title {
+  margin: 0;
+}
+
+.toolbar-gap {
+  width: 8px;
+}
+
+/* Composer */
+
+.dialog.composer {
+  width: min(760px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 48px));
+}
+
+.dialog.composer form {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.composer-fields {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.dialog .composer-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 2px 0;
+  font-weight: 400;
+}
+
+.composer-row > span {
+  width: 64px;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+
+.dialog .composer-row input,
+.dialog .composer-row select {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 7px 4px;
+  background: transparent;
+}
+
+.dialog .composer-row input:focus,
+.dialog .composer-row select:focus {
+  outline: none;
+}
+
+.composer-row:focus-within {
+  border-bottom-color: var(--accent);
+}
+
+.composer-body {
+  flex: 1;
+  min-height: 160px;
+  resize: none;
+  border: 0;
+  padding: 8px 4px;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.composer-body:focus {
+  outline: none;
+}
+
+.composer-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  font-size: 13px;
+}
+
+.composer-confirm span {
+  flex: 1;
+}
+
+.composer-confirm button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 5px 12px;
+}
+
+.composer-confirm .danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--fg-on-accent);
+}
+
+.dialog-footer .primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

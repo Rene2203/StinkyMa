@@ -13,6 +13,8 @@ import type {
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 import { requireRemoteContentException } from "../remoteContent.js";
+import { formatAddressList, localSentMessage, type OutgoingMail } from "../compose.js";
+import type { OutboxItem } from "../repository.js";
 
 type Row = Record<string, unknown>;
 
@@ -154,7 +156,7 @@ export class SqliteMailRepository implements MailRepository {
       }
       if (r.role !== "trash") counts.flagged += r.flaggedUnread;
     }
-    return { accounts, mailboxesByAccount, counts };
+    return { accounts, mailboxesByAccount, counts, outbox: this.outbox() };
   }
 
   async setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void> {
@@ -192,5 +194,71 @@ export class SqliteMailRepository implements MailRepository {
 
   async removeRemoteContentException(exception: string): Promise<void> {
     this.db.prepare("DELETE FROM remoteContentException WHERE pattern = ?").run(exception);
+  }
+
+  /** Postausgang zur Anzeige: nur noch nicht gesendete Mails (bereits angenommene warten nur auf die Ablage). */
+  outbox(): OutboxItem[] {
+    const rows = this.db
+      .prepare("SELECT id, accountId, mail, createdAt, lastError, failed FROM outbox WHERE sentAt IS NULL ORDER BY createdAt")
+      .all() as { id: string; accountId: string; mail: string; createdAt: string; lastError: string | null; failed: number }[];
+    return rows.map((r) => {
+      const mail = JSON.parse(r.mail) as OutgoingMail;
+      return {
+        id: r.id,
+        accountId: r.accountId,
+        subject: mail.subject,
+        to: formatAddressList([...mail.to, ...mail.cc, ...mail.bcc]),
+        createdAt: r.createdAt,
+        status: r.failed ? "failed" : "queued",
+        error: r.lastError,
+      };
+    });
+  }
+
+  /** Ohne Server (Beispielkonten): Mail sofort lokal in „Gesendet“ ablegen. */
+  async send(mail: OutgoingMail): Promise<void> {
+    const account = (await this.accounts()).find((a) => a.id === mail.accountId);
+    const sent = account ? (await this.mailboxes(account.id)).find((m) => m.role === "sent") : undefined;
+    if (!account || !sent) throw new Error("Für dieses Konto gibt es keinen Ordner „Gesendet“.");
+    const original = mail.answeredMessageId ? await this.message(mail.answeredMessageId) : null;
+    const id = `local-${globalThis.crypto.randomUUID()}`;
+    const message = localSentMessage(mail, {
+      id,
+      mailboxId: sent.id,
+      from: { name: account.displayName, address: account.email },
+      threadId: original?.threadId ?? `thread-${id}`,
+      date: new Date().toISOString(),
+      messageId: `<${id}@stinkyma.local>`,
+    });
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO thread (id, subject, participants, lastDate) VALUES (?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET lastDate = MAX(lastDate, excluded.lastDate)`,
+        )
+        .run(message.threadId, message.subject, JSON.stringify([message.from, ...message.to]), message.date);
+      this.db
+        .prepare(
+          `INSERT INTO message (id, accountId, mailboxId, uid, messageId, threadId, fromName, fromAddress, "to", cc,
+             subject, date, snippet, bodyText, bodyHTML, flags, hasAttachments)
+           VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0)`,
+        )
+        .run(
+          message.id, message.accountId, message.mailboxId, message.messageId, message.threadId,
+          message.from.name ?? null, message.from.address, JSON.stringify(message.to), JSON.stringify(message.cc),
+          message.subject, message.date, message.snippet, message.bodyText, message.flags,
+        );
+      if (original) this.db.prepare("UPDATE message SET flags = flags | ? WHERE id = ?").run(MessageFlag.answered, original.id);
+    })();
+  }
+
+  /** Nimmt eine noch nicht angenommene Mail aus dem Postausgang und gibt die Composer-Eingaben zurück. */
+  async reopenOutgoing(id: string): Promise<OutgoingMail | null> {
+    return this.db.transaction(() => {
+      const row = this.db.prepare("SELECT mail FROM outbox WHERE id = ? AND sentAt IS NULL").get(id) as { mail: string } | undefined;
+      if (!row) return null;
+      this.db.prepare("DELETE FROM outbox WHERE id = ?").run(id);
+      return JSON.parse(row.mail) as OutgoingMail;
+    })();
   }
 }

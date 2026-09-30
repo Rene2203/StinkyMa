@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W2.2 – Korrekturen nach dem zweiten Praxistest (Windows-CI steht aus)
+**Aktuelle Phase:** W3 Teil 1 – Mails schreiben und senden (lokal geprüft, Windows-CI steht aus; Test mit echtem iCloud-Konto steht aus)
 
 ## Überblick
 
@@ -192,3 +192,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Optionen, Domain vorausgefüllt. Tests: Normalisierung/Abgleich (u. a. `evilshop.example` greift nicht bei
   `shop.example`), Vertragstest beider Repositorys, Store, E2E (hinzufügen, ungültige Eingabe, entfernen).
   Lokal: 121 Tests + 3 E2E grün. **Ungeprüft:** Windows-CI; echte Bilder aus dem Internet.
+- **W3 Teil 1 – Schreiben und Senden:** Composer (Neu/Antworten/Allen antworten/Weiterleiten, Tasten N/R/A/F,
+  Strg+Enter), SMTP über nodemailer 10 (Version 7 hatte bekannte Sicherheitslücken), dauerhafter Postausgang
+  (Migration v5, nur TS), Ablage in „Gesendet“ per IMAP-APPEND (nicht bei Gmail/Outlook), „beantwortet“-Markierung.
+  Geprüft gegen GreenMail: Zustellung, Bcc unsichtbar, In-Reply-To, „Gesendet“, \Answered, SMTP nicht erreichbar
+  → bleibt im Postausgang und lässt sich zurückholen; E2E: Antworten per Tastatur bis zur Zustellung, Hinweis bei
+  fehlendem Empfänger, Verwerfen fragt nach. Gefunden und behoben: Preload-Brücke kannte „send“ nicht (jetzt per
+  Test abgesichert). Lokal: 149 Tests + 3 E2E grün.
+  **Ungeprüft:** echtes Senden über iCloud (smtp.mail.me.com:587, STARTTLS, app-spezifisches Passwort) – insbesondere
+  ob iCloud die Mail zusätzlich selbst in „Gesendet“ ablegt (dann stünde sie doppelt dort); Windows-CI.
+  Bewusst noch nicht: Entwürfe (Verwerfen fragt deshalb nach), Anhänge, Adressvorschläge, HTML-Mails schreiben.

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { InMemoryMailRepository, MockIds, createMockData, isFlagged, isRead, type MailRepository } from "@stinkyma/core";
 import { BrowserStore, selectedMessage, showsAccountIndicator, sidebarItem, visibleMessages } from "../src/store.js";
+import type { ComposeLabels } from "@stinkyma/core";
+
+const labels: ComposeLabels = { wrote: (m) => `${m.from.address} schrieb:`, forwardHeader: () => "--- Weitergeleitet ---" };
 
 describe("BrowserStore", () => {
   let repo: MailRepository;
@@ -74,6 +77,31 @@ describe("BrowserStore", () => {
     expect(store.getState().remoteContentExceptions).toEqual(["zeitung.example"]);
     store.closeOptions();
     expect(store.getState().options).toBeNull();
+  });
+
+  it("Schreiben: Antworten belegt den Composer vor, Senden legt in „Gesendet“ ab und markiert „beantwortet“", async () => {
+    store.openCompose("reply", labels);
+    expect(store.getState().compose).toBeNull(); // ohne geöffnete Mail kein Antworten
+    const original = store.getState().messages.find((m) => m.accountId === MockIds.iCloud)!;
+    await store.selectMessage(original.id);
+    store.openCompose("reply", labels);
+    const draft = store.getState().compose!;
+    expect(draft).toMatchObject({ mode: "reply", accountId: MockIds.iCloud, to: [original.from], answeredMessageId: original.id });
+    expect(draft.bodyText).toContain(`${original.from.address} schrieb:`);
+
+    await store.send({ ...draft, bodyText: `Gern!${draft.bodyText}` });
+    expect(store.getState().compose).toBeNull();
+    expect((selectedMessage(store.getState())!.flags & 2) !== 0).toBe(true);
+    await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.iCloud, "sent") });
+    expect(store.getState().messages.some((m) => m.subject === draft.subject && m.bodyText?.startsWith("Gern!"))).toBe(true);
+  });
+
+  it("Neue E-Mail nutzt das Konto des geöffneten Ordners", async () => {
+    await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.work, "inbox") });
+    store.openCompose("new", labels);
+    expect(store.getState().compose).toMatchObject({ mode: "new", accountId: MockIds.work, to: [] });
+    store.closeCompose();
+    expect(store.getState().compose).toBeNull();
   });
 
   it("lädt Anhänge der Konversation", async () => {

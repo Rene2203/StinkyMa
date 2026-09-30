@@ -1,5 +1,23 @@
 # Changelog
 
+## W3 (Teil 1) – Mails schreiben und senden
+
+### Neu
+- **Composer:** Neue E-Mail, Antworten, Allen antworten, Weiterleiten – Knöpfe in der Mail, „Neue E-Mail“ über der
+  Liste, Tasten N, R, A, F (und Strg+N), Senden mit Strg+Enter. Antworten zitieren die Mail („> “), setzen
+  In-Reply-To/References und lassen bei „Allen antworten“ die eigenen Adressen weg. Empfängerzeile versteht
+  „Name <adresse>“, Kommas in Anführungszeichen und Semikolons; ungültige Adressen werden benannt.
+- **Senden per SMTP** (nodemailer 10) über einen **dauerhaften Postausgang** (Migration `v5-outbox`): Die Mail ist
+  sofort gesichert, geht im Hintergrund raus und wird danach in „Gesendet“ abgelegt (außer Gmail/Outlook, die das
+  selbst tun). Nach dem Senden wird die Originalmail als „beantwortet“ markiert. Bcc steht nur im Umschlag.
+- **Offline/Fehler:** Server nicht erreichbar → Mail bleibt im Postausgang, neuer Versuch beim nächsten Abruf;
+  vom Server abgelehnt → Hinweis „Nicht gesendet“ in der Seitenleiste mit „Bearbeiten“ (zurück in den Composer).
+  Einmal angenommene Mails werden nie doppelt gesendet. Nichts wird ohne Klick auf „Senden“ verschickt.
+- Test: Die Methodenliste der Preload-Brücke wird gegen die Schnittstellen geprüft (hatte „send“ vergessen).
+
+### Noch nicht (Teil 2)
+- Entwürfe, Anhänge, Adressvorschläge, HTML-Formatierung; OAuth für Gmail/Outlook.
+
 ## W2.2 – Zweiter Praxistest (Windows)
 
 ### Behoben

@@ -1,4 +1,4 @@
-import { AlertTriangle, Plus, RefreshCw, Settings, X } from "lucide-react";
+import { AlertTriangle, Plus, RefreshCw, Send, Settings, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -102,6 +102,27 @@ export function Sidebar() {
           <button type="button" className="sidebar-button" data-testid="add-account" onClick={() => setDialogOpen(true)}>
             <Plus size={16} aria-hidden="true" /> {t("account.add")}
           </button>
+        )}
+        {state.outbox.length > 0 && (
+          <div className="outbox" data-testid="outbox">
+            {state.outbox.some((o) => o.status === "queued") && (
+              <p className="outbox-line" title={state.outbox.find((o) => o.status === "queued" && o.error)?.error ?? undefined}>
+                <Send size={14} aria-hidden="true" />
+                <span>{t("outbox.queued", { count: state.outbox.filter((o) => o.status === "queued").length })}</span>
+              </p>
+            )}
+            {state.outbox
+              .filter((o) => o.status === "failed")
+              .map((o) => (
+                <p key={o.id} className="outbox-line failed" title={o.error ?? undefined}>
+                  <AlertTriangle size={14} aria-hidden="true" />
+                  <span className="ellipsis">{t("outbox.failed", { subject: o.subject || "–" })}</span>
+                  <button type="button" className="link-button" onClick={() => void store.reopenOutgoing(o.id)}>
+                    {t("outbox.edit")}
+                  </button>
+                </p>
+              ))}
+          </div>
         )}
         <div className="sync-row">
           <span className="muted small" data-testid="sync-status">
