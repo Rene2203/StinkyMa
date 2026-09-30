@@ -17,17 +17,21 @@
 ## Leitplanken (vom Nutzer, verbindlich)
 
 - **Ursprüngliches Ziel bleibt:** iPad/Mac, Windows und Server mit Browser. Windows ist nur die erste Plattform.
-  Nichts bauen, was die anderen Plattformen verbaut; Datenmodell und Schnittstellen parallel halten.
+  Nichts bauen, was die anderen Plattformen verbaut; Datenmodell und Schnittstellen plattformneutral halten.
 - **KI-Maßstab ist ein ~3B-Modell auf schwacher Hardware** (Low-End-PC, N97-Server, iPad). Größere Modelle
   sind optional, nie Voraussetzung. Der starke Haupt-PC des Nutzers (RTX 4070 Ti Super) ist nicht der Standard.
 
 ## Aktueller Fokus: Windows (web/)
 
-Seit 30.09.2026: zuerst Windows-App, dann Server mit Browser (`docs/ROADMAP-WINDOWS.md`). Die Swift-App ruht.
+Seit 30.09.2026: zuerst Windows-App, dann Server mit Browser (`docs/ROADMAP-WINDOWS.md`).
+**iPad/Mac (Swift) ist zurückgestellt** (Entscheidung des Nutzers): keinen Swift-Code ändern, Apple-CI läuft nur
+von Hand. Das Ziel iPad/Mac bleibt – bis dahin erreicht das iPad StinkyMa über die Server-Version im Browser.
 - `web/packages/core`: plattformneutral (kein Electron/DOM). SQLite-Teil nur über `@stinkyma/core/sqlite`,
   Node-spezifisches über `@stinkyma/core/node` – damit die Oberfläche kein natives Modul einbündelt.
 - `web/packages/ui`: spricht nur mit `MailRepository`. UI-Texte in `packages/ui/src/i18n.ts` (de + en).
-- Schema-Änderungen immer in **beiden** Welten gleich halten (`MailSchema.swift` ↔ `web/packages/core/src/sqlite/schema.ts`).
+- Maßgeblich für das Schema ist `web/packages/core/src/sqlite/schema.ts`. Swift wird nicht mehr mitgezogen; jede
+  neue Migration ab v4 in `docs/SWIFT-NACHHOLEN.md` eintragen, damit sie später in `MailSchema.swift` nachgezogen wird
+  (gleicher Name, gleiche Tabellen). Migrationen bis v3 sind in beiden Welten gleich.
 
 ```sh
 cd web

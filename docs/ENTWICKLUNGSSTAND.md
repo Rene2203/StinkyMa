@@ -41,10 +41,11 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 3. Hardware: Haupt-PC (Windows) mit RTX 4070 Ti Super 16 GB – dort testet der Nutzer. **Maßstab für die KI
    bleibt ein 3B-Modell auf schwacher Hardware** (Leitplanken in `docs/ROADMAP-WINDOWS.md`).
 
-## iPad/Mac (ruht)
+## iPad/Mac (zurückgestellt)
 Grund: Ohne Mac und ohne bezahlten Apple-Developer-Account (99 €/Jahr) kann der Nutzer die App nicht auf
-Geräten testen. Stand: Phase 1 fertig, CI grün, UI-Test im iPad-Simulator besteht. Die Apple-CI läuft nur
-noch bei Änderungen am Swift-Code. Details im Verlauf unten.
+Geräten testen; außerdem sollen die Ressourcen auf Windows und Server gebündelt werden. Stand: Phase 1 fertig.
+Swift wird nicht mehr mitgezogen, die Apple-CI läuft nur von Hand. Was später nachzuholen ist:
+`docs/SWIFT-NACHHOLEN.md`. Das iPad erreicht StinkyMa bis dahin über die Server-Version im Browser.
 
 ## Testen ohne Mac
 
@@ -174,3 +175,6 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Simulator brauchte ~80 s, um den Seitenleisten-Eintrag zu finden, danach reichte das 10-s-Limit nicht.
   Korrektur: Zeitlimits in `NavigationUITests` auf 30 s, Fehlermeldung nennt die gefundene Anzahl.
   **Ungeprüft:** ob der UI-Test damit stabil grün ist (nur auf macOS-CI prüfbar).
+- **Entscheidung Nutzer: iPad/Mac zurückgestellt.** Kein paralleles Swift-Schema mehr (maßgeblich: `schema.ts`),
+  Apple-CI nur noch von Hand, Nachhol-Liste in `docs/SWIFT-NACHHOLEN.md`. Der UI-Test-Fix aus Lauf #13 bleibt
+  eingecheckt, aber ungeprüft.

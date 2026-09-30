@@ -15,7 +15,8 @@
 **Entscheidung vom 30.09.2026:** Die iPad-/Mac-Version ruht vorerst, weil sie ohne Mac bzw. ohne bezahlten
 Apple-Developer-Account nicht auf echten Geräten testbar ist. Zuerst entsteht die **Windows-App**, danach
 die **Server-Version mit Browser-Zugriff** (Spezifikation, Abschnitt 11). Die Swift-Module bleiben erhalten
-und werden später wieder aufgenommen.
+und werden später wieder aufgenommen. **Nachtrag 30.09.2026:** Die Swift-Seite ist ganz zurückgestellt – kein
+paralleles Nachziehen des Schemas mehr, Apple-CI nur von Hand. Offene Punkte sammelt `docs/SWIFT-NACHHOLEN.md`.
 
 ## Architektur
 
