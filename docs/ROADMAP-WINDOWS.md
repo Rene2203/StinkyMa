@@ -44,15 +44,15 @@ Die Phasen folgen der Spezifikation (Abschnitt 9), angepasst an Windows. ★ = V
 
 ## Hardware des Nutzers (Stand 30.09.2026)
 
-| Rechner | Ausstattung | Vorgeschlagene Rolle |
+| Rechner | Ausstattung | Rolle |
 |---|---|---|
-| **Intel N97** | 12 GB DDR5 (geteilt mit der Grafik) | **Dauerläufer-Server** (sparsam): Mail-Sync rund um die Uhr, Datenbank, Web-Oberfläche, später Push (Phase 13). KI nur für kleine Aufgaben (1–3B-Modelle auf der CPU, langsam, eher nachts). |
-| **PC mit RTX 2070 Super** | 8 GB VRAM, 32 GB DDR4, 1 TB M.2 | **KI-Server** mit Ollama/llama.cpp: 7–8B-Modelle (4-Bit) passen komplett in die Grafikkarte und laufen flott; 13B nur teilweise auf der GPU (spürbar langsamer). Wenn er aus ist, stellt die App KI-Aufgaben zurück (5.3) – nie Fallback in die Cloud. |
-| **Intel i5-14600K** | 32 GB, 2 TB M.2 | Stark genug für Windows-App plus lokale Modelle auf der CPU (7B mit einigen Wörtern pro Sekunde). Rolle hängt davon ab, ob das der Alltags-PC ist. |
+| **Haupt-PC (Windows)** | Ryzen 9 5900X, **RTX 4070 Ti Super (16 GB VRAM)**, 32 GB DDR4 | **Hier läuft die Windows-App.** „On-Device“-KI (5.0) direkt auf dem PC: 7–8B-Modelle sehr schnell, 13–14B (4-Bit) passen komplett in die Grafikkarte. |
+| Server: PC mit RTX 2070 Super | 8 GB VRAM, 32 GB DDR4, 1 TB M.2 | später: KI-Server im Heimnetz (5.3) |
+| Server: Intel N97 | 12 GB DDR5 (geteilt) | später: sparsamer Dauerläufer für Mail-Sync & Browser-Version (S1) |
+| Server: Intel i5-14600K | 32 GB, 2 TB M.2 | später: Reserve / Server-Version / Dienste |
 
-Alle drei zusammen decken die Spezifikation gut ab: „Eigener Server“ (5.3) und Server-Version (11.3) laufen im Heimnetz.
+Reihenfolge laut Nutzer: **Windows zuerst**, Server danach.
 
 ## Offene Fragen an den Nutzer
-- Welcher Rechner ist der Windows-Alltags-PC? Welche laufen dauerhaft?
-- Betriebssystem auf dem N97 (Linux/Windows)? Docker vorhanden?
+- (für S1, später) Welche Server laufen dauerhaft, Betriebssystem, Docker?
 - App-Name (Arbeitsname „StinkyMa“)

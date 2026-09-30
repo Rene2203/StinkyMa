@@ -38,8 +38,8 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 ## Nächste Schritte
 1. Installer vom Nutzer testen lassen (`docs/WINDOWS-TESTEN.md`).
 2. Phase W2: IMAP-Anbindung (imapflow), Konto-Einrichtung iCloud, MIME, sichere HTML-Anzeige.
-3. Hardware ist bekannt (N97, PC mit RTX 2070 Super, i5-14600K – Rollenvorschlag in `docs/ROADMAP-WINDOWS.md`).
-   Offen: Alltags-PC, Betriebssystem/Docker auf dem N97.
+3. Hardware: Haupt-PC (Windows) mit RTX 4070 Ti Super 16 GB – dort läuft die App und später die lokale KI.
+   Drei weitere Rechner sind Server (für S1, später).
 
 ## iPad/Mac (ruht)
 Grund: Ohne Mac und ohne bezahlten Apple-Developer-Account (99 €/Jahr) kann der Nutzer die App nicht auf
@@ -119,3 +119,5 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - Schrift: Nutzer wünscht Avenir. Umgesetzt als bevorzugte Systemschrift (Avenir Next / Avenir, Fallback Segoe UI).
   Die Schriftdateien werden bewusst **nicht** ins Repository oder den Installer aufgenommen (kommerzielle
   Lizenz; Weitergabe/Einbettung nur mit entsprechender Lizenz). Auf dem Rechner des Nutzers ungeprüft.
+- Nutzer bestätigt: Windows zuerst. Haupt-PC: Ryzen 9 5900X, RTX 4070 Ti Super (16 GB VRAM), 32 GB –
+  geeignet für lokale 7–14B-Modelle (Phase W5). Die drei anderen Rechner sind Server (später, S1).
