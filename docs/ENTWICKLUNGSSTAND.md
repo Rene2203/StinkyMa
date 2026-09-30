@@ -240,3 +240,5 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   GreenMail (Layout + PDF kommen an), E2E (HTML-Rechnung ohne Skript, „Unterlagen“ mit PDF, .exe abgewählt).
   **W3 Teil 2 damit komplett.** Lokal 178 Tests + 3 E2E grün. **Ungeprüft:** alles mit echtem iCloud-Konto;
   Weiterleiten ohne Internet (Original-Anhänge nicht ladbar → Hinweis im Mail-Fenster, Mail bleibt offen).
+- **Windows-CI Lauf #40 (W3 Teil 2 komplett) grün** – Installer „StinkyMa-Windows-Installer“ dort. Test mit iCloud
+  durch den Nutzer steht aus.
