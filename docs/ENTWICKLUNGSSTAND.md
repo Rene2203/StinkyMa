@@ -217,3 +217,11 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   (Rundreise durch den Parser), GreenMail: Anhang holen + mit Anhang senden, E2E: Speichern und Öffnen (Dialoge
   im Test ersetzt), .exe ohne Öffnen, Anhang im Composer kommt beim Empfänger an. Lokal 159 Tests + 3 E2E grün.
   **Ungeprüft:** echte Windows-Dialoge und Standardprogramme (im Test ersetzt), Drag & Drop (im Test nicht simuliert).
+- **W3 Teil 2, Baustein 2 – Entwürfe:** Tabelle `draft` (v6), lokale Zeile im Ordner „Entwürfe“, Server-Abgleich in
+  `#flushDrafts` (APPEND mit \\Draft, alte UID löschen, lokale Zeile auf neue UID umhängen; Revision verhindert,
+  dass während des Hochladens Geschriebenes verloren geht). Composer: Autospeichern, Esc/× behält, Verwerfen löscht.
+  Gefunden per E2E: Preload kannte die neuen Methoden nicht (Wächter-Test schlug an), Editor schluckte Esc.
+  Tests: Vertragstests beider Speicher, GreenMail (ersetzt statt verdoppelt, kein Duplikat nach Abgleich, gelöscht
+  nach Senden, iPhone-Entwurf weiterschreiben), E2E (Speichern, Wiederfinden, Server, Verwerfen). Lokal 166 + 3 E2E grün.
+  **Ungeprüft:** Verhalten mit iCloud (UIDPLUS wird vorausgesetzt; ohne UIDPLUS könnte eine alte Server-Fassung
+  liegen bleiben); Entwürfe mit großen Anhängen (werden bei jeder Server-Fassung komplett hochgeladen).

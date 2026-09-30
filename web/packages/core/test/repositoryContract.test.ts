@@ -168,5 +168,38 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
     expect(((await repo.message(original.id))!.flags & 2) !== 0).toBe(true);
     expect((await repo.overview()).outbox).toEqual([]);
   });
+
+  it("Entwürfe: speichern erscheint in „Entwürfe“, erneut speichern ersetzt, öffnen, senden löscht den Entwurf", async () => {
+    const repo = make();
+    const draftsId = MockIds.mailbox(MockIds.iCloud, "drafts");
+    const before = (await repo.messages({ kind: "mailbox", mailboxId: draftsId }, 50)).length;
+    const draft = { mode: "new" as const, accountId: MockIds.iCloud, to: [{ address: "anna@example.test" }], cc: [], bcc: [], subject: "Entwurf 1", bodyText: "Hallo", bodyHtml: "<p>Hallo</p>" };
+    const id = await repo.saveDraft(null, draft);
+    await repo.saveDraft(id, { ...draft, subject: "Entwurf 2" });
+    const drafts = await repo.messages({ kind: "mailbox", mailboxId: draftsId }, 50);
+    expect(drafts).toHaveLength(before + 1);
+    const mine = drafts.find((m) => m.subject === "Entwurf 2")!;
+    expect(mine.flags & 16).toBe(16);
+    expect(await repo.openDraft(mine.id)).toMatchObject({ draftId: id, subject: "Entwurf 2", bodyHtml: "<p>Hallo</p>", to: [{ address: "anna@example.test" }] });
+
+    await repo.send({ ...draft, subject: "Entwurf 2", draftId: id });
+    const after = await repo.messages({ kind: "mailbox", mailboxId: draftsId }, 50);
+    expect(after.some((m) => m.subject === "Entwurf 2")).toBe(false);
+    expect(after).toHaveLength(before);
+  });
+
+  it("Entwürfe: löschen und fremde Entwürfe (vom Server) öffnen", async () => {
+    const repo = make();
+    const draftsId = MockIds.mailbox(MockIds.work, "drafts");
+    const existing = (await repo.messages({ kind: "mailbox", mailboxId: draftsId }, 50))[0]!;
+    const opened = await repo.openDraft(existing.id);
+    expect(opened).toMatchObject({ mode: "new", accountId: MockIds.work, subject: existing.subject });
+    expect(opened?.draftId).toBeTruthy();
+    expect(await repo.openDraft((await repo.messages({ kind: "unifiedInbox" }, 1))[0]!.id)).toBeNull(); // keine Mail aus dem Posteingang
+
+    const id = await repo.saveDraft(null, { mode: "new", accountId: MockIds.work, to: [], cc: [], bcc: [], subject: "Weg damit", bodyText: "" });
+    await repo.deleteDraft(id);
+    expect((await repo.messages({ kind: "mailbox", mailboxId: draftsId }, 50)).some((m) => m.subject === "Weg damit")).toBe(false);
+  });
 });
 

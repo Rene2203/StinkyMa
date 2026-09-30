@@ -1,4 +1,4 @@
-import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, Reply, ReplyAll, ShieldAlert, Trash2 } from "lucide-react";
+import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, Pencil, Reply, ReplyAll, ShieldAlert, Trash2 } from "lucide-react";
 import { displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -27,33 +27,49 @@ export function MessageDetail() {
   const thread = threadFor(state, message);
   const last = thread.at(-1);
   const flagged = isFlagged(message);
+  const isDraft = store.isDraft(message);
 
   return (
     <section className="detail" aria-label={message.subject}>
       <div className="toolbar" role="toolbar">
-        <button type="button" title={`${t("compose.reply")} (R)`} data-testid="action-reply" onClick={() => store.openCompose("reply", composeLabels(t, locale))}>
-          <Reply size={17} /> <span>{t("compose.reply")}</span>
-        </button>
-        <button type="button" title={`${t("compose.replyAll")} (A)`} aria-label={t("compose.replyAll")} data-testid="action-reply-all" onClick={() => store.openCompose("replyAll", composeLabels(t, locale))}>
-          <ReplyAll size={17} />
-        </button>
-        <button type="button" title={`${t("compose.forward")} (F)`} aria-label={t("compose.forward")} data-testid="action-forward" onClick={() => store.openCompose("forward", composeLabels(t, locale))}>
-          <Forward size={17} />
-        </button>
-        <span className="toolbar-gap" aria-hidden="true" />
-        <button type="button" title={`${flagged ? t("action.unflag") : t("action.flag")} (S)`} onClick={() => void store.toggleFlag(message.id)}>
-          {flagged ? <FlagOff size={17} /> : <Flag size={17} />}
-        </button>
-        <button type="button" title={`${t("action.archive")} (E)`} onClick={() => void store.archive([message.id])}>
-          <Archive size={17} />
-        </button>
-        <button type="button" title={`${t("action.trash")} (Entf)`} onClick={() => void store.moveToTrash([message.id])}>
-          <Trash2 size={17} />
-        </button>
+        {isDraft ? (
+          <>
+            <button type="button" className="primary-action" data-testid="draft-edit" onClick={() => void store.editDraft(message.id)}>
+              <Pencil size={17} /> <span>{t("draft.edit")}</span>
+            </button>
+            <span className="toolbar-gap" aria-hidden="true" />
+            <button type="button" title={t("compose.discard")} aria-label={t("compose.discard")} data-testid="draft-delete" onClick={() => void store.deleteDraftMessage(message.id)}>
+              <Trash2 size={17} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" title={`${t("compose.reply")} (R)`} data-testid="action-reply" onClick={() => store.openCompose("reply", composeLabels(t, locale))}>
+              <Reply size={17} /> <span>{t("compose.reply")}</span>
+            </button>
+            <button type="button" title={`${t("compose.replyAll")} (A)`} aria-label={t("compose.replyAll")} data-testid="action-reply-all" onClick={() => store.openCompose("replyAll", composeLabels(t, locale))}>
+              <ReplyAll size={17} />
+            </button>
+            <button type="button" title={`${t("compose.forward")} (F)`} aria-label={t("compose.forward")} data-testid="action-forward" onClick={() => store.openCompose("forward", composeLabels(t, locale))}>
+              <Forward size={17} />
+            </button>
+            <span className="toolbar-gap" aria-hidden="true" />
+            <button type="button" title={`${flagged ? t("action.unflag") : t("action.flag")} (S)`} onClick={() => void store.toggleFlag(message.id)}>
+              {flagged ? <FlagOff size={17} /> : <Flag size={17} />}
+            </button>
+            <button type="button" title={`${t("action.archive")} (E)`} onClick={() => void store.archive([message.id])}>
+              <Archive size={17} />
+            </button>
+            <button type="button" title={`${t("action.trash")} (Entf)`} onClick={() => void store.moveToTrash([message.id])}>
+              <Trash2 size={17} />
+            </button>
+          </>
+        )}
       </div>
       <div className="detail-scroll">
         <div className="detail-content">
           <h2 className="thread-subject" data-testid="thread-subject">{message.subject}</h2>
+          {isDraft && <p className="draft-banner"><Pencil size={14} aria-hidden="true" /> {t("draft.banner")}</p>}
           {message.category && <CategoryChip category={message.category} />}
           {thread.map((m) => (
             <ThreadMessage

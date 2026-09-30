@@ -1,5 +1,5 @@
 import type { Account, Attachment, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
-import type { OutgoingMail } from "./compose.js";
+import type { ComposeDraft, OutgoingMail } from "./compose.js";
 
 /**
  * Zugriff auf den lokalen Mail-Bestand. Die Oberfläche spricht nur mit dieser Schnittstelle –
@@ -32,6 +32,14 @@ export interface MailRepository {
   send(mail: OutgoingMail): Promise<void>;
   /** Holt eine noch nicht gesendete Mail aus dem Postausgang zurück (zum Bearbeiten); sie wird dann nicht gesendet. */
   reopenOutgoing(id: string): Promise<OutgoingMail | null>;
+  /**
+   * Speichert einen Entwurf (neu: `draftId` = null) und gibt seine ID zurück. Er erscheint sofort im Ordner
+   * „Entwürfe“; die Server-Kopie folgt gebündelt im Hintergrund.
+   */
+  saveDraft(draftId: string | null, draft: ComposeDraft): Promise<string>;
+  deleteDraft(draftId: string): Promise<void>;
+  /** Öffnet eine Mail aus dem Ordner „Entwürfe“ zum Weiterschreiben (auch Entwürfe von anderen Geräten). */
+  openDraft(messageId: string): Promise<ComposeDraft | null>;
 }
 
 /** Eine Mail im Postausgang (noch nicht gesendet). */
@@ -83,6 +91,9 @@ export const mailRepositoryMethods = [
   "removeRemoteContentException",
   "send",
   "reopenOutgoing",
+  "saveDraft",
+  "deleteDraft",
+  "openDraft",
 ] as const satisfies readonly (keyof MailRepository)[];
 
 export type MailRepositoryMethod = (typeof mailRepositoryMethods)[number];

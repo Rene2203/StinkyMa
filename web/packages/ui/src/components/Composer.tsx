@@ -6,6 +6,7 @@ import {
   parseAddressList,
   textToHtml,
   type ComposeDraft,
+  type EmailAddress,
   type OutgoingAttachment,
 } from "@stinkyma/core";
 import { formatBytes } from "../format.js";
@@ -32,7 +33,6 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
   const [subject, setSubject] = useState(draft.subject);
   const initialHtml = useMemo(() => draft.bodyHtml ?? textToHtml(draft.bodyText), [draft]);
   const [body, setBody] = useState({ html: initialHtml, text: draft.bodyText });
-  const [bodyTouched, setBodyTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnedNoSubject, setWarnedNoSubject] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -45,15 +45,68 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
   const toField = useRef<HTMLInputElement>(null);
   const isReply = draft.mode === "reply" || draft.mode === "replyAll";
 
+  // --- Entwurf: automatisch speichern (lokal sofort, Server gebündelt) ---
+  const [draftId, setDraftId] = useState<string | null>(draft.draftId ?? null);
+  const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [draftError, setDraftError] = useState<string | undefined>(undefined);
+  const draftIdRef = useRef<string | null>(draft.draftId ?? null);
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const stopSaving = useRef(false);
+
+  const snapshot = (): ComposeDraft => ({
+    mode: draft.mode,
+    accountId,
+    to: lenientAddresses(to),
+    cc: lenientAddresses(cc),
+    bcc: lenientAddresses(bcc),
+    subject,
+    bodyText: body.text,
+    bodyHtml: body.html,
+    attachments,
+    inReplyTo: draft.inReplyTo ?? null,
+    references: draft.references ?? [],
+    answeredMessageId: draft.answeredMessageId ?? null,
+    draftId: draftIdRef.current,
+  });
+  const snapshotKey = JSON.stringify([accountId, to, cc, bcc, subject, body.html, attachments.map((a) => [a.filename, a.size])]);
+  const savedKey = useRef(snapshotKey);
+  const dirty = snapshotKey !== savedKey.current;
+
+  const saveDraftNow = (): Promise<void> => {
+    const key = snapshotKey;
+    const data = snapshot();
+    saveChain.current = saveChain.current.then(async () => {
+      if (key === savedKey.current) return;
+      setDraftStatus("saving");
+      try {
+        const id = await store.saveDraft(draftIdRef.current, { ...data, draftId: draftIdRef.current });
+        draftIdRef.current = id;
+        setDraftId(id);
+        savedKey.current = key;
+        setDraftStatus("saved");
+        setDraftError(undefined);
+      } catch (e) {
+        setDraftStatus("error");
+        setDraftError(e instanceof Error ? e.message : String(e));
+      }
+    });
+    return saveChain.current;
+  };
+
+  useEffect(() => {
+    if (!dirty || stopSaving.current) return;
+    const timer = setTimeout(() => {
+      if (!stopSaving.current) void saveDraftNow();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [snapshotKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     dialog.current?.showModal();
     // Antworten: Cursor an den Anfang des Textes (über dem Zitat, macht der Editor); sonst ins Feld „An“.
     if (!isReply) toField.current?.focus();
   }, [isReply]);
 
-  const changed =
-    to !== formatAddressList(draft.to) || cc !== formatAddressList(draft.cc) || bcc !== formatAddressList(draft.bcc) ||
-    subject !== draft.subject || bodyTouched || attachments.length !== (draft.attachments?.length ?? 0);
 
   const addFiles = async (files: FileList | File[]) => {
     const added = await Promise.all([...files].map(readAttachment));
@@ -61,12 +114,25 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
     setError(null);
   };
 
-  const close = () => {
+  /** Schließen behält alles als Entwurf (nichts geht verloren). */
+  const close = async () => {
     if (busy) return;
-    if (changed && !confirmDiscard) {
+    stopSaving.current = true;
+    if (dirty) await saveDraftNow();
+    else await saveChain.current;
+    store.closeCompose();
+  };
+
+  /** Verwerfen löscht den Entwurf – mit Rückfrage, wenn es etwas zu verlieren gibt. */
+  const discard = async () => {
+    if (busy) return;
+    if ((dirty || draftIdRef.current) && !confirmDiscard) {
       setConfirmDiscard(true);
       return;
     }
+    stopSaving.current = true;
+    await saveChain.current;
+    if (draftIdRef.current) await store.deleteDraft(draftIdRef.current);
     store.closeCompose();
   };
 
@@ -96,6 +162,8 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
     }
     setBusy(true);
     setError(null);
+    stopSaving.current = true;
+    await saveChain.current;
     try {
       await store.send({
         accountId,
@@ -109,19 +177,26 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
         inReplyTo: draft.inReplyTo ?? null,
         references: draft.references ?? [],
         answeredMessageId: draft.answeredMessageId ?? null,
+        draftId: draftIdRef.current,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e));
+      stopSaving.current = false;
       setBusy(false);
     }
   };
 
   // In der Capture-Phase, damit der Editor Strg+Enter nicht als Zeilenumbruch nimmt.
+  // Esc ebenso: der Editor würde es sonst schlucken. Im Link-Feld bricht Esc nur die Link-Eingabe ab.
   const onKeyDownCapture = (event: KeyboardEvent) => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       event.stopPropagation();
       void send();
+    } else if (event.key === "Escape" && !(event.target as HTMLElement).closest(".link-field")) {
+      event.preventDefault();
+      event.stopPropagation();
+      void close();
     }
   };
 
@@ -133,7 +208,7 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
       data-testid="composer"
       onCancel={(e) => {
         e.preventDefault();
-        close();
+        void close();
       }}
       onKeyDownCapture={onKeyDownCapture}
       onDragOver={(e) => {
@@ -154,7 +229,7 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
       <form onSubmit={send}>
         <header className="dialog-header">
           <h2 id="composer-title">{t(titles[draft.mode])}</h2>
-          <button type="button" className="icon-button" aria-label={t("compose.close")} onClick={close} disabled={busy}>
+          <button type="button" className="icon-button" aria-label={t("compose.close")} title={t("compose.closeKeeps")} onClick={() => void close()} disabled={busy}>
             <X size={16} />
           </button>
         </header>
@@ -210,10 +285,7 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
         <RichTextEditor
           initialHtml={initialHtml}
           focus={isReply ? "start" : null}
-          onChange={(value) => {
-            setBody(value);
-            setBodyTouched(true);
-          }}
+          onChange={setBody}
         />
 
         {attachments.length > 0 && (
@@ -243,7 +315,7 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
           <p className="composer-confirm" role="alert">
             <span>{t("compose.confirmDiscard")}</span>
             <button type="button" onClick={() => setConfirmDiscard(false)}>{t("compose.keepWriting")}</button>
-            <button type="button" className="danger" onClick={() => store.closeCompose()} data-testid="compose-confirm-discard">
+            <button type="button" className="danger" onClick={() => void discard()} data-testid="compose-confirm-discard">
               {t("compose.discard")}
             </button>
           </p>
@@ -266,7 +338,10 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
               }}
             />
           </span>
-          <button type="button" onClick={close} disabled={busy}>{t("compose.discard")}</button>
+          <span className="muted small draft-status" data-testid="draft-status" aria-live="polite" title={draftError}>
+            {draftStatus === "saving" ? t("draft.saving") : draftStatus === "saved" && !dirty ? t("draft.saved") : draftStatus === "error" ? t("draft.error") : ""}
+          </span>
+          <button type="button" onClick={() => void discard()} disabled={busy} data-testid="compose-discard">{t("compose.discard")}</button>
           <button type="submit" className="primary" disabled={busy} data-testid="compose-send" title={`${t("compose.send")} (Strg+Enter)`}>
             <Send size={15} aria-hidden="true" /> {busy ? t("compose.sending") : t("compose.send")}
           </button>
@@ -292,4 +367,10 @@ function readAttachment(file: File): Promise<OutgoingAttachment> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+/** Adressen für den Entwurf: auch unfertige Eingaben behalten (sie werden erst beim Senden geprüft). */
+function lenientAddresses(input: string): EmailAddress[] {
+  const { addresses, invalid } = parseAddressList(input);
+  return [...addresses, ...invalid.map((raw) => ({ name: null, address: raw }))];
 }

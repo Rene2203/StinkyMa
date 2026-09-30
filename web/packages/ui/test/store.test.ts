@@ -96,6 +96,21 @@ describe("BrowserStore", () => {
     expect(store.getState().messages.some((m) => m.subject === draft.subject && m.bodyText?.startsWith("Gern!"))).toBe(true);
   });
 
+  it("Entwürfe: speichern, im Ordner erkennen, bearbeiten, löschen", async () => {
+    store.openCompose("new", labels);
+    const draft = { ...store.getState().compose!, to: [{ address: "anna@example.test" }], subject: "Später weiter" };
+    const id = await store.saveDraft(null, draft);
+    store.closeCompose();
+    await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(draft.accountId, "drafts") });
+    const row = store.getState().messages.find((m) => m.subject === "Später weiter")!;
+    expect(store.isDraft(row)).toBe(true);
+    await store.editDraft(row.id);
+    expect(store.getState().compose).toMatchObject({ draftId: id, subject: "Später weiter" });
+    store.closeCompose();
+    await store.deleteDraftMessage(row.id);
+    expect(store.getState().messages.some((m) => m.subject === "Später weiter")).toBe(false);
+  });
+
   it("Neue E-Mail nutzt das Konto des geöffneten Ordners", async () => {
     await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.work, "inbox") });
     store.openCompose("new", labels);

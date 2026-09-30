@@ -252,6 +252,27 @@ export const migrations: Migration[] = [
       CREATE INDEX outbox_on_accountId_createdAt ON outbox(accountId, createdAt);
     `,
   },
+  {
+    name: "v6-drafts",
+    // Entwürfe: lokal sofort gespeichert (mail = Composer-Eingaben als JSON), sichtbar als Mail im Ordner
+    // „Entwürfe“ (messageId). Die Server-Kopie (serverUid) wird gebündelt ersetzt; dirty = muss zum Server,
+    // deleted = Server-Kopie muss noch gelöscht werden.
+    sql: `
+      CREATE TABLE draft (
+        id TEXT PRIMARY KEY NOT NULL,
+        accountId TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+        mail TEXT NOT NULL,
+        messageId TEXT NOT NULL DEFAULT '',
+        serverUid INTEGER,
+        serverMailboxId TEXT,
+        updatedAt TEXT NOT NULL,
+        dirty INTEGER NOT NULL DEFAULT 1,
+        deleted INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX draft_on_accountId ON draft(accountId);
+      CREATE INDEX draft_on_messageId ON draft(messageId);
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

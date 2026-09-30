@@ -95,6 +95,9 @@ function MessageRow(props: {
       data-message-id={message.id}
       className={`row${selected ? " selected" : ""}${read ? "" : " unread"}`}
       onClick={() => void store.selectMessage(message.id)}
+      onDoubleClick={() => {
+        if (store.isDraft(message)) void store.editDraft(message.id);
+      }}
       onContextMenu={props.onContextMenu}
     >
       <div className="row-status" aria-hidden={read && !flagged}>

@@ -40,6 +40,7 @@ test.beforeAll(async () => {
   await admin.connect();
   await admin.mailboxCreate("Archiv");
   await admin.mailboxCreate("Sent");
+  await admin.mailboxCreate("Drafts");
   await admin.append("INBOX", htmlMail, [], new Date());
   await admin.append(
     "INBOX",
@@ -229,16 +230,56 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await page.screenshot({ path: join(screenshotDir, "11-Anhaenge.png") });
   });
 
-  await test.step("Neue E-Mail ohne Empfänger: Hinweis, Verwerfen fragt nach", async () => {
+  const serverCount = async (mailbox: string) => {
+    const mine = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+    await mine.connect();
+    const status = await mine.status(mailbox, { messages: true });
+    await mine.logout();
+    return status && status.messages;
+  };
+
+  await test.step("Neue E-Mail ohne Empfänger: Hinweis; ohne Eingaben schließt Esc ohne Entwurf", async () => {
     await page.getByTestId("compose-new").click();
     const composer = page.getByTestId("composer");
     await expect(composer).toBeVisible();
-    await composer.getByTestId("compose-subject").fill("Test");
     await composer.getByTestId("compose-send").click();
     await expect(composer.getByRole("alert")).toContainText("mindestens einen Empfänger");
     await page.keyboard.press("Escape");
+    await expect(composer).toHaveCount(0);
+  });
+
+  await test.step("Entwurf: speichert automatisch, Schließen behält ihn, weiterschreiben, verwerfen – auch auf dem Server", async () => {
+    await page.getByTestId("compose-new").click();
+    const composer = page.getByTestId("composer");
+    await composer.getByTestId("compose-to").fill("lisa@example.test");
+    await composer.getByTestId("compose-subject").fill("Urlaubsplanung");
+    await composer.getByTestId("compose-body").click();
+    await page.keyboard.type("Erste Ideen");
+    await expect(composer.getByTestId("draft-status")).toHaveText("Entwurf gespeichert", { timeout: 5_000 });
+    await page.keyboard.press("Escape");
+    await expect(composer).toHaveCount(0);
+
+    await page.getByRole("button", { name: /^Entwürfe/ }).click();
+    const row = page.getByTestId("message-row").filter({ hasText: "Urlaubsplanung" });
+    await expect(row).toHaveCount(1);
+    await page.getByTestId("sync-now").click(); // überträgt sofort statt nach der Schreibpause
+    await expect.poll(() => serverCount("Drafts"), { timeout: 15_000 }).toBe(1);
+
+    await row.dblclick();
+    await expect(composer).toBeVisible();
+    await expect(composer.getByTestId("compose-subject")).toHaveValue("Urlaubsplanung");
+    await expect(composer.getByTestId("compose-body")).toContainText("Erste Ideen");
+    await composer.getByTestId("compose-body").click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" und mehr");
+    await expect(composer.getByTestId("draft-status")).toHaveText("Entwurf gespeichert", { timeout: 5_000 });
+    await page.screenshot({ path: join(screenshotDir, "12-Entwurf.png") });
+    await composer.getByTestId("compose-discard").click();
     await composer.getByTestId("compose-confirm-discard").click();
     await expect(composer).toHaveCount(0);
+    await expect(row).toHaveCount(0);
+    await page.getByTestId("sync-now").click();
+    await expect.poll(() => serverCount("Drafts"), { timeout: 15_000 }).toBe(0);
   });
 
   await test.step("Antworten per Taste R, Senden mit Strg+Enter – kommt beim Empfänger an und liegt in „Gesendet“", async () => {
@@ -275,15 +316,7 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect(composer).toHaveCount(0, { timeout: 5_000 });
 
     const jonas = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: "jonas@example.test", pass: "x" }, logger: false });
-    await expect
-      .poll(async () => {
-        const mine = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
-        await mine.connect();
-        const status = await mine.status("Sent", { messages: true });
-        await mine.logout();
-        return status && status.messages;
-      }, { timeout: 15_000 })
-      .toBe(1);
+    await expect.poll(() => serverCount("Sent"), { timeout: 15_000 }).toBe(1);
     await jonas.connect();
     await jonas.mailboxOpen("INBOX");
     let source = "";

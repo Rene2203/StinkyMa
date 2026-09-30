@@ -9,6 +9,11 @@
   einem Temp-Ordner, der beim nächsten Start geleert wird; Dateinamen werden bereinigt (keine Pfade, keine
   reservierten Windows-Namen).
 - **Anhänge senden:** Büroklammer im Mail-Fenster oder Dateien hineinziehen; Hinweis ab 18 MB, Grenze 40 MB.
+- **Entwürfe:** Das Mail-Fenster speichert 1,5 s nach der letzten Änderung automatisch („Entwurf gespeichert“).
+  Schließen (× oder Esc) behält den Entwurf, „Verwerfen“ löscht ihn nach Rückfrage. Entwürfe erscheinen sofort im
+  Ordner „Entwürfe“; Doppelklick oder „Entwurf bearbeiten“ öffnet sie wieder. Auf dem Server (IMAP, \\Draft) liegt
+  immer nur die aktuelle Fassung – hochgeladen nach 8 s Schreibpause bzw. beim Abruf. Entwürfe von anderen Geräten
+  lassen sich weiterschreiben. Senden löscht den Entwurf. Migration `v6-drafts`.
 
 ## W3 (Teil 1) – Mails schreiben und senden
 

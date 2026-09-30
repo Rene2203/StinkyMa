@@ -16,6 +16,16 @@ export interface PendingAction {
   lastError: string | null;
 }
 
+export interface DraftRow {
+  id: string;
+  accountId: string;
+  mail: string;
+  messageId: string;
+  serverUid: number | null;
+  serverMailboxId: string | null;
+  deleted: number;
+}
+
 export interface OutboxRow {
   id: string;
   accountId: string;
@@ -196,6 +206,7 @@ export class MailWriter {
       if (!row) return;
       // Wartende Aktionen folgen der Mail auf ihre neue ID.
       this.db.prepare("UPDATE pendingAction SET messageId = ? WHERE messageId = ?").run(target.newId, id);
+      this.db.prepare("UPDATE draft SET messageId = ? WHERE messageId = ?").run(target.newId, id);
       if (target.newId === id) {
         this.db.prepare("UPDATE message SET mailboxId = ?, uid = ? WHERE id = ?").run(target.mailboxId, target.uid, id);
         return;
@@ -271,6 +282,38 @@ export class MailWriter {
 
   private deleteOrphanThreads(): void {
     this.db.prepare("DELETE FROM thread WHERE id NOT IN (SELECT DISTINCT threadId FROM message)").run();
+  }
+
+  // --- Entwürfe (Server-Abgleich) ---
+
+  /** Entwürfe, die zum Server müssen (geändert oder gelöscht). */
+  pendingDrafts(accountId: string): DraftRow[] {
+    return this.db
+      .prepare("SELECT id, accountId, mail, messageId, serverUid, serverMailboxId, deleted FROM draft WHERE accountId = ? AND (dirty = 1 OR deleted = 1) ORDER BY updatedAt")
+      .all(accountId) as DraftRow[];
+  }
+
+  draftRevision(id: string): string | null {
+    return (this.db.prepare("SELECT updatedAt FROM draft WHERE id = ?").get(id) as { updatedAt: string } | undefined)?.updatedAt ?? null;
+  }
+
+  /** Nach dem Hochladen: neue Server-Kopie merken – aber nur, wenn inzwischen nicht weiter geschrieben wurde. */
+  markDraftUploaded(id: string, revision: string, server: { uid: number | null; mailboxId: string }): void {
+    this.db
+      .prepare("UPDATE draft SET serverUid = ?, serverMailboxId = ?, dirty = CASE WHEN updatedAt = ? THEN 0 ELSE 1 END WHERE id = ?")
+      .run(server.uid, server.mailboxId, revision, id);
+  }
+
+  unlinkDraftMessage(id: string): void {
+    this.db.prepare("UPDATE draft SET messageId = '' WHERE id = ?").run(id);
+  }
+
+  draftAccount(id: string): string | null {
+    return (this.db.prepare("SELECT accountId FROM draft WHERE id = ?").get(id) as { accountId: string } | undefined)?.accountId ?? null;
+  }
+
+  removeDraftRow(id: string): void {
+    this.db.prepare("DELETE FROM draft WHERE id = ?").run(id);
   }
 
   // --- Postausgang ---

@@ -368,5 +368,47 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     expect(delivered).toMatch(/filename="?Notiz.txt/);
     expect(delivered).toContain(Buffer.from("Test").toString("base64"));
   });
+
+  it("Entwürfe: gebündelt zum Server, ersetzt statt verdoppelt, gelöscht nach dem Senden", async () => {
+    await admin.mailboxCreate("Drafts");
+    const account = await addAndSync();
+    const draft = { mode: "new" as const, accountId: account.id, to: [{ address: "anna@example.test" }], cc: [], bcc: [], subject: "Planung", bodyText: "Erster Stand", bodyHtml: "<p>Erster Stand</p>" };
+    const id = await service.saveDraft(null, draft);
+    const draftsBox = (await service.mailboxes(account.id)).find((m) => m.role === "drafts")!;
+    const local = () => service.messages({ kind: "mailbox", mailboxId: draftsBox.id }, 10);
+    expect((await local()).map((m) => m.subject)).toEqual(["Planung"]); // sofort sichtbar
+
+    await service.flushNow(account.id);
+    expect(await serverFlags("Planung", "Drafts")).toEqual(expect.arrayContaining(["\\Draft", "\\Seen"]));
+    expect((await local())[0]?.uid).toBeGreaterThan(0);
+
+    await service.saveDraft(id, { ...draft, subject: "Planung v2", bodyHtml: "<p>Zweiter Stand</p>" });
+    await service.flushNow(account.id);
+    const status = await admin.status("Drafts", { messages: true });
+    expect(status && status.messages).toBe(1); // ersetzt, nicht verdoppelt
+    expect(await serverFlags("Planung v2", "Drafts")).toBeDefined();
+    await service.syncAccountNow(account.id);
+    expect((await local()).map((m) => m.subject)).toEqual(["Planung v2"]); // kein Duplikat nach dem Abgleich
+
+    await service.send({ ...draft, subject: "Planung v2", draftId: id });
+    await service.flushNow(account.id);
+    const after = await admin.status("Drafts", { messages: true });
+    expect(after && after.messages).toBe(0);
+    expect(await local()).toEqual([]);
+  });
+
+  it("Entwurf von einem anderen Gerät öffnen und weiterschreiben", async () => {
+    await admin.mailboxCreate("Drafts");
+    await admin.append("Drafts", rfc822({ from: user, subject: "Vom iPhone", date: daysAgo(0), messageId: "<d1@example.test>", body: "Angefangen unterwegs" }), ["\\Draft", "\\Seen"], daysAgo(0));
+    const account = await addAndSync();
+    const draftsBox = (await service.mailboxes(account.id)).find((m) => m.role === "drafts")!;
+    const [serverDraft] = await service.messages({ kind: "mailbox", mailboxId: draftsBox.id }, 10);
+    const opened = await service.openDraft(serverDraft!.id);
+    expect(opened).toMatchObject({ subject: "Vom iPhone", bodyText: expect.stringContaining("Angefangen unterwegs") });
+    await service.saveDraft(opened!.draftId!, { ...opened!, bodyText: "Fertig geschrieben", bodyHtml: "<p>Fertig geschrieben</p>" });
+    await service.flushNow(account.id);
+    const status = await admin.status("Drafts", { messages: true });
+    expect(status && status.messages).toBe(1); // alte Fassung vom iPhone ersetzt
+  });
 });
 

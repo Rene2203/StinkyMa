@@ -13,7 +13,7 @@ import type {
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 import { requireRemoteContentException } from "../remoteContent.js";
-import { formatAddressList, localSentMessage, type OutgoingMail } from "../compose.js";
+import { draftFromMessage, formatAddressList, localDraftMessage, localSentMessage, type ComposeDraft, type OutgoingMail } from "../compose.js";
 import type { OutboxItem } from "../repository.js";
 
 type Row = Record<string, unknown>;
@@ -231,30 +231,104 @@ export class SqliteMailRepository implements MailRepository {
       messageId: `<${id}@stinkyma.local>`,
     });
     this.db.transaction(() => {
-      this.db
-        .prepare(
-          `INSERT INTO thread (id, subject, participants, lastDate) VALUES (?, ?, ?, ?)
-           ON CONFLICT(id) DO UPDATE SET lastDate = MAX(lastDate, excluded.lastDate)`,
-        )
-        .run(message.threadId, message.subject, JSON.stringify([message.from, ...message.to]), message.date);
-      this.db
-        .prepare(
-          `INSERT INTO message (id, accountId, mailboxId, uid, messageId, threadId, fromName, fromAddress, "to", cc,
-             subject, date, snippet, bodyText, bodyHTML, flags, hasAttachments)
-           VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          message.id, message.accountId, message.mailboxId, message.messageId, message.threadId,
-          message.from.name ?? null, message.from.address, JSON.stringify(message.to), JSON.stringify(message.cc),
-          message.subject, message.date, message.snippet, message.bodyText, message.bodyHtml ?? null, message.flags,
-          message.hasAttachments ? 1 : 0,
-        );
-      const insertAttachment = this.db.prepare(
-        "INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId) VALUES (?, ?, ?, ?, ?, 0, NULL)",
-      );
-      (mail.attachments ?? []).forEach((a, i) => insertAttachment.run(`${message.id}/a${i}`, message.id, a.filename, a.mimeType, a.size));
+      this.#insertLocalMessage(message, mail);
       if (original) this.db.prepare("UPDATE message SET flags = flags | ? WHERE id = ?").run(MessageFlag.answered, original.id);
     })();
+    if (mail.draftId) await this.deleteDraft(mail.draftId);
+  }
+
+  /** Lokale Mail (ohne Server-UID) samt Anhang-Metadaten einfügen; eine vorhandene Zeile mit gleicher ID wird ersetzt. */
+  #insertLocalMessage(message: Message, mail: OutgoingMail): void {
+    this.db.prepare("DELETE FROM message WHERE id = ?").run(message.id);
+    this.db
+      .prepare(
+        `INSERT INTO thread (id, subject, participants, lastDate) VALUES (?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET lastDate = MAX(lastDate, excluded.lastDate), subject = excluded.subject`,
+      )
+      .run(message.threadId, message.subject, JSON.stringify([message.from, ...message.to]), message.date);
+    this.db
+      .prepare(
+        `INSERT INTO message (id, accountId, mailboxId, uid, messageId, threadId, fromName, fromAddress, "to", cc,
+           subject, date, snippet, bodyText, bodyHTML, flags, hasAttachments)
+         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        message.id, message.accountId, message.mailboxId, message.messageId, message.threadId,
+        message.from.name ?? null, message.from.address, JSON.stringify(message.to), JSON.stringify(message.cc),
+        message.subject, message.date, message.snippet, message.bodyText, message.bodyHtml ?? null, message.flags,
+        message.hasAttachments ? 1 : 0,
+      );
+    const insertAttachment = this.db.prepare(
+      "INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId) VALUES (?, ?, ?, ?, ?, 0, NULL)",
+    );
+    (mail.attachments ?? []).forEach((a, i) => insertAttachment.run(`${message.id}/a${i}`, message.id, a.filename, a.mimeType, a.size));
+  }
+
+  // --- Entwürfe ---
+
+  async saveDraft(draftId: string | null, draft: ComposeDraft): Promise<string> {
+    const account = (await this.accounts()).find((a) => a.id === draft.accountId);
+    if (!account) throw new Error("Konto nicht gefunden.");
+    const box = (await this.mailboxes(account.id)).find((m) => m.role === "drafts");
+    const now = new Date().toISOString();
+    const id = draftId ?? globalThis.crypto.randomUUID();
+    const existing = this.db.prepare("SELECT accountId, messageId FROM draft WHERE id = ?").get(id) as { accountId: string; messageId: string } | undefined;
+    const stored: ComposeDraft = { ...draft, draftId: id };
+    this.db.transaction(() => {
+      // Konto gewechselt: alte lokale Zeile weg (die Server-Kopie im alten Konto bleibt – selten, bewusst einfach)
+      let messageId = existing?.accountId === account.id ? existing.messageId : "";
+      if (existing && existing.accountId !== account.id && existing.messageId) {
+        this.db.prepare("DELETE FROM message WHERE id = ?").run(existing.messageId);
+      }
+      if (box) {
+        messageId ||= `local-draft-${id}`;
+        this.#insertLocalMessage(
+          localDraftMessage(stored, { id: messageId, mailboxId: box.id, from: { name: account.displayName, address: account.email }, date: now }),
+          stored,
+        );
+      }
+      if (existing) {
+        this.db
+          .prepare("UPDATE draft SET accountId = ?, mail = ?, messageId = ?, updatedAt = ?, dirty = 1 WHERE id = ?")
+          .run(account.id, JSON.stringify(stored), messageId, now, id);
+      } else {
+        this.db
+          .prepare("INSERT INTO draft (id, accountId, mail, messageId, updatedAt) VALUES (?, ?, ?, ?, ?)")
+          .run(id, account.id, JSON.stringify(stored), messageId, now);
+      }
+    })();
+    return id;
+  }
+
+  /** Löscht den Entwurf lokal; gibt es eine Server-Kopie, bleibt die Zeile als „gelöscht“, bis der Server folgt. */
+  async deleteDraft(draftId: string): Promise<void> {
+    this.db.transaction(() => {
+      const row = this.db.prepare("SELECT messageId, serverUid FROM draft WHERE id = ?").get(draftId) as
+        | { messageId: string; serverUid: number | null }
+        | undefined;
+      if (!row) return;
+      if (row.messageId) this.db.prepare("DELETE FROM message WHERE id = ?").run(row.messageId);
+      if (row.serverUid !== null) this.db.prepare("UPDATE draft SET deleted = 1, messageId = '' WHERE id = ?").run(draftId);
+      else this.db.prepare("DELETE FROM draft WHERE id = ?").run(draftId);
+    })();
+  }
+
+  async openDraft(messageId: string): Promise<ComposeDraft | null> {
+    const row = this.db.prepare("SELECT id, mail FROM draft WHERE messageId = ? AND deleted = 0").get(messageId) as
+      | { id: string; mail: string }
+      | undefined;
+    if (row) return { ...(JSON.parse(row.mail) as ComposeDraft), draftId: row.id };
+    // Entwurf vom Server (z. B. auf dem iPhone angefangen): als Entwurf übernehmen, Server-Kopie merken.
+    const message = await this.message(messageId);
+    if (!message) return null;
+    const box = (await this.mailboxes(message.accountId)).find((m) => m.id === message.mailboxId);
+    if (box?.role !== "drafts") return null;
+    const id = globalThis.crypto.randomUUID();
+    const draft: ComposeDraft = { ...draftFromMessage(message), draftId: id };
+    this.db
+      .prepare("INSERT INTO draft (id, accountId, mail, messageId, serverUid, serverMailboxId, updatedAt, dirty) VALUES (?, ?, ?, ?, ?, ?, ?, 0)")
+      .run(id, message.accountId, JSON.stringify(draft), message.id, message.uid ?? null, message.uid ? message.mailboxId : null, message.date);
+    return draft;
   }
 
   /** Nimmt eine noch nicht angenommene Mail aus dem Postausgang und gibt die Composer-Eingaben zurück. */

@@ -1383,3 +1383,40 @@ button.attachment-open:hover {
 .hint.warning.attachment-warning {
   margin: 0;
 }
+
+/* Entwürfe */
+
+.draft-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--fg);
+  font-size: 13px;
+}
+
+.toolbar .primary-action {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.draft-status {
+  margin-right: 4px;
+}
+
+.dialog-footer {
+  align-items: center;
+}
+
+.dialog-footer .footer-start .icon-button {
+  border: 0;
+  background: transparent;
+  padding: 6px;
+}
+
+.dialog-footer .footer-start .icon-button:hover {
+  background: var(--bg-hover);
+}

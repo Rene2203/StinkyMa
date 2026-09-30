@@ -242,6 +242,41 @@ export class BrowserStore {
     }
   }
 
+  /** Speichert den Entwurf (lokal sofort, Server gebündelt) und gibt seine ID zurück. */
+  saveDraft(draftId: string | null, draft: ComposeDraft): Promise<string> {
+    return this.#repository.saveDraft(draftId, draft);
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    await this.#guard(() => this.#repository.deleteDraft(draftId));
+    await Promise.all([this.loadSidebar(), this.loadMessages()]);
+  }
+
+  /** Öffnet eine Mail aus „Entwürfe“ im Composer. */
+  async editDraft(messageId: string): Promise<void> {
+    await this.#guard(async () => {
+      const draft = await this.#repository.openDraft(messageId);
+      if (draft) this.#set({ compose: draft });
+    });
+  }
+
+  /** Entwurf aus der Liste löschen (auch einen vom Server/anderen Gerät). */
+  async deleteDraftMessage(messageId: string): Promise<void> {
+    await this.#guard(async () => {
+      const draft = await this.#repository.openDraft(messageId);
+      if (draft?.draftId) await this.#repository.deleteDraft(draft.draftId);
+    });
+    await Promise.all([this.loadSidebar(), this.loadMessages()]);
+  }
+
+  /** Liegt die Mail im Ordner „Entwürfe“? */
+  isDraft(message: Message): boolean {
+    const box = this.#state.sections
+      .flatMap((section) => section.items)
+      .find((i) => i.kind.type === "mailbox" && i.kind.mailbox.id === message.mailboxId);
+    return box?.kind.type === "mailbox" && box.kind.mailbox.role === "drafts";
+  }
+
   /** Holt eine Mail aus dem Postausgang zurück in den Composer (z. B. nach einem Fehler). */
   async reopenOutgoing(id: string): Promise<void> {
     await this.#guard(async () => {

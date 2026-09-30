@@ -20,7 +20,7 @@ import { messageIdFor, syncAccount, type SyncResult } from "./accountSync.js";
 import { connectImap, describeConnectionError, loginFor, MailConnectionError, testImapLogin } from "./connection.js";
 import { imapFlagName } from "./flags.js";
 import type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus } from "../accounts.js";
-import type { OutgoingMail } from "../compose.js";
+import type { ComposeDraft, OutgoingMail } from "../compose.js";
 import { buildMessage, sendRaw, smtpLoginFor, SmtpRejectedError } from "./smtp.js";
 import { extractAttachment } from "./parse.js";
 
@@ -37,6 +37,8 @@ export interface MailServiceOptions {
   now?: () => Date;
   /** Wie lange eine ungenutzte Serververbindung offen bleibt (Standard 2 Minuten). */
   idleTimeoutMs?: number;
+  /** Schreibpause, nach der ein Entwurf zum Server geht (Standard 8 Sekunden). */
+  draftUploadDelayMs?: number;
 }
 
 /** Nach so vielen Fehlversuchen (Server lehnt ab, nicht: offline) wird eine Aktion verworfen. */
@@ -59,6 +61,7 @@ export class MailService implements MailRepository, AccountsApi {
   readonly #clients = new Map<string, ImapFlow>();
   readonly #idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #draftTimers = new Map<string, ReturnType<typeof setTimeout>>();
   #disposed = false;
 
   constructor(
@@ -113,7 +116,41 @@ export class MailService implements MailRepository, AccountsApi {
       createdAt: now.toISOString(),
     });
     this.options.onChange?.();
+    if (mail.draftId) await this.deleteDraft(mail.draftId);
     this.#scheduleFlush(account.id);
+  }
+
+  // --- Entwürfe ---
+
+  /** Lokal sofort; die Server-Kopie folgt nach einer Schreibpause (nicht bei jedem Tastendruck hochladen). */
+  async saveDraft(draftId: string | null, draft: ComposeDraft): Promise<string> {
+    const id = await this.repository.saveDraft(draftId, draft);
+    this.options.onChange?.();
+    if (!isDemoAccount({ id: draft.accountId })) this.#scheduleDraftUpload(draft.accountId);
+    return id;
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    const accountId = this.writer.draftAccount(draftId);
+    await this.repository.deleteDraft(draftId);
+    this.options.onChange?.();
+    if (accountId && !isDemoAccount({ id: accountId })) this.#scheduleFlush(accountId);
+  }
+
+  openDraft(messageId: string): Promise<ComposeDraft | null> {
+    return this.repository.openDraft(messageId);
+  }
+
+  #scheduleDraftUpload(accountId: string): void {
+    const previous = this.#draftTimers.get(accountId);
+    if (previous) clearTimeout(previous);
+    if (this.#disposed) return;
+    const timer = setTimeout(() => {
+      this.#draftTimers.delete(accountId);
+      this.#scheduleFlush(accountId);
+    }, this.options.draftUploadDelayMs ?? 8_000);
+    timer.unref?.();
+    this.#draftTimers.set(accountId, timer);
   }
 
   async reopenOutgoing(id: string): Promise<OutgoingMail | null> {
@@ -218,6 +255,7 @@ export class MailService implements MailRepository, AccountsApi {
     await this.#withAccount(accountId, async (client) => {
       await this.#flushOutbox(client, accountId);
       await this.#flush(client, accountId);
+      await this.#flushDrafts(client, accountId);
     });
   }
 
@@ -303,6 +341,7 @@ export class MailService implements MailRepository, AccountsApi {
       const result = await this.#withAccount(accountId, async (client) => {
         await this.#flushOutbox(client, accountId);
         await this.#flush(client, accountId);
+        await this.#flushDrafts(client, accountId);
         if (this.writer.pendingActionCount(accountId) > 0) {
           // Nicht abgleichen, solange lokale Änderungen fehlen – sonst würde der Server sie zurückdrehen.
           throw new MailConnectionError("Änderungen konnten noch nicht übertragen werden. Neuer Versuch beim nächsten Abruf.");
@@ -339,9 +378,10 @@ export class MailService implements MailRepository, AccountsApi {
   /** Beim Beenden: offene Verbindungen sofort schließen, keine neuen mehr öffnen. Die Warteschlange bleibt gespeichert. */
   dispose(): void {
     this.#disposed = true;
-    for (const timer of [...this.#idleTimers.values(), ...this.#flushTimers.values()]) clearTimeout(timer);
+    for (const timer of [...this.#idleTimers.values(), ...this.#flushTimers.values(), ...this.#draftTimers.values()]) clearTimeout(timer);
     this.#idleTimers.clear();
     this.#flushTimers.clear();
+    this.#draftTimers.clear();
     for (const client of this.#clients.values()) client.close();
     this.#clients.clear();
   }
@@ -436,6 +476,64 @@ export class MailService implements MailRepository, AccountsApi {
       if (mail.answeredMessageId && this.writer.messageLocation(mail.answeredMessageId)) {
         await this.setFlag("answered", true, [mail.answeredMessageId]);
       }
+      changed = true;
+    }
+    if (changed) this.options.onChange?.();
+  }
+
+  /**
+   * Entwürfe zum Server: neue Fassung in „Entwürfe“ ablegen (\\Draft), alte Server-Kopie löschen, lokale Zeile
+   * auf die neue UID umhängen. Gelöschte Entwürfe verschwinden auch vom Server.
+   */
+  async #flushDrafts(client: ImapFlow, accountId: string): Promise<void> {
+    const rows = this.writer.pendingDrafts(accountId);
+    if (rows.length === 0) return;
+    const account = this.writer.account(accountId);
+    if (!account) return;
+    const mailboxes = this.writer.mailboxes(accountId);
+    const draftsBox = mailboxes.find((m) => m.role === "drafts");
+    let changed = false;
+    for (const row of rows) {
+      const oldBox = row.serverMailboxId ? mailboxes.find((m) => m.id === row.serverMailboxId) : undefined;
+      const removeOld = async () => {
+        if (row.serverUid === null || !oldBox) return;
+        const lock = await client.getMailboxLock(this.#pathOf(accountId, oldBox.id));
+        try {
+          await client.messageDelete(String(row.serverUid), { uid: true });
+        } finally {
+          lock.release();
+        }
+      };
+      if (row.deleted) {
+        await removeOld();
+        this.writer.removeDraftRow(row.id);
+        continue;
+      }
+      const revision = this.writer.draftRevision(row.id);
+      if (!draftsBox || !revision) {
+        // Kein Entwürfe-Ordner auf dem Server: Entwurf bleibt nur lokal.
+        if (revision) this.writer.markDraftUploaded(row.id, revision, { uid: null, mailboxId: "" });
+        continue;
+      }
+      const mail = JSON.parse(row.mail) as ComposeDraft;
+      const domain = account.email.split("@")[1] ?? "stinkyma.local";
+      const built = await buildMessage(mail, {
+        from: { name: account.displayName, address: account.email },
+        messageId: `<draft-${randomUUID()}@${domain}>`,
+        date: this.#now(),
+      });
+      const appended = await client.append(this.#pathOf(accountId, draftsBox.id), built.raw, ["\\Draft", "\\Seen"]);
+      const uid = appended && typeof appended.uid === "number" ? appended.uid : null;
+      await removeOld();
+      const validity = draftsBox.uidValidity ?? (appended && typeof appended.uidValidity === "bigint" ? Number(appended.uidValidity) : null);
+      if (row.messageId && uid !== null && validity !== null) {
+        this.writer.relocateMessage(row.messageId, { newId: messageIdFor(draftsBox.id, validity, uid), mailboxId: draftsBox.id, uid });
+      } else if (row.messageId && uid === null) {
+        // Server nennt keine UID (kein UIDPLUS): lokale Zeile weg, der nächste Abgleich holt die Server-Kopie.
+        this.writer.deleteMessages([row.messageId]);
+        this.writer.unlinkDraftMessage(row.id);
+      }
+      this.writer.markDraftUploaded(row.id, revision, { uid, mailboxId: draftsBox.id });
       changed = true;
     }
     if (changed) this.options.onChange?.();

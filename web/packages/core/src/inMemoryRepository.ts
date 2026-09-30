@@ -3,12 +3,14 @@ import { MessageFlag, mailboxRoleRank } from "./models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
 import { requireRemoteContentException } from "./remoteContent.js";
-import { localSentMessage, type OutgoingMail } from "./compose.js";
+import { draftFromMessage, localDraftMessage, localSentMessage, type ComposeDraft, type OutgoingMail } from "./compose.js";
 
 /** `MailRepository` im Arbeitsspeicher – für UI-Tests und Vorschauen, ohne Datenbank. */
 export class InMemoryMailRepository implements MailRepository {
   readonly #data: MockDataSet;
   readonly #remoteContentExceptions = new Set<string>();
+  /** Entwurf-ID → gespeicherte Eingaben und lokale Mail-ID. */
+  readonly #drafts = new Map<string, { draft: ComposeDraft; messageId: string }>();
 
   constructor(data: MockDataSet) {
     this.#data = structuredClone(data);
@@ -127,6 +129,47 @@ export class InMemoryMailRepository implements MailRepository {
       }),
     );
     if (original) original.flags |= MessageFlag.answered;
+    if (mail.draftId) await this.deleteDraft(mail.draftId);
+  }
+
+  async saveDraft(draftId: string | null, draft: ComposeDraft): Promise<string> {
+    const account = this.#data.accounts.find((a) => a.id === draft.accountId);
+    if (!account) throw new Error("Konto nicht gefunden.");
+    const box = this.#data.mailboxes.find((b) => b.accountId === account.id && b.role === "drafts");
+    const id = draftId ?? globalThis.crypto.randomUUID();
+    const previous = this.#drafts.get(id);
+    if (previous) this.#removeMessage(previous.messageId);
+    const stored: ComposeDraft = { ...draft, draftId: id };
+    const messageId = `local-draft-${id}`;
+    if (box) {
+      this.#data.messages.push(
+        localDraftMessage(stored, { id: messageId, mailboxId: box.id, from: { name: account.displayName, address: account.email }, date: new Date().toISOString() }),
+      );
+    }
+    this.#drafts.set(id, { draft: stored, messageId: box ? messageId : "" });
+    return id;
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    const entry = this.#drafts.get(draftId);
+    if (!entry) return;
+    this.#removeMessage(entry.messageId);
+    this.#drafts.delete(draftId);
+  }
+
+  async openDraft(messageId: string): Promise<ComposeDraft | null> {
+    for (const [id, entry] of this.#drafts) if (entry.messageId === messageId) return { ...entry.draft, draftId: id };
+    const message = this.#data.messages.find((m) => m.id === messageId);
+    if (!message || this.#roleOf(message.mailboxId) !== "drafts") return null;
+    const id = globalThis.crypto.randomUUID();
+    const draft: ComposeDraft = { ...draftFromMessage(message), draftId: id };
+    this.#drafts.set(id, { draft, messageId });
+    return draft;
+  }
+
+  #removeMessage(id: string): void {
+    const index = this.#data.messages.findIndex((m) => m.id === id);
+    if (index !== -1) this.#data.messages.splice(index, 1);
   }
 
   async reopenOutgoing(): Promise<OutgoingMail | null> {

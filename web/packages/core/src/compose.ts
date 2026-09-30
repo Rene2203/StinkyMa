@@ -25,6 +25,8 @@ export interface OutgoingMail {
   references?: string[];
   /** Lokale ID der beantworteten Mail – wird nach dem Senden als „beantwortet“ markiert. */
   answeredMessageId?: string | null;
+  /** Entwurf, aus dem diese Mail entstanden ist – wird nach dem Senden gelöscht. */
+  draftId?: string | null;
 }
 
 /** Vorbelegung des Composers. */
@@ -264,4 +266,32 @@ export function localSentMessage(
     flags: 1, // gelesen
     hasAttachments: (mail.attachments?.length ?? 0) > 0,
   };
+}
+
+/** Lokale Mail-Zeile für einen Entwurf im Ordner „Entwürfe“ (gelesen + Entwurf). */
+export function localDraftMessage(draft: OutgoingMail, options: { id: string; mailboxId: string; from: EmailAddress; date: string }): Message {
+  return {
+    ...localSentMessage(draft, { ...options, threadId: `thread-${options.id}`, messageId: `<${options.id}@stinkyma.local>` }),
+    flags: 1 | 16, // gelesen, Entwurf
+  };
+}
+
+/** Composer-Vorbelegung aus einer Mail im Ordner „Entwürfe“ (z. B. auf einem anderen Gerät angelegt). */
+export function draftFromMessage(message: Message): ComposeDraft {
+  return {
+    mode: "new",
+    accountId: message.accountId,
+    to: message.to,
+    cc: message.cc,
+    bcc: [],
+    subject: message.subject,
+    bodyText: message.bodyText ?? message.snippet,
+    bodyHtml: message.bodyHtml ? htmlBodyContent(message.bodyHtml) : null,
+  };
+}
+
+/** Inhalt von <body> (ohne Kopf, Stile und Skripte) – für den Editor. */
+function htmlBodyContent(html: string): string {
+  const body = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html)?.[1] ?? html;
+  return body.replace(/<(script|style|head)[^>]*>[\s\S]*?<\/\1>/gi, "");
 }
