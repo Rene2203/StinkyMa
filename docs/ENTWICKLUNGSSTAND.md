@@ -4,13 +4,13 @@ Laufendes Protokoll des Zwischenstands. Wird nach jedem größeren Arbeitsschrit
 nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHANGELOG.md`.
 
 **Zuletzt aktualisiert:** 30.09.2026
-**Aktuelle Phase:** 1 – Fundament (umgesetzt, baut in CI; Abnahme auf Gerät steht aus)
+**Aktuelle Phase:** 1 – Fundament (im iPad-Simulator abgenommen; Test in Swift Playgrounds auf echtem iPad steht aus)
 
 ## Überblick
 
 | Phase | Status |
 |---|---|
-| 1 – Fundament | 🟢 Code fertig, CI grün (Linux + macOS, beide Apps bauen); Start auf Gerät noch ungeprüft |
+| 1 – Fundament | 🟢 CI grün; iPad-UI-Test im Simulator besteht (Screenshots in `docs/screenshots/`) |
 | 2 – Ein Konto lesen | ⚪ offen |
 | 3–15 | ⚪ offen |
 
@@ -27,8 +27,9 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 ## Was noch nicht geprüft ist
 
-- **Aussehen und Bedienung:** Die App kompiliert, wurde aber noch nie gestartet (weder Simulator
-  noch Gerät). Layout, Wischgesten, Tastaturkürzel und VoiceOver sind ungeprüft.
+- **Auf echtem iPad:** noch nicht gestartet. Swift-Playgrounds-Paket baut in der CI, Öffnen auf dem
+  iPad des Nutzers steht aus.
+- Im Simulator ungeprüft: Wischgesten, Kontextmenü, Tastaturkürzel, VoiceOver, Hochformat, Mac-App.
 - Keychain-Test in CI: Läuft ohne Signatur; falls der Keychain dort `errSecMissingEntitlement`
   meldet, wird der Test stillschweigend übersprungen – echter Nachweis erst in der signierten App.
 
@@ -79,7 +80,14 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Playground-Schritt läuft jetzt vor dem UI-Test, damit das Paket auch bei rotem UI-Test entsteht.
 - Dritter Lauf (#11): Playground-Paket ließ sich nicht auflösen – Platzhalter-Icon `.mail` gibt es
   in AppleProductTypes nicht → `.leaf`. UI-Test läuft jetzt auch, wenn der Playground-Schritt
-  scheitert. **Vierter Lauf steht aus.**
+  scheitert.
+- Vierter Lauf (#13) **komplett grün**: Pakettests, macOS-App, Playground-Paket, iPad-UI-Test.
+  Abnahme Phase 1 im Simulator erfüllt: App startet, Mock-Posteingang, Navigation (Mail öffnen,
+  „Markiert“, Gmail-Posteingang), Ungelesen-Zähler sinkt beim Öffnen (8 → 7).
+  Screenshots: `docs/screenshots/phase1-*.png`.
+- Beobachtungen für später (UI-Feinschliff): Bei ungelesenen iCloud-Mails stehen zwei blaue Punkte
+  nebeneinander (Ungelesen + Kontofarbe) – verwechselbar. Die blaue Auswahl der Liste scheint durch
+  die schwebende Seitenleiste (iPadOS-26-Stil) hindurch.
 - Swift-Playgrounds-Export (`scripts/make-playground.sh`): kopiert alle Module in ein App-Target.
   Unter Linux geprüft, dass die Kernmodule als ein Modul kompilieren; Playground-Build in der CI
   (Xcode) und Öffnen auf dem iPad **noch ungeprüft**.
