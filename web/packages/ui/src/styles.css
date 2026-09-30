@@ -1,7 +1,9 @@
 /* StinkyMa – Oberfläche. Farben als Variablen, hell/dunkel folgt der Windows-Einstellung. */
 :root {
   color-scheme: light dark;
-  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  /* Avenir, falls auf dem Rechner installiert (Schrift wird nicht mitgeliefert – Lizenz), sonst Windows-Standard. */
+  --font: "Avenir Next", "Avenir Next LT Pro", "Avenir", "Avenir LT Std", "Avenir LT Pro",
+    "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --bg: #ffffff;
   --bg-sidebar: #f3f3f3;
   --bg-list: #fbfbfb;

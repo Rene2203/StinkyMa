@@ -14,6 +14,7 @@ Die CI baut bei jeder Änderung unter `web/` einen fertigen Windows-Installer.
 - Änderungen (gelesen, markiert, archiviert) werden gespeichert und sind nach einem Neustart noch da.
 - Tastatur: ↑/↓ oder J/K wechseln die Mail · E archivieren · Entf Papierkorb · S markieren · U gelesen/ungelesen · Esc schließt.
 - Rechtsklick auf eine Mail öffnet das Kontextmenü; beim Überfahren mit der Maus erscheinen Schnellaktionen.
+- Schrift: **Avenir**, sofern sie unter Windows installiert ist (Rechtsklick auf die Schriftdatei → *Für alle Benutzer installieren*); sonst Segoe UI. Die Schrift wird aus Lizenzgründen nicht mitgeliefert.
 - Die Oberfläche folgt der Windows-Sprache (Deutsch, sonst Englisch) und dem hellen/dunklen Modus.
 
 Die Daten liegen unter `%APPDATA%\StinkyMa\demo.sqlite`. Zum Zurücksetzen der Beispieldaten: App schließen, Datei löschen.
