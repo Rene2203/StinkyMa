@@ -37,14 +37,14 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(flaggedRow.waitForExistence(timeout: 10), "Keine markierten Mails")
         snapshot(app, "03-Markiert")
 
-        // 4. Ordner eines einzelnen Kontos: Entwürfe im Arbeitskonto
-        let drafts = app.descendants(matching: .any).matching(identifier: "sidebar.mailbox.mock-work-drafts").firstMatch
-        showSidebarIfNeeded(app, element: drafts)
-        XCTAssertTrue(drafts.waitForExistence(timeout: 10))
-        click(drafts)
-        let oneDraft = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 1"), object: rows)
-        XCTAssertEqual(XCTWaiter().wait(for: [oneDraft], timeout: 10), .completed, "Im Entwurfsordner liegt genau ein Entwurf")
-        snapshot(app, "04-Entwuerfe")
+        // 4. Posteingang eines einzelnen Kontos (Gmail, weit oben in der Seitenleiste)
+        let gmailInbox = app.descendants(matching: .any).matching(identifier: "sidebar.mailbox.mock-gmail-inbox").firstMatch
+        showSidebarIfNeeded(app, element: gmailInbox)
+        XCTAssertTrue(gmailInbox.waitForExistence(timeout: 10))
+        click(gmailInbox)
+        let fourMails = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 4"), object: rows)
+        XCTAssertEqual(XCTWaiter().wait(for: [fourMails], timeout: 10), .completed, "Im Gmail-Posteingang liegen 4 Mails")
+        snapshot(app, "04-Gmail-Posteingang")
     }
 
     /// Blendet die Seitenleiste ein, falls das iPad sie nach der Auswahl einer Mail eingeklappt hat.

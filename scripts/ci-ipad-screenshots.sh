@@ -34,18 +34,26 @@ xcodebuild test \
 # Screenshots mit sprechenden Namen aus dem Ergebnis-Bundle holen.
 xcrun xcresulttool export attachments --path "$OUT/UITests.xcresult" --output-path "$OUT/screenshots"
 python3 - "$OUT/screenshots" <<'PY'
-import json, os, sys
+import json, os, re, sys
 folder = sys.argv[1]
 manifest = json.load(open(os.path.join(folder, "manifest.json")))
 for test in manifest:
     for attachment in test.get("attachments", []):
-        name = attachment.get("suggestedHumanReadableName") or attachment["exportedFileName"]
-        # Xcode hängt z. B. „_0_<UUID>.png“ an; den Anfang bis zum ersten Unterstrich nach dem Namen behalten.
-        base = name.split("_0_")[0]
-        if not base.endswith(".png"):
-            base += ".png"
-        os.replace(os.path.join(folder, attachment["exportedFileName"]), os.path.join(folder, base))
-        print("Screenshot:", base)
+        exported = os.path.join(folder, attachment["exportedFileName"])
+        name = attachment.get("suggestedHumanReadableName", "")
+        # Eigene Screenshots („01-Posteingang_0_<UUID>.png“) und die Bildschirmaufnahme behalten,
+        # alles andere (Debug-Texte, UI-Hierarchie) verwerfen.
+        match = re.match(r"^(\d\d-[A-Za-z0-9-]+)_0_", name)
+        if match:
+            target = match.group(1) + ".png"
+        elif name.startswith("Screen Recording") and name.endswith(".mp4"):
+            target = "Bildschirmaufnahme.mp4"
+        else:
+            os.remove(exported)
+            continue
+        os.replace(exported, os.path.join(folder, target))
+        print("Behalten:", target)
+os.remove(os.path.join(folder, "manifest.json"))
 PY
 
 exit $TEST_STATUS

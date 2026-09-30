@@ -71,7 +71,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - Erster UI-Testlauf im iPad-Simulator (iOS 26.5): **App startet, Mock-Posteingang erscheint,
   Mail öffnen zeigt die Konversation** ✅. Fehlgeschlagen beim Tippen auf „Markiert“ in der
   Seitenleiste: Die Test-Kennung hing am Symbol statt an der Zeile. Behoben; außerdem exportiert
-  das Skript Screenshots jetzt auch bei fehlgeschlagenem Test. **Zweiter Lauf steht aus.**
+  das Skript Screenshots jetzt auch bei fehlgeschlagenem Test.
+- Zweiter Lauf (#9): Posteingang ✅, Konversation ✅, Seitenleiste „Markiert“ ✅. Fehlgeschlagen erst
+  beim Entwurfsordner des dritten Kontos: liegt im Querformat unterhalb des sichtbaren Bereichs.
+  Test nutzt jetzt den Gmail-Posteingang. Außerdem: Artefakt-Upload scheiterte an Dateinamen mit
+  Anführungszeichen (Debug-Anhänge) → nur eigene Screenshots + Bildschirmaufnahme behalten.
+  Playground-Schritt läuft jetzt vor dem UI-Test, damit das Paket auch bei rotem UI-Test entsteht.
+  **Dritter Lauf steht aus.**
 - Swift-Playgrounds-Export (`scripts/make-playground.sh`): kopiert alle Module in ein App-Target.
   Unter Linux geprüft, dass die Kernmodule als ein Modul kompilieren; Playground-Build in der CI
   (Xcode) und Öffnen auf dem iPad **noch ungeprüft**.

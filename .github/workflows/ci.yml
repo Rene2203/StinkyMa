@@ -38,8 +38,6 @@ jobs:
         run: >
           xcodebuild build -project StinkyMa.xcodeproj -scheme StinkyMa-macOS
           -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO
-      - name: iPadOS-App im Simulator testen (UI-Tests mit Screenshots)
-        run: scripts/ci-ipad-screenshots.sh
       - name: Swift-Playgrounds-Paket erzeugen und bauen
         run: |
           scripts/make-playground.sh build/playground/StinkyMa.swiftpm
@@ -53,6 +51,8 @@ jobs:
         with:
           name: StinkyMa-Playground
           path: build/playground
+      - name: iPadOS-App im Simulator testen (UI-Tests mit Screenshots)
+        run: scripts/ci-ipad-screenshots.sh
       - name: Screenshots hochladen
         if: always()
         uses: actions/upload-artifact@v4
