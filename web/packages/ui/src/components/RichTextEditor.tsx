@@ -93,7 +93,8 @@ export function RichTextEditor({
   useEffect(() => {
     if (!editor) return;
     onReady?.(editor);
-    if (focus === "start") editor.commands.focus("start");
+    // Der Editor kann beim schnellen Neuaufbau (Composer öffnet mit vorbefülltem Text) schon wieder abgebaut sein
+    if (focus === "start" && !editor.isDestroyed) editor.commands.focus("start");
   }, [editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

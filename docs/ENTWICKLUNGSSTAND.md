@@ -412,6 +412,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - **Windows-CI Lauf #71 rot, #72 (gleicher Stand) grün:** GreenMail nahm beim Start auf dem Windows-Runner kurz keine
   Anmeldungen an; der OAuth-Integrationstest wartete gar nicht auf ihn. Jetzt: gemeinsames `waitForGreenMail` (60 s) für
   beide Integrationstests und GreenMail in der CI mit `-Dgreenmail.startup.timeout=30000`. Lokal 24/24 grün.
+- **Windows-CI #77: echter Fehler gefunden.** Das winzige CI-Modell lieferte einen Antwortvorschlag; Klick darauf öffnete
+  den Editor nicht. Nachgestellt (KI-Schnittstelle im Test durch eine Attrappe ersetzt): selten „Cannot read properties of
+  null (reading 'commands')“ – der Editor war beim schnellen Neuaufbau schon abgebaut, als er den Cursor setzen wollte; der
+  Fehler riss den ganzen Composer mit. Jetzt Prüfung `isDestroyed`. Lokal selten (1 von ~20), auf dem langsameren
+  Windows-Runner zweimal in Folge. Kann auch beim normalen „Antworten“ aufgetreten sein.
+  **Lokal nicht testbar:** echte Modelle in der E2E-App unter Linux – node-llama-cpp prüft seine Binärdateien in einem
+  Kindprozess, der Playwrights Debugger-Schalter erbt und hängen bleibt. Unter Windows (CI) läuft es.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,
