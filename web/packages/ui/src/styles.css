@@ -2109,3 +2109,51 @@ button.attachment-open:hover {
   color: var(--danger);
   flex-shrink: 0;
 }
+
+/* Türsteher */
+
+.screener-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
+}
+
+.screener-bar > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.screener-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.screener-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.screener-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+
+.screener-buttons button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}

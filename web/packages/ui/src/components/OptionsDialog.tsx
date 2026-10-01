@@ -1,4 +1,4 @@
-import { AppWindow, ImageDown, KeyRound, PenLine, Plus, X } from "lucide-react";
+import { AppWindow, ImageDown, KeyRound, PenLine, Plus, UserCheck, X } from "lucide-react";
 import { normalizeRemoteContentException } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -120,6 +120,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
 
         {state.appSettings && <OAuthSection />}
 
+        <ScreenerSection />
+
         <section className="options-section" aria-labelledby="options-signature-heading">
           <h3 id="options-signature-heading">
             <PenLine size={16} aria-hidden="true" /> {t("signature.title")}
@@ -229,6 +231,33 @@ function OAuthSection() {
         <button type="button" disabled={!dirty} data-testid="oauth-save" onClick={() => void save()}>{t("oauth.save")}</button>
         {saved && !dirty && <span className="muted small" role="status">{t("oauth.saved")}</span>}
       </div>
+    </section>
+  );
+}
+
+/** Türsteher je Konto an/aus. */
+function ScreenerSection() {
+  const { store, t } = useUi();
+  const state = useBrowserState();
+  const accounts = Object.values(state.accountsById).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (accounts.length === 0) return null;
+  return (
+    <section className="options-section" aria-labelledby="options-screener-heading">
+      <h3 id="options-screener-heading">
+        <UserCheck size={16} aria-hidden="true" /> {t("screener.title")}
+      </h3>
+      <p className="hint">{t("screener.text")}</p>
+      {accounts.map((account) => (
+        <label key={account.id} className="checkbox">
+          <input
+            type="checkbox"
+            checked={account.screener ?? false}
+            data-testid={`screener-${account.id}`}
+            onChange={(e) => void store.setScreener(account.id, e.target.checked)}
+          />
+          <span>{t("screener.account", { account: account.displayName || account.email })}</span>
+        </label>
+      ))}
     </section>
   );
 }

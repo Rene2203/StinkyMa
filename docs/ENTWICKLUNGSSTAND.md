@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent** in Arbeit: W6.1 (Zu tun: Termine/Fristen/Zahlungen) und W6.2 (Phishing-Check) fertig, lokal geprüft. Als Nächstes W6.3 Türsteher, W6.4 Regeln, W6.5 Antwortentwürfe, W6.6 Tages-Digest; danach Feinabstimmung der Modelle (Wunsch des Nutzers)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent** in Arbeit: W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check) und W6.3 (Türsteher) fertig, lokal geprüft. Als Nächstes W6.4 Regeln, W6.5 Antwortentwürfe, W6.6 Tages-Digest; danach Feinabstimmung der Modelle (Wunsch des Nutzers)
 
 ## Überblick
 
@@ -375,4 +375,17 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Rat, Schild-Symbol in der Liste. **Messung:** Regeln allein 10/14 Betrugsmails, mit Gemma-Einordnung 13/14 – in Test- und
   Kontrollsatz **0 Fehlalarme** bei 94 echten Mails.
   **Ungeprüft:** echte Phishing-Mails (HTML, Weiterleitungen); Absender-Vertrauen („kenne ich“) noch nicht eingebaut.
+- **W6.3 – Türsteher (lokal geprüft):** pro Konto in Optionen bzw. beim Hinzufügen eines Kontos (Standard aus). Migration
+  `v11-screener`. Mails von Absendern ohne Entscheidung erscheinen nicht im Posteingang, sondern unter „Neue Absender“
+  (Seitenleiste, nur wenn ein Konto den Türsteher an hat). Beim Einschalten gelten bisherige Absender, Empfänger gesendeter
+  Mails und die eigene Adresse als erlaubt; wem man schreibt, der wird automatisch erlaubt. Blockieren verschiebt die Mails in
+  den Spam-Ordner (auf dem Server, über die Warteschlange); hat das Konto keinen, bleiben sie lokal ausgeblendet.
+  Geprüft: Vertragstests beider Repositories, SQLite, Store-Test, E2E gegen GreenMail (zwei neue Absender, Erlauben,
+  Blockieren → `Junk` auf dem Server enthält die Mail). Entscheidungen gelten kontenübergreifend je Adresse.
+  **Ungeprüft:** echte Konten mit vielen Absendern (Dauer des Schnappschusses), Entscheidung wieder zurücknehmen (noch keine
+  Oberfläche dafür).
+- **Messung Aktionen mit Gemma 4 E4B:** 93,0 % bei doppelter Zeit (15,4 s) – nicht besser als E2B. Beide setzen bei
+  „31. Oktober“ das Jahr 2027 → Punkt für die Feinabstimmung. Details in `docs/KI-MESSUNG.md`.
+- **Wackeliger E2E-Test behoben:** „Grillen?“ und die HTML-Mail hatten dieselbe Uhrzeit; je nach Reihenfolge öffnete das
+  Archivieren per E die einzige ungelesene Mail, und „Ungelesen“ war leer. Jetzt feste Reihenfolge; 3 volle Läufe grün.
 

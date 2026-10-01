@@ -354,6 +354,18 @@ export const migrations: Migration[] = [
       CREATE INDEX reminder_pending_on_dueDate ON reminder(dueDate) WHERE status = 'pending';
     `,
   },
+  {
+    name: "v11-screener",
+    // Türsteher: pro Konto an/aus; Entscheidungen je Absender-Adresse (klein geschrieben) gelten für alle Konten.
+    sql: `
+      ALTER TABLE account ADD COLUMN screener INTEGER NOT NULL DEFAULT 0;
+      CREATE TABLE senderDecision (
+        address TEXT PRIMARY KEY NOT NULL,
+        decision TEXT NOT NULL,
+        decidedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

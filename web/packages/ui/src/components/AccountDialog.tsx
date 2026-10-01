@@ -19,6 +19,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [removeDemo, setRemoveDemo] = useState(true);
+  const [screener, setScreener] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [username, setUsername] = useState("");
   const [imap, setImap] = useState<ServerFields>({ host: "", port: "993", security: "tls" });
@@ -47,7 +48,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
     setError(null);
     setWaitingFor(provider);
     try {
-      await store.addOAuthAccount(provider, hasDemo && removeDemo);
+      await store.addOAuthAccount(provider, hasDemo && removeDemo, screener);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e));
@@ -80,7 +81,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
       smtpSecurity: smtp.security,
     };
     try {
-      await store.addAccount(settings, password, hasDemo && removeDemo);
+      await store.addAccount(settings, password, hasDemo && removeDemo, screener);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e));
@@ -177,6 +178,11 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             {serverFields(t("dialog.smtp"), smtp, setSmtp, "smtp")}
           </div>
         )}
+
+        <label className="checkbox">
+          <input type="checkbox" checked={screener} data-testid="account-screener" onChange={(e) => setScreener(e.target.checked)} />
+          {t("screener.addAccount")}
+        </label>
 
         {hasDemo && (
           <label className="checkbox">

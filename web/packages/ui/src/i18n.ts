@@ -292,6 +292,15 @@ const de = {
   "phishing.giftCards": "Bittet um Gutscheinkarten oder Codes – typisch für Betrug.",
   "phishing.riskyAttachment": "Anhang „{filename}“ kann Programme enthalten.",
   "phishing.aiSuspect": "Die KI auf diesem Gerät stuft die Mail als verdächtig ein.",
+  "sidebar.screener": "Neue Absender",
+  "screener.newSender": "Neuer Absender: {name} ({address})",
+  "screener.explain": "Der Türsteher hält Mails von Absendern zurück, die dir noch nie geschrieben haben. Erlauben: diese und künftige Mails kommen in den Posteingang. Blockieren: sie wandern in den Spam-Ordner.",
+  "screener.allow": "Erlauben",
+  "screener.block": "Blockieren",
+  "screener.title": "Türsteher für neue Absender",
+  "screener.text": "Mails von Absendern, die dir noch nie geschrieben haben und denen du noch nie geschrieben hast, landen zuerst unter „Neue Absender“. Wer schon da war, bleibt sichtbar.",
+  "screener.account": "Türsteher für {account}",
+  "screener.addAccount": "Neue Absender zuerst prüfen (Türsteher)",
   "shortcuts.hint": "Tastatur: ↑/↓ oder J/K wechseln · E archivieren · Entf Papierkorb · S markieren · U gelesen/ungelesen",
 } as const;
 
@@ -588,6 +597,15 @@ const en: Record<MessageKey, string> = {
   "phishing.giftCards": "Asks for gift cards or codes – typical for fraud.",
   "phishing.riskyAttachment": "Attachment “{filename}” may contain programs.",
   "phishing.aiSuspect": "The AI on this device rates this email as suspicious.",
+  "sidebar.screener": "New senders",
+  "screener.newSender": "New sender: {name} ({address})",
+  "screener.explain": "The screener holds back emails from senders who have never written to you. Allow: this and future emails go to the inbox. Block: they are moved to spam.",
+  "screener.allow": "Allow",
+  "screener.block": "Block",
+  "screener.title": "Screener for new senders",
+  "screener.text": "Emails from senders who have never written to you, and whom you have never written to, first land in “New senders”. Existing contacts stay visible.",
+  "screener.account": "Screener for {account}",
+  "screener.addAccount": "Check new senders first (screener)",
   "shortcuts.hint": "Keyboard: ↑/↓ or J/K to move · E archive · Del trash · S flag · U read/unread",
 };
 

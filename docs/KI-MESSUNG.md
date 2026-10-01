@@ -101,6 +101,23 @@ Prüft, ob v2 nur auf den eigenen Testsatz passt. Kategorie richtig (Phishing er
 | Qwen 3.5 2B | 78,6 % (1/4) | 82,1 % (2/4) |
 | Qwen 3.5 4B | 92,9 % (2/4) | 96,4 % (3/4) |
 
+## Aktionen erkennen (W6.1, 01.10.2026)
+
+35 Fälle mit 43 erwarteten Angaben (Termine, Fristen, Zahlungen, To-dos), plus Mails ohne Aktion. Gemessen auf 4 CPU-Kernen,
+`eval-models.ts --actions`. „Angaben gefunden“: Datum/Uhrzeit/Betrag stimmen. „Unnötig“: Aktion in einer Mail ohne Aktion.
+
+| Verfahren | Angaben gefunden | unnötige Aktionen | Regel-Rückfall | Zeit (Median) |
+|---|---|---|---|---|
+| Regeln (ohne KI) | 93,0 % (von 43) | 0 | 0 | 0,0 s |
+| Gemma 4 E2B | 97,7 % (von 43) | 4 | 0 | 7,8 s |
+| Gemma 4 E4B | 93,0 % (von 43) | 3 | 0 | 15,4 s |
+
+- Beide Gemma-Modelle setzen bei „31. Oktober“ das falsche Jahr (2027) – Kandidat für die Feinabstimmung (Bezugsdatum im Prompt
+  deutlicher, Jahr bei fehlender Angabe per Regel ergänzen).
+- E4B ist hier **nicht** besser als E2B: verschiebt einmal einen Termin um einen Tag und lässt einmal das Datum weg, bei doppelter
+  Zeit. Für Aktionen bleibt E2B die Wahl; die Regeln laufen ohnehin sofort und die KI verfeinert im Hintergrund.
+- Ehrlich: Die Regeln wurden an diesem Satz entwickelt; ihre 93 % sind deshalb eher optimistisch.
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,

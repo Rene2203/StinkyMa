@@ -7,9 +7,13 @@
   verfeinert. Erinnerung per Windows-Benachrichtigung, Kalendereintrag (.ics), erledigt/ausblenden. Migration `v10-message-actions`.
 - **Phishing-Check:** Warnleiste mit nachvollziehbaren Gründen (gefälschter Absender, irreführende Links, Druck, Datenabfrage,
   Gutscheinkarten …) und Kennzeichen in der Liste.
+- **Türsteher für neue Absender** (pro Konto, Standard aus; beim Hinzufügen eines Kontos wählbar): Mails von Unbekannten
+  landen zuerst unter „Neue Absender“. Erlauben → Posteingang (auch künftig), Blockieren → Spam-Ordner auf dem Server.
+  Beim Einschalten gelten alle bisherigen Absender und Empfänger eigener Mails als bekannt. Migration `v11-screener`.
 
 ### Behoben
 - Archivierte/verschobene Mails verloren den gelesenen Anhang-Text (Suche in Scans) und KI-Leseergebnisse.
+- E2E-Test „Ungelesen“ war wackelig (zwei Mails mit gleicher Uhrzeit, zufällige Reihenfolge).
 
 ## W5 – KI-Basis (in Arbeit)
 

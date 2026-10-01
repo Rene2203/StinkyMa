@@ -302,4 +302,32 @@ describe("BrowserStore", () => {
     await archiving;
     expect(s.getState().messages.some((m) => m.id === first.id)).toBe(false);
   });
+  it("Türsteher: neue Absender warten, Erlauben/Blockieren räumt den Bereich auf", async () => {
+    const data = createMockData(new Date("2026-09-29T10:00:00Z"));
+    data.accounts.find((a) => a.id === MockIds.work)!.screener = true; // ohne Schnappschuss: alle Absender sind neu
+    const s = new BrowserStore(new InMemoryMailRepository(data));
+    await s.start();
+    expect(sidebarItem(s.getState(), { kind: "screener" })).toBeDefined();
+    await s.selectScope({ kind: "screener" });
+    const waiting = s.getState().messages;
+    expect(waiting.length).toBeGreaterThan(1);
+    expect(waiting.every((m) => m.accountId === MockIds.work)).toBe(true);
+
+    const first = waiting[0]!;
+    await s.selectMessage(first.id);
+    await s.decideSender(first.from.address, "allow");
+    let state = s.getState();
+    expect(state.messages.some((m) => m.from.address === first.from.address)).toBe(false);
+    expect(state.selectedMessageId).not.toBe(first.id);
+
+    const blocked = state.messages[0]!;
+    await s.decideSender(blocked.from.address, "block");
+    await s.selectScope({ kind: "unifiedInbox" });
+    state = s.getState();
+    expect(state.messages.some((m) => m.from.address === first.from.address)).toBe(true);
+    expect(state.messages.some((m) => m.from.address === blocked.from.address && m.accountId === MockIds.work)).toBe(false);
+
+    await s.setScreener(MockIds.work, false);
+    expect(sidebarItem(s.getState(), { kind: "screener" })).toBeUndefined();
+  });
 });

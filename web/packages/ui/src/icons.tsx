@@ -24,6 +24,7 @@ import {
   ShieldX,
   Trash2,
   User,
+  UserCheck,
   type LucideIcon,
 } from "lucide-react";
 import { fileExtension, type MailboxRole, type MessageCategory } from "@stinkyma/core";
@@ -47,6 +48,8 @@ export function sidebarIcon(kind: SidebarItemKind): LucideIcon {
       return Mail;
     case "flagged":
       return Flag;
+    case "screener":
+      return UserCheck;
     case "mailbox":
       return roleIcon[kind.mailbox.role];
   }

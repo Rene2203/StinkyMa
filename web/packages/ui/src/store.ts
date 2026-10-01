@@ -41,6 +41,7 @@ export type SidebarItemKind =
   | { type: "unifiedInbox" }
   | { type: "unread" }
   | { type: "flagged" }
+  | { type: "screener" }
   | { type: "mailbox"; mailbox: Mailbox };
 
 export interface SidebarItem {
@@ -322,6 +323,26 @@ export class BrowserStore {
     } catch {
       // Zusatz – Fehler hier nicht melden
     }
+  }
+
+  // --- Türsteher ---
+
+  async setScreener(accountId: string, enabled: boolean): Promise<void> {
+    await this.#guard(() => this.#repository.setScreener(accountId, enabled));
+    await this.loadSidebar();
+    if (!enabled && this.#state.selectedScope.kind === "screener" && !Object.values(this.#state.accountsById).some((a) => a.screener)) {
+      await this.selectScope({ kind: "unifiedInbox" });
+    } else await this.loadMessages();
+  }
+
+  /** Absender der geöffneten Mail erlauben oder blockieren; danach die nächste wartende Mail zeigen. */
+  async decideSender(address: string, decision: "allow" | "block"): Promise<void> {
+    const list = visibleMessages(this.#state);
+    const index = list.findIndex((m) => m.id === this.#state.selectedMessageId);
+    await this.#guard(() => this.#repository.decideSender(address, decision));
+    await Promise.all([this.loadSidebar(), this.loadMessages()]);
+    const next = visibleMessages(this.#state)[Math.max(0, Math.min(index, visibleMessages(this.#state).length - 1))];
+    if (this.#state.selectedScope.kind === "screener") await this.selectMessage(next?.id ?? null);
   }
 
   // --- Aktionen (Termine, Fristen, Zahlungen) ---
@@ -659,9 +680,9 @@ export class BrowserStore {
   }
 
   /** Richtet ein Konto ein. Fehler werden an den Dialog weitergegeben (nicht als Banner). */
-  async addAccount(settings: AccountSettings, password: string, removeDemoAccounts: boolean): Promise<Account> {
+  async addAccount(settings: AccountSettings, password: string, removeDemoAccounts: boolean, screener = false): Promise<Account> {
     if (!this.#accounts) throw new Error("Kontoverwaltung ist hier nicht verfügbar.");
-    const account = await this.#accounts.addAccount(settings, password, { removeDemoAccounts });
+    const account = await this.#accounts.addAccount(settings, password, { removeDemoAccounts, screener });
     await this.selectScope({ kind: "unifiedInbox" });
     await this.reload();
     return account;
@@ -682,9 +703,9 @@ export class BrowserStore {
   }
 
   /** Konto per Anmeldung im Browser. Fehler an den Dialog (nicht als Banner). */
-  async addOAuthAccount(provider: OAuthProviderId, removeDemoAccounts: boolean): Promise<Account> {
+  async addOAuthAccount(provider: OAuthProviderId, removeDemoAccounts: boolean, screener = false): Promise<Account> {
     if (!this.#accounts) throw new Error("Kontoverwaltung ist hier nicht verfügbar.");
-    const account = await this.#accounts.addOAuthAccount(provider, { removeDemoAccounts });
+    const account = await this.#accounts.addOAuthAccount(provider, { removeDemoAccounts, screener });
     await this.selectScope({ kind: "unifiedInbox" });
     await this.reload();
     return account;
@@ -714,6 +735,8 @@ export class BrowserStore {
         [{ type: "unread" }, { kind: "unread" }, counts.unread],
         [{ type: "flagged" }, { kind: "flagged" }, counts.flagged],
       ];
+      // Türsteher: eigener Bereich, sobald er bei einem Konto an ist (Zähler = wartende Mails)
+      if (accounts.some((a) => a.screener)) smart.push([{ type: "screener" }, { kind: "screener" }, counts.screener]);
       const sections: SidebarSection[] = [
         { id: "smart", account: null, items: smart.map(([kind, scope, unreadCount]) => ({ kind, scope, unreadCount })) },
         ...accounts.map((account) => ({

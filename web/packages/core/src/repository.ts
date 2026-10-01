@@ -52,6 +52,13 @@ export interface MailRepository {
   search(query: string, options: { scope?: MessageScope | null; limit: number }): Promise<Message[]>;
   /** Signatur eines Kontos setzen (leer/`null` = keine Signatur). */
   setSignature(accountId: string, html: string | null): Promise<void>;
+  /**
+   * Türsteher an/aus. Beim Einschalten gelten alle bisherigen Absender des Kontos, alle Empfänger eigener Mails und die
+   * eigene Adresse als bekannt – nur wirklich neue Absender landen unter „Neue Absender“.
+   */
+  setScreener(accountId: string, enabled: boolean): Promise<void>;
+  /** Absender erlauben (Mails erscheinen im Posteingang) oder blockieren (Mails verschwinden aus dem Posteingang). */
+  decideSender(address: string, decision: "allow" | "block"): Promise<void>;
 }
 
 /** Eine Mail im Postausgang (noch nicht gesendet). */
@@ -75,6 +82,8 @@ export interface UnreadCounts {
   flagged: number;
   /** Ungelesene pro Ordner (Mailbox-ID → Anzahl); fehlende Ordner haben 0. */
   mailboxes: Record<string, number>;
+  /** Mails neuer Absender, die auf eine Entscheidung warten (Türsteher) – gelesen oder nicht. */
+  screener: number;
 }
 
 export interface MailOverview {
@@ -109,6 +118,8 @@ export const mailRepositoryMethods = [
   "suggestAddresses",
   "setSignature",
   "search",
+  "setScreener",
+  "decideSender",
 ] as const satisfies readonly (keyof MailRepository)[];
 
 export type MailRepositoryMethod = (typeof mailRepositoryMethods)[number];

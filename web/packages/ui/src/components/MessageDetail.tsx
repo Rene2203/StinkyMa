@@ -11,6 +11,7 @@ import { SafeHtml } from "./SafeHtml.js";
 import { SummaryCard } from "./SummaryCard.js";
 import { ActionsCard } from "./ActionsCard.js";
 import { PhishingBanner } from "./PhishingBanner.js";
+import { ScreenerBar } from "./ScreenerBar.js";
 
 export function MessageDetail() {
   const { store, t, locale } = useUi();
@@ -85,6 +86,7 @@ export function MessageDetail() {
           <h2 className="thread-subject" data-testid="thread-subject">{message.subject}</h2>
           {isDraft && <p className="draft-banner"><Pencil size={14} aria-hidden="true" /> {t("draft.banner")}</p>}
           {message.category && <CategoryChip category={message.category} />}
+          {state.selectedScope.kind === "screener" && <ScreenerBar message={message} />}
           {!isDraft && (
             <PhishingBanner
               key={message.id}

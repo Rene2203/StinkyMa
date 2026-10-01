@@ -118,6 +118,8 @@ export class MailService implements MailRepository, AccountsApi {
     const account = this.writer.account(mail.accountId);
     if (!account) throw new Error("Konto nicht gefunden.");
     if (mail.to.length + mail.cc.length + mail.bcc.length === 0) throw new Error("Bitte mindestens einen Empfänger angeben.");
+    // Wem man schreibt, der gilt für den Türsteher als bekannt
+    this.repository.allowRecipients([...mail.to, ...mail.cc, ...mail.bcc].map((r) => r.address));
     if (isDemoAccount(account)) {
       await this.repository.send(mail);
       this.options.onChange?.();
@@ -267,6 +269,23 @@ export class MailService implements MailRepository, AccountsApi {
   }
 
   /** Sofort lokal in den Zielordner; der Server folgt über die Warteschlange. */
+  // --- Türsteher (W6.3) ---
+
+  async setScreener(accountId: string, enabled: boolean): Promise<void> {
+    await this.repository.setScreener(accountId, enabled);
+    this.options.onChange?.();
+  }
+
+  /** Erlauben: Mails erscheinen im Posteingang. Blockieren: vorhandene Mails wandern in den Spam-Ordner (auch auf dem Server). */
+  async decideSender(address: string, decision: "allow" | "block"): Promise<void> {
+    await this.repository.decideSender(address, decision);
+    if (decision === "block") {
+      const ids = this.repository.inboxMessageIdsFrom(address);
+      if (ids.length) await this.move(ids, "spam");
+    }
+    this.options.onChange?.();
+  }
+
   async move(messageIds: string[], role: MailboxRole): Promise<void> {
     const createdAt = this.#now().toISOString();
     for (const [accountId, ids] of this.#groupByAccount(messageIds)) {
@@ -409,6 +428,7 @@ export class MailService implements MailRepository, AccountsApi {
     };
     await storeSecret(account.id);
     this.writer.insertAccount(account);
+    if (options.screener) await this.repository.setScreener(account.id, true);
     this.options.onChange?.();
     void this.syncNow();
     this.#watch(account.id);

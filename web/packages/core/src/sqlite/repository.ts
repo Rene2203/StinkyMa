@@ -33,7 +33,7 @@ export function accountFromRow(r: Row): Account {
     imapHost: str(r.imapHost), imapPort: num(r.imapPort), imapSecurity: str(r.imapSecurity) as Account["imapSecurity"],
     smtpHost: str(r.smtpHost), smtpPort: num(r.smtpPort), smtpSecurity: str(r.smtpSecurity) as Account["smtpSecurity"],
     authType: str(r.authType) as Account["authType"], color: str(r.color) as Account["color"],
-    aiCloudAllowed: bool(r.aiCloudAllowed), sortOrder: num(r.sortOrder),
+    aiCloudAllowed: bool(r.aiCloudAllowed), sortOrder: num(r.sortOrder), screener: bool(r.screener),
     lastSyncAt: optStr(r.lastSyncAt), syncError: optStr(r.syncError), signatureHtml: optStr(r.signatureHtml),
   };
 }
@@ -79,16 +79,26 @@ const archiveDuplicate = `(mailbox.role = 'archive' AND message.messageId IS NOT
    WHERE other.messageId = message.messageId AND other.accountId = message.accountId
      AND otherBox.role NOT IN ('archive', 'trash', 'spam')))`;
 
+/** Absender blockiert (gilt immer) */
+const blockedSender = `EXISTS (SELECT 1 FROM senderDecision d WHERE d.address = lower(message.fromAddress) AND d.decision = 'block')`;
+/** Türsteher des Kontos an und Absender noch nicht erlaubt (auch nicht blockiert) */
+const pendingSender = `(SELECT screener FROM account WHERE account.id = message.accountId) = 1
+  AND NOT EXISTS (SELECT 1 FROM senderDecision d WHERE d.address = lower(message.fromAddress))`;
+/** Posteingangs-Mail, die (noch) nicht im Posteingang erscheinen soll */
+export const screenedOut = `(mailbox.role = 'inbox' AND (${blockedSender} OR (${pendingSender})))`;
+
 export function scopeCondition(scope: MessageScope): { sql: string; params: unknown[] } {
   switch (scope.kind) {
     case "unifiedInbox":
-      return { sql: "mailbox.role = ?", params: ["inbox"] };
+      return { sql: `mailbox.role = ? AND NOT ${screenedOut}`, params: ["inbox"] };
     case "unread":
-      return { sql: "mailbox.role = ? AND (message.flags & ?) = 0", params: ["inbox", MessageFlag.seen] };
+      return { sql: `mailbox.role = ? AND (message.flags & ?) = 0 AND NOT ${screenedOut}`, params: ["inbox", MessageFlag.seen] };
     case "flagged":
-      return { sql: `mailbox.role <> ? AND (message.flags & ?) <> 0 AND NOT ${archiveDuplicate}`, params: ["trash", MessageFlag.flagged] };
+      return { sql: `mailbox.role <> ? AND (message.flags & ?) <> 0 AND NOT ${archiveDuplicate} AND NOT ${screenedOut}`, params: ["trash", MessageFlag.flagged] };
     case "mailbox":
-      return { sql: "message.mailboxId = ?", params: [scope.mailboxId] };
+      return { sql: `message.mailboxId = ? AND NOT ${screenedOut}`, params: [scope.mailboxId] };
+    case "screener":
+      return { sql: `mailbox.role = ? AND ${pendingSender}`, params: ["inbox"] };
   }
 }
 
@@ -151,13 +161,14 @@ export class SqliteMailRepository implements MailRepository {
     const rows = this.db
       .prepare(
         `SELECT message.mailboxId AS mailboxId, mailbox.role AS role,
-                SUM(CASE WHEN (message.flags & @seen) = 0 THEN 1 ELSE 0 END) AS unread,
-                SUM(CASE WHEN (message.flags & @seen) = 0 AND (message.flags & @flagged) <> 0 AND NOT ${archiveDuplicate} THEN 1 ELSE 0 END) AS flaggedUnread
+                SUM(CASE WHEN (message.flags & @seen) = 0 AND NOT ${screenedOut} THEN 1 ELSE 0 END) AS unread,
+                SUM(CASE WHEN (message.flags & @seen) = 0 AND (message.flags & @flagged) <> 0 AND NOT ${archiveDuplicate} AND NOT ${screenedOut} THEN 1 ELSE 0 END) AS flaggedUnread
          FROM message JOIN mailbox ON mailbox.id = message.mailboxId
          GROUP BY message.mailboxId`,
       )
       .all({ seen: MessageFlag.seen, flagged: MessageFlag.flagged }) as { mailboxId: string; role: string; unread: number; flaggedUnread: number }[];
-    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {} };
+    const screener = (this.db.prepare(`SELECT COUNT(*) AS n FROM message JOIN mailbox ON mailbox.id = message.mailboxId WHERE mailbox.role = 'inbox' AND ${pendingSender}`).get() as { n: number }).n;
+    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {}, screener };
     for (const r of rows) {
       if (r.unread > 0) counts.mailboxes[r.mailboxId] = r.unread;
       if (r.role === "inbox") {
@@ -167,6 +178,51 @@ export class SqliteMailRepository implements MailRepository {
       if (r.role !== "trash") counts.flagged += r.flaggedUnread;
     }
     return { accounts, mailboxesByAccount, counts, outbox: this.outbox() };
+  }
+
+  async setScreener(accountId: string, enabled: boolean): Promise<void> {
+    this.db.transaction(() => {
+      this.db.prepare("UPDATE account SET screener = ? WHERE id = ?").run(enabled ? 1 : 0, accountId);
+      if (!enabled) return;
+      // Bisherige Absender, Empfänger eigener Mails und die eigene Adresse gelten als bekannt
+      const now = new Date().toISOString();
+      this.db
+        .prepare(
+          `INSERT OR IGNORE INTO senderDecision (address, decision, decidedAt)
+           SELECT DISTINCT lower(fromAddress), 'allow', ? FROM message WHERE accountId = ?
+           UNION SELECT DISTINCT lower(json_extract(r.value, '$.address')), 'allow', ? FROM message JOIN mailbox ON mailbox.id = message.mailboxId, json_each(message."to") AS r
+             WHERE message.accountId = ? AND mailbox.role = 'sent'
+           UNION SELECT lower(email), 'allow', ? FROM account WHERE id = ?`,
+        )
+        .run(now, accountId, now, accountId, now, accountId);
+    })();
+  }
+
+  async decideSender(address: string, decision: "allow" | "block"): Promise<void> {
+    const normalized = address.trim().toLowerCase();
+    if (!normalized.includes("@")) throw new Error("Ungültige Absenderadresse.");
+    this.db
+      .prepare(
+        `INSERT INTO senderDecision (address, decision, decidedAt) VALUES (?, ?, ?)
+         ON CONFLICT(address) DO UPDATE SET decision = excluded.decision, decidedAt = excluded.decidedAt`,
+      )
+      .run(normalized, decision, new Date().toISOString());
+  }
+
+  /** Posteingangs-Mails eines Absenders (für „Blockieren“ → in den Spam-Ordner). */
+  inboxMessageIdsFrom(address: string): string[] {
+    return (
+      this.db
+        .prepare("SELECT message.id AS id FROM message JOIN mailbox ON mailbox.id = message.mailboxId WHERE mailbox.role = 'inbox' AND lower(message.fromAddress) = ?")
+        .all(address.trim().toLowerCase()) as { id: string }[]
+    ).map((r) => r.id);
+  }
+
+  /** Empfänger eigener Mails gelten als bekannt (nur wenn noch keine Entscheidung vorliegt). */
+  allowRecipients(addresses: string[]): void {
+    const insert = this.db.prepare("INSERT OR IGNORE INTO senderDecision (address, decision, decidedAt) VALUES (?, 'allow', ?)");
+    const now = new Date().toISOString();
+    for (const address of addresses) if (address.includes("@")) insert.run(address.trim().toLowerCase(), now);
   }
 
   async setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void> {

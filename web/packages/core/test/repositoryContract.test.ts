@@ -87,6 +87,31 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
     expect(flaggedNow && isFlagged(flaggedNow)).toBe(true);
   });
 
+  it("Türsteher: aus = nichts wartet; an = bisherige Absender bleiben sichtbar", async () => {
+    const repo = make();
+    const before = (await repo.messages({ kind: "unifiedInbox" }, 100)).length;
+    expect((await repo.overview()).counts.screener).toBe(0);
+    await repo.setScreener(MockIds.iCloud, true);
+    expect((await repo.accounts()).find((a) => a.id === MockIds.iCloud)?.screener).toBe(true);
+    expect(await repo.messages({ kind: "screener" }, 100)).toEqual([]);
+    expect((await repo.messages({ kind: "unifiedInbox" }, 100)).length).toBe(before);
+  });
+
+  it("Türsteher: blockierter Absender verschwindet aus Posteingang und Zählern, erlaubt kommt zurück", async () => {
+    const repo = make();
+    const sender = "Rechnung@Stadtwerke-Musterstadt.example";
+    const visible = async () => (await repo.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.from.address.toLowerCase() === sender.toLowerCase());
+    expect(await visible()).toBe(true);
+    const unreadBefore = (await repo.overview()).counts.unifiedInbox;
+    await repo.decideSender(sender, "block");
+    expect(await visible()).toBe(false);
+    expect((await repo.overview()).counts.unifiedInbox).toBeLessThanOrEqual(unreadBefore);
+    expect(await repo.messages({ kind: "screener" }, 100)).toEqual([]); // blockiert ≠ wartend
+    await repo.decideSender(sender, "allow");
+    expect(await visible()).toBe(true);
+    await expect(repo.decideSender("keine-adresse", "allow")).rejects.toThrow(/Ungültige/);
+  });
+
   it("verschiebt in den Ordner des jeweiligen Kontos", async () => {
     const repo = make();
     const inbox = await repo.messages({ kind: "unifiedInbox" }, 100);

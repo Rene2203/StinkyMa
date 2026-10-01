@@ -15,6 +15,7 @@ unten abarbeiten.
 
 | Seit | Was | Wo in TypeScript |
 |------|-----|------------------|
+| 01.10.2026 | Migration `v11-screener`: Spalte `account.screener INTEGER NOT NULL DEFAULT 0`, Tabelle `senderDecision(address TEXT PRIMARY KEY, decision TEXT, decidedAt TEXT)`; Türsteher-Filter im Posteingang | `core/src/sqlite/schema.ts`, `sqlite/repository.ts` (`screenedOut`) |
 | 01.10.2026 | Migration `v10-message-actions` (Tabellen `messageAction`, `messageActionScan`; `reminder.actionId`, `reminder.status`) | `core/src/sqlite/schema.ts`, `sqlite/actionStore.ts` |
 | 01.10.2026 | Aktionen erkennen (Regeln + KI mit Belegprüfung), Erinnerungen, .ics; Phishing-Check mit Gründen | `core/src/ai/actions.ts`, `core/src/calendar.ts`, `core/src/phishing.ts` |
 | 01.10.2026 | Verschieben einer Mail (neue ID) behält Anhang-Text, Leseergebnis, Aktionen, Erinnerungen | `core/src/sqlite/writer.ts` (`relocateMessage`) |

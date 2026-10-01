@@ -12,6 +12,8 @@ export class InMemoryMailRepository implements MailRepository {
   readonly #remoteContentExceptions = new Set<string>();
   /** Entwurf-ID → gespeicherte Eingaben und lokale Mail-ID. */
   readonly #drafts = new Map<string, { draft: ComposeDraft; messageId: string }>();
+  /** Türsteher: Entscheidungen je Absender (klein geschrieben). */
+  readonly #senderDecisions = new Map<string, "allow" | "block">();
 
   constructor(data: MockDataSet) {
     this.#data = structuredClone(data);
@@ -61,10 +63,12 @@ export class InMemoryMailRepository implements MailRepository {
     const accounts = await this.accounts();
     const mailboxesByAccount: Record<string, Mailbox[]> = {};
     for (const account of accounts) mailboxesByAccount[account.id] = await this.mailboxes(account.id);
-    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {} };
+    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {}, screener: 0 };
     for (const m of this.#data.messages) {
-      if ((m.flags & MessageFlag.seen) !== 0) continue;
       const role = this.#roleOf(m.mailboxId);
+      if (role === "inbox" && this.#pending(m)) counts.screener += 1;
+      if (this.#screenedOut(m)) continue;
+      if ((m.flags & MessageFlag.seen) !== 0) continue;
       counts.mailboxes[m.mailboxId] = (counts.mailboxes[m.mailboxId] ?? 0) + 1;
       if (role === "inbox") {
         counts.unifiedInbox += 1;
@@ -73,6 +77,33 @@ export class InMemoryMailRepository implements MailRepository {
       if (role !== "trash" && (m.flags & MessageFlag.flagged) !== 0 && !this.#isArchiveDuplicate(m)) counts.flagged += 1;
     }
     return { accounts, mailboxesByAccount, counts, outbox: [] };
+  }
+
+  async setScreener(accountId: string, enabled: boolean): Promise<void> {
+    const account = this.#data.accounts.find((a) => a.id === accountId);
+    if (!account) return;
+    account.screener = enabled;
+    if (!enabled) return;
+    const known = [account.email, ...this.#data.messages.filter((m) => m.accountId === accountId).flatMap((m) => (this.#roleOf(m.mailboxId) === "sent" ? m.to.map((r) => r.address) : [m.from.address]))];
+    for (const address of known) if (!this.#senderDecisions.has(address.toLowerCase())) this.#senderDecisions.set(address.toLowerCase(), "allow");
+  }
+
+  async decideSender(address: string, decision: "allow" | "block"): Promise<void> {
+    const normalized = address.trim().toLowerCase();
+    if (!normalized.includes("@")) throw new Error("Ungültige Absenderadresse.");
+    this.#senderDecisions.set(normalized, decision);
+  }
+
+  /** Türsteher an und Absender noch ohne Entscheidung */
+  #pending(m: Message): boolean {
+    const account = this.#data.accounts.find((a) => a.id === m.accountId);
+    return !!account?.screener && !this.#senderDecisions.has(m.from.address.toLowerCase());
+  }
+
+  /** Posteingangs-Mail, die nicht im Posteingang erscheinen soll (wartend oder blockiert) */
+  #screenedOut(m: Message): boolean {
+    if (this.#roleOf(m.mailboxId) !== "inbox") return false;
+    return this.#senderDecisions.get(m.from.address.toLowerCase()) === "block" || this.#pending(m);
   }
 
   async setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void> {
@@ -239,6 +270,8 @@ export class InMemoryMailRepository implements MailRepository {
   #inScope(scope: MessageScope): Message[] {
     return this.#data.messages.filter((m) => {
       const role = this.#roleOf(m.mailboxId);
+      if (scope.kind === "screener") return role === "inbox" && this.#pending(m);
+      if (this.#screenedOut(m)) return false;
       switch (scope.kind) {
         case "unifiedInbox":
           return role === "inbox";

@@ -28,6 +28,8 @@ export interface Account {
   color: AccountColor;
   /** Nutzer-Freigabe: Darf eine Cloud-KI Mails dieses Kontos verarbeiten? Standard: nein (5.0). */
   aiCloudAllowed: boolean;
+  /** Türsteher: Mails unbekannter Absender erst unter „Neue Absender“ zeigen (W6.3). */
+  screener?: boolean;
   sortOrder: number;
   /** Zeitpunkt des letzten erfolgreichen Abgleichs (ISO-8601), `null` = noch nie. */
   lastSyncAt?: string | null;
@@ -142,7 +144,9 @@ export type MessageScope =
   | { kind: "unifiedInbox" }
   | { kind: "unread" }
   | { kind: "flagged" }
-  | { kind: "mailbox"; mailboxId: string };
+  | { kind: "mailbox"; mailboxId: string }
+  /** Türsteher: Mails neuer Absender, die noch auf „Erlauben“ oder „Blockieren“ warten */
+  | { kind: "screener" };
 
 export function scopeKey(scope: MessageScope): string {
   return scope.kind === "mailbox" ? `mailbox:${scope.mailboxId}` : scope.kind;

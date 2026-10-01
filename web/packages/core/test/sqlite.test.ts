@@ -102,3 +102,31 @@ describe("Suche in Anhängen", () => {
   });
 });
 
+
+describe("Türsteher (SQLite)", () => {
+  it("neuer Absender nach dem Einschalten wartet unter „Neue Absender“; Erlauben holt ihn in den Posteingang", async () => {
+    const db = openDatabase(":memory:");
+    seedIfEmpty(db, createMockData(new Date("2026-09-29T10:00:00Z")));
+    const repo = new SqliteMailRepository(db);
+    await repo.setScreener(MockIds.iCloud, true);
+    const inbox = (db.prepare("SELECT id FROM mailbox WHERE accountId = ? AND role = 'inbox'").get(MockIds.iCloud) as { id: string }).id;
+    new MailWriter(db).insertMessage({
+      id: "neu-1", accountId: MockIds.iCloud, mailboxId: inbox, uid: 9001, messageId: "<neu-1@unbekannt.example>", threadId: "t-neu", threadSubject: "Hallo",
+      from: { name: "Unbekannt", address: "Neu@Unbekannt.example" }, to: [], cc: [], subject: "Hallo", date: "2026-09-29T09:00:00.000Z",
+      snippet: "Hallo", bodyText: "Hallo", bodyHtml: null, flags: 0, attachments: [],
+    });
+    expect((await repo.messages({ kind: "screener" }, 10)).map((m) => m.id)).toEqual(["neu-1"]);
+    expect((await repo.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.id === "neu-1")).toBe(false);
+    expect((await repo.messages({ kind: "mailbox", mailboxId: inbox }, 100)).some((m) => m.id === "neu-1")).toBe(false);
+    const overview = await repo.overview();
+    expect(overview.counts.screener).toBe(1);
+    // Wem man geschrieben hat, der ist bekannt
+    repo.allowRecipients(["neu@unbekannt.example"]);
+    expect((await repo.overview()).counts.screener).toBe(0);
+    expect((await repo.messages({ kind: "unread" }, 100)).some((m) => m.id === "neu-1")).toBe(true);
+    // Türsteher aus: nichts wartet mehr
+    await repo.decideSender("neu@unbekannt.example", "block");
+    await repo.setScreener(MockIds.iCloud, false);
+    expect((await repo.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.id === "neu-1")).toBe(false); // blockiert bleibt blockiert
+  });
+});

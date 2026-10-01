@@ -45,9 +45,10 @@ test.beforeAll(async () => {
   await admin.append("INBOX", htmlMail, [], new Date());
   await admin.append(
     "INBOX",
-    ["From: Jonas <jonas@example.test>", `To: ${email}`, "Subject: Grillen?", `Date: ${new Date().toUTCString()}`, "Message-ID: <g1@example.test>", "", "Kommst du Samstag?", ""].join("\r\n"),
+    // Eine Minute jünger als die HTML-Mail: feste Reihenfolge, damit Archivieren nicht zufällig diese Mail öffnet (und gelesen setzt)
+    ["From: Jonas <jonas@example.test>", `To: ${email}`, "Subject: Grillen?", `Date: ${new Date(Date.now() + 60_000).toUTCString()}`, "Message-ID: <g1@example.test>", "", "Kommst du Samstag?", ""].join("\r\n"),
     [],
-    new Date(),
+    new Date(Date.now() + 60_000),
   );
   // Mail mit Anhängen: ein PDF (öffnen/speichern) und eine .exe (nur speichern)
   const boundary = "grenze42";
@@ -191,8 +192,8 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await test.step("„Ungelesen“: geöffnete Mail bleibt sichtbar", async () => {
     await page.getByTestId("sidebar-unread").click();
     const rows = page.getByTestId("message-row");
+    await expect(rows.first()).toBeVisible(); // count() wartet nicht, bis die Liste geladen ist
     const count = await rows.count();
-    expect(count).toBeGreaterThan(0);
     await rows.first().click();
     await expect(page.getByTestId("thread-subject")).toBeVisible();
     // Das Gelesen-Setzen löst im Hauptprozess „mail:changed“ aus – danach muss die Mail noch offen sein.
@@ -515,6 +516,51 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await page.keyboard.press("Escape");
     await expect(viewer).toHaveCount(0);
     await page.getByTestId("search-input").press("Escape");
+  });
+
+  await test.step("Türsteher: neuer Absender wartet, Erlauben bzw. Blockieren (→ Spam auf dem Server)", async () => {
+    await page.getByTestId("open-options").click();
+    const options = page.getByTestId("options-dialog");
+    const toggle = options.locator("[data-testid^='screener-']").first();
+    await toggle.check();
+    await expect(toggle).toBeChecked();
+    await options.getByRole("button", { name: "Fertig" }).click();
+    await expect(page.getByTestId("sidebar-screener")).toBeVisible();
+
+    const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+    await admin.connect();
+    await admin.mailboxCreate("Junk");
+    const mail = (from: string, subject: string, id: string) =>
+      [`From: ${from}`, `To: ${email}`, `Subject: ${subject}`, `Date: ${new Date().toUTCString()}`, `Message-ID: <${id}@example.test>`, "", "Hallo!", ""].join("\r\n");
+    await admin.append("INBOX", mail("Neue Nachbarin <nachbarin@example.test>", "Paket für dich angenommen", "screen-1"), [], new Date());
+    await admin.append("INBOX", mail("Werbung <angebote@werbung.example>", "Nur heute: alles reduziert", "screen-2"), [], new Date());
+    await page.getByTestId("sync-now").click();
+    await page.getByTestId("sidebar-screener").click();
+    const rows = page.getByTestId("message-row");
+    await expect(rows).toHaveCount(2, { timeout: 20_000 });
+    // Bekannte Absender (vor dem Einschalten schon da) bleiben im Posteingang
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    await expect(page.getByTestId("message-row").filter({ hasText: "Grillen?" })).toBeVisible();
+    await expect(page.getByTestId("message-row").filter({ hasText: "Paket für dich angenommen" })).toHaveCount(0);
+
+    await page.getByTestId("sidebar-screener").click();
+    await rows.filter({ hasText: "Paket für dich angenommen" }).click();
+    await expect(page.getByTestId("screener-bar")).toContainText("nachbarin@example.test");
+    await page.screenshot({ path: join(screenshotDir, "23-Tuersteher.png") });
+    await page.getByTestId("screener-allow").click();
+    await expect(rows).toHaveCount(1);
+    await rows.filter({ hasText: "Nur heute" }).click();
+    await page.getByTestId("screener-block").click();
+    await expect(rows).toHaveCount(0);
+
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    await expect(page.getByTestId("message-row").filter({ hasText: "Paket für dich angenommen" })).toBeVisible();
+    await expect(page.getByTestId("message-row").filter({ hasText: "Nur heute" })).toHaveCount(0);
+    await page.getByTestId("sync-now").click();
+    await expect
+      .poll(async () => { const status = await admin.status("Junk", { messages: true }); return status ? status.messages : -1; }, { timeout: 20_000 })
+      .toBe(1);
+    await admin.logout();
   });
 
   await test.step("Abruf per Knopf", async () => {

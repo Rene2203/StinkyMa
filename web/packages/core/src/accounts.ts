@@ -18,6 +18,8 @@ export interface AccountSettings {
 export interface AddAccountOptions {
   /** Beispielkonten beim ersten echten Konto entfernen. */
   removeDemoAccounts: boolean;
+  /** Türsteher für dieses Konto gleich einschalten (Standard: aus). */
+  screener?: boolean;
 }
 
 export interface SyncStatus {
