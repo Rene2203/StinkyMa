@@ -1,5 +1,13 @@
 # Changelog
 
+## W5 – KI-Basis (in Arbeit)
+
+### Neu
+- **KI-Kern** (`@stinkyma/core`, plattformneutral): Anbieter-Schnittstelle, zentrale Freigabe-Prüfung (Mails verlassen
+  das Gerät nur mit Freigabe je Konto und Aufgabe, nie stilles Ausweichen), Übertragungsprotokoll, Eingabe-Bereinigung,
+  versionierte deutsche Prompts mit JSON-Schema, Prüfung der Antworten mit einem zweiten Versuch und Regel-Rückfall.
+- **Modellkatalog:** Gemma 4 E2B/E4B und Qwen 3.5 2B/4B (Q4, GGUF) mit Prüfsummen – Auswahl per Messlauf.
+
 ## W4 – Suche, sofortige Zustellung, Infobereich, Anhänge ansehen
 
 ### Neu

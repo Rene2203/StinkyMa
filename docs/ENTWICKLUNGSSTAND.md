@@ -3,9 +3,9 @@
 Laufendes Protokoll des Zwischenstands. Wird nach jedem größeren Arbeitsschritt aktualisiert –
 nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHANGELOG.md`.
 
-**Zuletzt aktualisiert:** 30.09.2026
+**Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W4 fertig (lokal geprüft) – Windows-CI und Test durch den Nutzer stehen aus; als Nächstes W5 (KI-Basis mit 3B-Modell)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1 (KI-Kern ohne Modell) fertig; als Nächstes W5.2 (lokale Laufzeit + Modell-Download), dann Messlauf Gemma 4 vs. Qwen 3.5
 
 ## Überblick
 
@@ -278,3 +278,15 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Textebene bleiben unauffindbar (Texterkennung/OCR später). **Ungeprüft:** Tempo der PDF-Auslese auf dem N97.
 - **Windows-CI Lauf #53 (W4 komplett) grün** – aktueller Installer (alle W4-Läufe #47, #49, #51, #53 grün).
   Test durch den Nutzer und Entscheidung zu W5 stehen aus.
+- **Entscheidung Nutzer (W5):** Gemma 4 (E2B/E4B, kann auch Bilder und Ton) **und** Qwen 3.5 (2B/4B) werden beide
+  eingebaut; ein Messlauf auf einem deutschen Testsatz entscheidet. Regel: Ist Gemma 4 E2B beim deutschen Text nicht
+  deutlich schlechter, wird es Standard (wegen Multimodalität). Größere Modelle bleiben optional.
+- **W5.1 – KI-Kern (ohne Modell):** `packages/core/src/ai/`: `AIProvider`, `AIRouter` mit Freigabe-Prüfung je Konto
+  und Aufgabe (On-Device immer erlaubt; Server/Cloud nur mit Freigabe; ein Konto ohne Freigabe blockiert die ganze
+  Anfrage; nie Ausweichen auf einen anderen Anbieter), `PrivacyGuard` (vorerst ohne Funktion) und Übertragungsprotokoll
+  nur für Server/Cloud. Eingaben bereinigen (Zitate, Signatur, Newsletter-Fußzeilen, Kürzen; bei langen Konversationen
+  Vorrang für die neuesten Mails). Versionierte deutsche Prompts mit JSON-Schema für Kategorie und Zusammenfassung;
+  Antwort prüfen, genau ein zweiter Versuch, dann Regeln (Kategorie) bzw. ehrlicher Fehler (Zusammenfassung).
+  Modellkatalog mit Download-Adressen, Größen und SHA-256 (Gemma 4 E2B/E4B, Qwen 3.5 2B/4B, je mit Bild-Baustein).
+  Tests: 22 neue Unit-Tests (Router-Pflichttests, Auswertung, Regeln, Vorbereitung, Aufgaben mit Test-Anbieter).
+  **Ungeprüft:** alles mit echtem Modell – kommt mit W5.2/W5.3.

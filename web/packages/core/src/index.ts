@@ -11,3 +11,4 @@ export * from "./compose.js";
 export * from "./files.js";
 export * from "./search.js";
 export * from "./appSettings.js";
+export * from "./ai/index.js";
