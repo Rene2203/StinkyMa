@@ -1,6 +1,6 @@
 import type { Message, MessageCategory } from "../models.js";
 import { mailForModel, threadForModel } from "./prepare.js";
-import { categories, categorizePrompt, categorizeSchema, documentTypes, readImagePrompt, readImageSchema, summarizePrompt, summarizePromptV2, summarizeSchema, summarizeSchemaV2, type DocumentType } from "./prompts.js";
+import { categories, categorizePrompt, categorizeSchema, documentTypes, readImagePrompt, readImageSchema, summarizePrompt, summarizePromptV2, summarizePromptV4, summarizeSchema, summarizeSchemaV2, summarizeSchemaV4, type DocumentType } from "./prompts.js";
 import type { AIRouter } from "./router.js";
 import type { AIImage, AIRequest, AIResponse, PrivacyClass } from "./types.js";
 
@@ -56,7 +56,14 @@ export function parseSummary(text: string, context: { lastFromUser?: boolean } =
     ? value.openPoints.filter((p): p is string => typeof p === "string" && p.trim() !== "").map((p) => p.trim()).slice(0, 4)
     : [];
   let waitingOn: ThreadSummary["waitingOn"];
-  if (typeof value.nutzerMussHandeln === "boolean" || typeof value.nutzerWartet === "boolean") {
+  const v4 = value as { letzteMailFragtOderBittet?: unknown; letzteMailKuendigtMeldungAn?: unknown };
+  if (typeof v4.letzteMailFragtOderBittet === "boolean" || typeof v4.letzteMailKuendigtMeldungAn === "boolean") {
+    // Frage/Bitte in der letzten Mail: dran ist, wer sie bekommen hat. Angekündigte Meldung: dran ist, wer sie geschrieben hat.
+    const fromUser = context.lastFromUser ?? false;
+    if (v4.letzteMailFragtOderBittet === true) waitingOn = fromUser ? "others" : "me";
+    else if (v4.letzteMailKuendigtMeldungAn === true) waitingOn = fromUser ? "me" : "others";
+    else waitingOn = "nobody";
+  } else if (typeof value.nutzerMussHandeln === "boolean" || typeof value.nutzerWartet === "boolean") {
     const mustAct = value.nutzerMussHandeln === true && !context.lastFromUser;
     waitingOn = mustAct ? "me" : value.nutzerWartet === true ? "others" : "nobody";
   } else {
@@ -120,7 +127,7 @@ export async function categorizeMessage(
 export async function summarizeThread(
   router: AIRouter,
   thread: Message[],
-  options: { ownAddresses: string[]; maxChars?: number; signal?: AbortSignal; /** nur für Vergleichsmessungen */ promptVersion?: 2 | 3 },
+  options: { ownAddresses: string[]; maxChars?: number; signal?: AbortSignal; /** nur für Vergleichsmessungen */ promptVersion?: 2 | 3 | 4 },
 ): Promise<ThreadSummary> {
   const own = new Set(options.ownAddresses.map((a) => a.toLowerCase()));
   const last = [...thread].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
@@ -130,8 +137,8 @@ export async function summarizeThread(
   const v2 = options.promptVersion === 2;
   const request: AIRequest = {
     task: "summarize",
-    messages: v2 ? summarizePromptV2(threadText, options.ownAddresses) : summarizePrompt(threadText + lastLine, options.ownAddresses),
-    jsonSchema: v2 ? summarizeSchemaV2 : summarizeSchema,
+    messages: v2 ? summarizePromptV2(threadText, options.ownAddresses) : options.promptVersion === 4 ? summarizePromptV4(threadText + lastLine, options.ownAddresses) : summarizePrompt(threadText + lastLine, options.ownAddresses),
+    jsonSchema: v2 ? summarizeSchemaV2 : options.promptVersion === 4 ? summarizeSchemaV4 : summarizeSchema,
     maxTokens: 400,
     temperature: 0.2,
   };

@@ -75,6 +75,8 @@ export interface SummaryOutcome {
   missingFacts: string[];
   forbiddenFound: string[];
   waitingOnCorrect: boolean;
+  /** erwartet → geliefert, für die Fehlerliste */
+  waitingOn?: string;
   durationMs: number;
 }
 
@@ -115,7 +117,7 @@ function median(values: number[]): number {
 
 export async function evaluateProvider(
   provider: AIProvider,
-  options: { mails?: EvalMail[]; threads?: EvalThread[]; loadMs?: number; signal?: AbortSignal; onProgress?: (progress: EvalProgress) => void; summaryPromptVersion?: 2 | 3 } = {},
+  options: { mails?: EvalMail[]; threads?: EvalThread[]; loadMs?: number; signal?: AbortSignal; onProgress?: (progress: EvalProgress) => void; summaryPromptVersion?: 2 | 3 | 4 } = {},
 ): Promise<EvalReport> {
   if (provider.privacyClass !== "onDevice") throw new Error("Der Messlauf ist nur für Modelle auf diesem Gerät gedacht.");
   const mails = options.mails ?? evalMails;
@@ -151,6 +153,7 @@ export async function evaluateProvider(
         missingFacts,
         forbiddenFound: (thread.forbidden ?? []).filter((word) => text.includes(normalizeFact(word))),
         waitingOnCorrect: result.waitingOn === thread.waitingOn,
+        waitingOn: `${result.waitingOn} statt ${thread.waitingOn}`,
         durationMs: result.durationMs,
       });
     } catch (error) {
@@ -231,7 +234,7 @@ export function formatEvalReports(reports: EvalReport[], context: { machine: str
     lines.push("", `**${r.displayName}** – Fehler:`);
     lines.push(`- Kategorie: ${wrong.length === 0 ? "keine" : wrong.map((o) => `${o.id} (${o.expected} → ${o.got}${o.fallback ? ", Regel" : ""})`).join(", ")}`);
     lines.push(
-      `- Zusammenfassung: ${missing.length === 0 ? "keine" : missing.map((o) => `${o.id}${o.ok ? "" : " ungültig"}${o.missingFacts.length ? ` fehlt: ${o.missingFacts.join(", ")}` : ""}${o.waitingOnCorrect ? "" : " / wer-ist-dran falsch"}${o.forbiddenFound.length ? ` / erfunden: ${o.forbiddenFound.join(", ")}` : ""}`).join("; ")}`,
+      `- Zusammenfassung: ${missing.length === 0 ? "keine" : missing.map((o) => `${o.id}${o.ok ? "" : " ungültig"}${o.missingFacts.length ? ` fehlt: ${o.missingFacts.join(", ")}` : ""}${o.waitingOnCorrect ? "" : ` / wer-ist-dran falsch${o.waitingOn ? ` (${o.waitingOn})` : ""}`}${o.forbiddenFound.length ? ` / erfunden: ${o.forbiddenFound.join(", ")}` : ""}`).join("; ")}`,
     );
   }
   return lines.join("\n");

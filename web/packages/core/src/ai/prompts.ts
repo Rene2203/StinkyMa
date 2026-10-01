@@ -84,6 +84,37 @@ Erfinde nichts.`,
   ];
 }
 
+// v4: Das Modell beurteilt nur noch die letzte Mail (Frage/Bitte/Frist? Meldung angekündigt?). Wer dann dran ist, folgt
+// im Code daraus, wer die letzte Mail geschrieben hat – das verwechseln kleine Modelle sonst.
+export const summarizeSchemaV4: JsonSchema = {
+  type: "object",
+  properties: {
+    summary: { type: "string", maxLength: 600 },
+    openPoints: { type: "array", items: { type: "string", maxLength: 160 }, maxItems: 4 },
+    letzteMailFragtOderBittet: { type: "boolean" },
+    letzteMailKuendigtMeldungAn: { type: "boolean" },
+  },
+  required: ["summary", "openPoints", "letzteMailFragtOderBittet", "letzteMailKuendigtMeldungAn"],
+  additionalProperties: false,
+};
+
+export function summarizePromptV4(thread: string, ownAddresses: string[]): AIMessage[] {
+  return [
+    {
+      role: "system",
+      content: `Du fasst E-Mail-Konversationen auf Deutsch zusammen. Antworte nur mit JSON:
+{"summary": "2 bis 4 kurze Sätze", "openPoints": ["was noch offen ist"], "letzteMailFragtOderBittet": true | false, "letzteMailKuendigtMeldungAn": true | false}
+Mails des Nutzers (${ownAddresses.join(", ") || "Empfänger"}) sind mit „(Nutzer)“ markiert.
+- "summary": Übernimm alle Beträge, Mengen, Daten, Uhrzeiten und Namen genau so, wie sie in den Mails stehen – auch bei Punkten, die schon erledigt sind.
+- "openPoints": offene Fragen, Bitten und Fristen – höchstens 4, sonst leer.
+- "letzteMailFragtOderBittet": Schau nur auf die LETZTE Mail. true, wenn sie eine Frage stellt, um etwas bittet, eine Frist setzt oder eine Entscheidung braucht. false bei Dank, Zusage, Bestätigung oder reiner Information.
+- "letzteMailKuendigtMeldungAn": Schau nur auf die LETZTE Mail. true, wenn der Absender ankündigt, sich bis zu einem Zeitpunkt zu melden oder etwas zu klären. Sonst false.
+Erfinde nichts.`,
+    },
+    { role: "user", content: thread },
+  ];
+}
+
 /** Fassung v2 – nur noch für Vergleichsmessungen (eval-models.ts --summary-v2). */
 export const summarizeSchemaV2: JsonSchema = {
   type: "object",
