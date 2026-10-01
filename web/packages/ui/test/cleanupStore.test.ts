@@ -20,6 +20,8 @@ function setup() {
       return { moved: ids.length };
     },
     check: async () => ({ queued: 3 }),
+    unsubscribeInfo: async (messageId) => ({ messageId, sender: "deals@shop.example", info: null, method: null, done: null, suspicious: false }),
+    unsubscribe: async () => ({ method: "oneClick" }),
   };
   const saved: RuleInput[] = [];
   const rules = {

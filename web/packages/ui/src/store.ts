@@ -5,6 +5,8 @@ import {
   type CleanupGroup,
   type CleanupGroupBy,
   type CleanupMail,
+  type UnsubscribeResult,
+  type UnsubscribeView,
   isFlagged,
   isRead,
   scopeKey,
@@ -130,6 +132,15 @@ export interface BrowserState {
   digest: { view: DigestView | null; busy: boolean; error: string | null } | null;
   /** Aufräumen (Dialog); null = geschlossen. */
   cleanup: CleanupState | null;
+  /** Abbestellen je Mail (geöffnete Mail, gewählte Gruppe beim Aufräumen) */
+  unsubscribes: Record<string, UnsubscribeState>;
+}
+
+export interface UnsubscribeState {
+  view: UnsubscribeView | null;
+  busy: boolean;
+  error: string | null;
+  result: UnsubscribeResult | null;
 }
 
 export interface CleanupState {
@@ -224,6 +235,7 @@ export const initialState: BrowserState = {
   categoryNote: null,
   learnedSenders: [],
   cleanup: null,
+  unsubscribes: {},
 };
 
 // --- Abgeleitete Werte ---
@@ -301,6 +313,47 @@ export class BrowserStore {
     this.#cleanup = options.cleanup;
   }
 
+  // --- Abbestellen ---
+
+  #setUnsubscribe(messageId: string, patch: Partial<UnsubscribeState>): void {
+    const current = this.#state.unsubscribes[messageId] ?? { view: null, busy: false, error: null, result: null };
+    this.#set({ unsubscribes: { ...this.#state.unsubscribes, [messageId]: { ...current, ...patch } } });
+  }
+
+  /** Bietet die Mail eine Abmeldung an? (holt die Angabe bei älteren Mails einmal vom Server) */
+  async loadUnsubscribe(messageId: string): Promise<void> {
+    const api = this.#cleanup;
+    if (!api || this.#state.unsubscribes[messageId]?.view) return;
+    try {
+      const view = await api.unsubscribeInfo(messageId);
+      this.#setUnsubscribe(messageId, { view });
+    } catch {
+      // Ohne Angabe gibt es eben keinen Knopf – kein Fehlerbanner
+    }
+  }
+
+  /** Abbestellen – nur auf Klick. Bei „web“ öffnet die Oberfläche die zurückgegebene Seite. */
+  async unsubscribe(messageId: string): Promise<UnsubscribeResult | null> {
+    const api = this.#cleanup;
+    if (!api) return null;
+    this.#setUnsubscribe(messageId, { busy: true, error: null });
+    try {
+      const result = await api.unsubscribe(messageId);
+      const view = await api.unsubscribeInfo(messageId);
+      this.#setUnsubscribe(messageId, { busy: false, result, view });
+      return result;
+    } catch (e) {
+      this.#setUnsubscribe(messageId, { busy: false, error: messageOf(e) });
+      return null;
+    }
+  }
+
+  /** Aufräumen direkt für einen Absender öffnen (z. B. nach dem Abbestellen). */
+  async openCleanupFor(address: string): Promise<void> {
+    await this.openCleanup();
+    await this.selectCleanupGroup(address.toLowerCase());
+  }
+
   // --- Aufräumen ---
 
   get canCleanup(): boolean {
@@ -361,6 +414,7 @@ export class BrowserStore {
       const now = this.#state.cleanup;
       if (!now?.group || now.group.key !== key) return;
       this.#set({ cleanup: { ...now, group: { key, mails, busy: false } } });
+      if (mails[0]) void this.loadUnsubscribe(mails[0].id);
     } catch (e) {
       const now = this.#state.cleanup;
       if (now?.group) this.#set({ cleanup: { ...now, group: { ...now.group, busy: false }, error: messageOf(e) } });
@@ -1234,6 +1288,7 @@ export class BrowserStore {
     if (this.#state.categoryNote && this.#state.categoryNote.messageId !== id) this.#set({ categoryNote: null });
     void this.#loadCachedSummary();
     void this.#loadActions(id);
+    void this.loadUnsubscribe(id);
     await this.#guard(async () => {
       const thread = await this.#repository.thread(message.threadId);
       const attachmentsByMessageId: Record<string, Attachment[]> = {};

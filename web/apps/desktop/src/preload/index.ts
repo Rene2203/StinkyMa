@@ -8,7 +8,7 @@ const accountMethods = ["addAccount", "addOAuthAccount", "reauthorize", "oauthPr
 const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
 const rulesMethods = ["list", "folders", "interpret", "preview", "save", "setEnabled", "remove"];
-const cleanupMethods = ["groups", "groupMails", "trash", "check"];
+const cleanupMethods = ["groups", "groupMails", "trash", "check", "unsubscribeInfo", "unsubscribe"];
 const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender"];
 
 const bridge = (channel: string, methods: string[]) =>

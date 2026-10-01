@@ -26,6 +26,7 @@ import type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus } from
 import type { ComposeDraft, OutgoingMail } from "../compose.js";
 import { buildMessage, sendRaw, smtpLoginFor, SmtpRejectedError, type SmtpLogin } from "./smtp.js";
 import { extractAttachment } from "./parse.js";
+import { headerValue } from "../unsubscribe.js";
 
 export type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus };
 export { accountsApiMethods } from "../accounts.js";
@@ -120,11 +121,15 @@ export class MailService implements MailRepository, AccountsApi {
    * (übersteht Neustart und Offline-Phasen) und wird im Hintergrund gesendet, danach in „Gesendet“ abgelegt.
    */
   async send(mail: OutgoingMail): Promise<void> {
+    await this.#send(mail, true);
+  }
+
+  async #send(mail: OutgoingMail, rememberRecipients: boolean): Promise<void> {
     const account = this.writer.account(mail.accountId);
     if (!account) throw new Error("Konto nicht gefunden.");
     if (mail.to.length + mail.cc.length + mail.bcc.length === 0) throw new Error("Bitte mindestens einen Empfänger angeben.");
     // Wem man schreibt, der gilt für den Türsteher als bekannt
-    this.repository.allowRecipients([...mail.to, ...mail.cc, ...mail.bcc].map((r) => r.address));
+    if (rememberRecipients) this.repository.allowRecipients([...mail.to, ...mail.cc, ...mail.bcc].map((r) => r.address));
     if (isDemoAccount(account)) {
       await this.repository.send(mail);
       this.options.onChange?.();
@@ -241,6 +246,32 @@ export class MailService implements MailRepository, AccountsApi {
         lock.release();
       }
     });
+  }
+
+  /**
+   * Abmelde-Angabe einer Mail vom Server holen (für Mails, die vor dieser Funktion geladen wurden). Nur die zwei
+   * Kopfzeilen, nicht die ganze Mail. `null`: Beispielmail, gerade verschoben oder nicht mehr auf dem Server.
+   */
+  async fetchListUnsubscribe(messageId: string): Promise<{ header: string | null; post: string | null } | null> {
+    const location = this.writer.messageLocation(messageId);
+    if (!location || location.uid === null || isDemoAccount({ id: location.accountId })) return null;
+    const uid = location.uid;
+    return this.#withAccount(location.accountId, async (client) => {
+      const lock = await client.getMailboxLock(this.#pathOf(location.accountId, location.mailboxId), { readOnly: true });
+      try {
+        const message = await client.fetchOne(String(uid), { headers: ["list-unsubscribe", "list-unsubscribe-post"] }, { uid: true });
+        if (!message) return null;
+        const headers = message.headers ? message.headers.toString("utf8") : "";
+        return { header: headerValue(headers, "List-Unsubscribe"), post: headerValue(headers, "List-Unsubscribe-Post") };
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  /** Abmelde-Mail senden (nur auf Klick). Anders als `send`: der Empfänger wird nicht als bekannter Kontakt gemerkt. */
+  async sendUnsubscribeMail(accountId: string, mailto: { address: string; subject: string; body: string }): Promise<void> {
+    await this.#send({ accountId, to: [{ address: mailto.address }], cc: [], bcc: [], subject: mailto.subject, bodyText: mailto.body }, false);
   }
 
   /** Wie viele Mails noch im Postausgang warten (ohne endgültig abgelehnte). */

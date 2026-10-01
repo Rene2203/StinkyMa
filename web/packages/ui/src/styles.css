@@ -2931,3 +2931,46 @@ button.ai-activity.idle {
     border-bottom: 1px solid var(--border);
   }
 }
+
+/* Abbestellen */
+.unsubscribe-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+.unsubscribe-bar > svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.unsubscribe-bar.warning > svg {
+  color: var(--danger);
+}
+.unsubscribe-bar .unsubscribe-text {
+  flex: 1;
+  min-width: 200px;
+}
+.unsubscribe-bar button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.unsubscribe-bar button.link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+}
+.unsubscribe-bar.done {
+  color: var(--fg-muted);
+}

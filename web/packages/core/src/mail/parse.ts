@@ -3,6 +3,7 @@ import { simpleParser, type AddressObject, type ParsedMail } from "mailparser";
 import type { EmailAddress } from "../models.js";
 import { makeSnippet } from "../mockData.js";
 import { isExtractable } from "./attachmentText.js";
+import { headerValue, parseListUnsubscribe, type UnsubscribeInfo } from "../unsubscribe.js";
 
 export interface ParsedAttachment {
   filename: string;
@@ -27,6 +28,8 @@ export interface ParsedMessage {
   bodyHtml: string | null;
   snippet: string;
   attachments: ParsedAttachment[];
+  /** Abmelde-Angabe (List-Unsubscribe), falls vorhanden */
+  listUnsubscribe: UnsubscribeInfo | null;
 }
 
 function addresses(value: AddressObject | AddressObject[] | undefined): EmailAddress[] {
@@ -87,6 +90,7 @@ export async function parseMessage(source: Buffer | string): Promise<ParsedMessa
     bodyText,
     bodyHtml,
     snippet: snippetFromText(bodyText ?? ""),
+    listUnsubscribe: listUnsubscribeOf(mail),
     attachments: mail.attachments.map((a) => {
       const filename = a.filename ?? "Anhang";
       const isInline = a.related || a.contentDisposition === "inline";
@@ -108,4 +112,9 @@ export async function extractAttachment(source: Buffer | string, index: number):
   const attachment = mail.attachments[index];
   if (!attachment) return null;
   return { filename: attachment.filename ?? "Anhang", mimeType: attachment.contentType, content: attachment.content };
+}
+
+function listUnsubscribeOf(mail: ParsedMail): UnsubscribeInfo | null {
+  const lines = (mail.headerLines ?? []).filter((h) => h.key === "list-unsubscribe" || h.key === "list-unsubscribe-post").map((h) => h.line).join("\n");
+  return lines ? parseListUnsubscribe(headerValue(lines, "List-Unsubscribe"), headerValue(lines, "List-Unsubscribe-Post")) : null;
 }

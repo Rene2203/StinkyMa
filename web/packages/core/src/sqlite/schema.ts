@@ -403,6 +403,18 @@ export const migrations: Migration[] = [
       ALTER TABLE account ADD COLUMN syncDays INTEGER;
     `,
   },
+  {
+    // Abmelde-Angabe der Mail (JSON; '' = keine; NULL = noch nicht gelesen) und wen der Nutzer abbestellt hat.
+    name: "v15-unsubscribe",
+    sql: `
+      ALTER TABLE message ADD COLUMN listUnsubscribe TEXT;
+      CREATE TABLE unsubscribed (
+        address TEXT PRIMARY KEY NOT NULL,
+        method TEXT NOT NULL,
+        requestedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

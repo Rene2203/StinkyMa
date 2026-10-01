@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import type { MessageKey } from "../i18n.js";
 import { cleanupSelected, type CleanupState } from "../store.js";
+import { UnsubscribeBar } from "./UnsubscribeBar.js";
 
 /** So viele Mails einer Gruppe werden angezeigt (ausgewählt und gelöscht werden trotzdem alle). */
 const shownMails = 300;
@@ -130,6 +131,7 @@ function GroupDetail({ cleanup }: { cleanup: CleanupState }) {
           {t("cleanup.summary", { count: mails.length, protected: protectedMails.length })}
         </span>
       </div>
+      {mails[0] && <UnsubscribeBar messageId={mails[0].id} showCleanup={false} />}
       {protectedMails.length > 0 && (
         <p className="hint small">
           <ShieldCheck size={13} aria-hidden="true" /> {t("cleanup.protectHint")}

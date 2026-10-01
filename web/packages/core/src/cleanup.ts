@@ -1,4 +1,5 @@
 import type { EmailAddress, MessageCategory } from "./models.js";
+import type { UnsubscribeResult, UnsubscribeView } from "./unsubscribe.js";
 
 // Aufräumen: Wo kommen viele Mails her (Absender oder Domain)? Alles davon in den Papierkorb – außer Mails, die man
 // behalten sollte (Rechnungen, Bestellungen, Tickets, Zugangsdaten …). Der Schutz kommt aus einfachen Regeln (läuft
@@ -74,9 +75,16 @@ export interface CleanupApi {
   trash(messageIds: string[]): Promise<{ moved: number }>;
   /** Noch nicht eingeordnete Mails einer Gruppe von der KI einordnen lassen (vorrangig). Gibt die Anzahl zurück. */
   check(key: string, groupBy: CleanupGroupBy, accountId: string | null): Promise<{ queued: number }>;
+  /** Bietet diese Mail eine Abmeldung an (holt die Angabe bei Bedarf vom Server)? */
+  unsubscribeInfo(messageId: string): Promise<UnsubscribeView>;
+  /**
+   * Abbestellen – nur auf Klick: Ein-Klick-Abmeldung beim Anbieter, sonst Abmelde-Mail, sonst gibt es die Webseite zurück
+   * (die Oberfläche öffnet sie im Browser).
+   */
+  unsubscribe(messageId: string): Promise<UnsubscribeResult>;
 }
 
-export const cleanupApiMethods = ["groups", "groupMails", "trash", "check"] as const satisfies readonly (keyof CleanupApi)[];
+export const cleanupApiMethods = ["groups", "groupMails", "trash", "check", "unsubscribeInfo", "unsubscribe"] as const satisfies readonly (keyof CleanupApi)[];
 
 // Zweistufige Domains, bei denen die registrierte Domain drei Teile hat („shop.co.uk“).
 const secondLevel = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "com.au", "net.au", "org.au", "co.at", "or.at", "gv.at", "ac.at", "com.br", "co.jp", "ne.jp", "or.jp", "co.nz", "co.za", "com.tr", "com.mx", "com.cn", "co.in", "co.kr"]);

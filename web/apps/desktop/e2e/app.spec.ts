@@ -148,6 +148,25 @@ test("Einordnung korrigieren: für den Absender gemerkt, andere Mails folgen", a
   await expect(rows().filter({ hasText: "Hi Anna, wir grillen am Samstag" }).locator(".chip")).toHaveText("Persönlich");
 });
 
+test("Newsletter abbestellen mit einem Klick, danach aufräumen", async () => {
+  await page.getByRole("searchbox").fill("");
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  await rows().filter({ hasText: "Vereinsnachrichten September" }).click();
+  const bar = page.getByTestId("unsubscribe-bar");
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText("ohne Browser");
+  await shot("29-Abbestellen");
+  await bar.getByTestId("unsubscribe").click();
+  const done = page.getByTestId("unsubscribe-done");
+  await expect(done).toContainText("Abbestellt am");
+  await done.getByTestId("unsubscribe-cleanup").click();
+  const dialog = page.getByTestId("cleanup-dialog");
+  await expect(dialog.getByTestId("cleanup-detail")).toContainText("news@tsv-musterstadt.example");
+  await expect(dialog.getByTestId("unsubscribe-done")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
 test("Aufräumen: größter Absender, Geschütztes bleibt abgewählt, Löschen erst nach Bestätigung", async () => {
   await page.getByTestId("open-cleanup").click();
   const dialog = page.getByTestId("cleanup-dialog");

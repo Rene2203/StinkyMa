@@ -13,6 +13,7 @@ import { SummaryCard } from "./SummaryCard.js";
 import { ActionsCard } from "./ActionsCard.js";
 import { PhishingBanner } from "./PhishingBanner.js";
 import { ScreenerBar } from "./ScreenerBar.js";
+import { UnsubscribeBar } from "./UnsubscribeBar.js";
 import { ReplyDraftsCard } from "./ReplyDraftsCard.js";
 
 export function MessageDetail() {
@@ -107,6 +108,7 @@ export function MessageDetail() {
               assessment={assessPhishing(message, { attachmentNames: (state.attachmentsByMessageId[message.id] ?? []).map((a) => a.filename) })}
             />
           )}
+          {!isDraft && <UnsubscribeBar messageId={message.id} />}
           {state.summary?.threadId === message.threadId && <SummaryCard summary={state.summary} />}
           {state.replies?.messageId === message.id && <ReplyDraftsCard replies={state.replies} />}
           {state.actions?.messageId === message.id && <ActionsCard view={state.actions} />}

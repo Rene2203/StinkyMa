@@ -161,6 +161,7 @@ async function syncMailbox(
           bodyHtml: parsed.bodyHtml,
           flags: flagsFromImap(msg.flags),
           attachments: parsed.attachments,
+          listUnsubscribe: parsed.listUnsubscribe ? JSON.stringify(parsed.listUnsubscribe) : "",
         });
         // Text aus PDF-/Text-Anhängen für die Suche – Fehler dabei halten den Abgleich nie auf.
         for (const [index, attachment] of parsed.attachments.entries()) {

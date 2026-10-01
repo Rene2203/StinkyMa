@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { groupKey, protectReason, type CleanupGroup, type CleanupGroupBy, type CleanupGroupsQuery, type CleanupMail } from "../cleanup.js";
 import { MessageFlag, type MessageCategory } from "../models.js";
+import type { UnsubscribeMethod } from "../unsubscribe.js";
 import { archiveDuplicate } from "./repository.js";
 
 type Row = Record<string, unknown>;
@@ -86,5 +87,32 @@ export class CleanupStore {
       .all({ k, accountId }) as Row[];
     // LIKE trifft auch fremde Domains mit gleicher Endung („shop.co.uk“ bei „co.uk“) – genau prüfen
     return rows.map(mailFromRow).filter((m) => groupKey(m.from.address, groupBy) === k).slice(0, limit);
+  }
+
+  /** Abmelde-Angabe einer Mail: `raw` null = noch nicht gelesen, '' = keine. */
+  unsubscribeSource(messageId: string): { accountId: string; sender: string; category: MessageCategory | null; raw: string | null } | null {
+    const row = this.db.prepare("SELECT accountId, fromAddress, category, listUnsubscribe FROM message WHERE id = ?").get(messageId) as Row | undefined;
+    if (!row) return null;
+    return {
+      accountId: String(row.accountId),
+      sender: String(row.fromAddress).toLowerCase(),
+      category: row.category ? (String(row.category) as MessageCategory) : null,
+      raw: row.listUnsubscribe === null || row.listUnsubscribe === undefined ? null : String(row.listUnsubscribe),
+    };
+  }
+
+  setListUnsubscribe(messageId: string, json: string): void {
+    this.db.prepare("UPDATE message SET listUnsubscribe = ? WHERE id = ?").run(json, messageId);
+  }
+
+  unsubscribed(address: string): { method: UnsubscribeMethod; at: string } | null {
+    const row = this.db.prepare("SELECT method, requestedAt FROM unsubscribed WHERE address = ?").get(address.toLowerCase()) as Row | undefined;
+    return row ? { method: String(row.method) as UnsubscribeMethod, at: String(row.requestedAt) } : null;
+  }
+
+  markUnsubscribed(address: string, method: UnsubscribeMethod, at: string): void {
+    this.db
+      .prepare("INSERT INTO unsubscribed (address, method, requestedAt) VALUES (?, ?, ?) ON CONFLICT(address) DO UPDATE SET method = excluded.method, requestedAt = excluded.requestedAt")
+      .run(address.toLowerCase(), method, at);
   }
 }

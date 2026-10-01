@@ -54,6 +54,8 @@ export interface NewMessage {
   bodyHtml: string | null;
   flags: number;
   category?: MessageCategory | null;
+  /** Abmelde-Angabe als JSON; '' = keine */
+  listUnsubscribe?: string | null;
   attachments: { filename: string; mimeType: string; size: number; contentId: string | null; isInline: boolean }[];
 }
 
@@ -161,13 +163,14 @@ export class MailWriter {
       const inserted = this.db
         .prepare(
           `INSERT OR IGNORE INTO message (id, accountId, mailboxId, uid, messageId, threadId, fromName, fromAddress, "to", cc,
-             subject, date, snippet, bodyText, bodyHTML, flags, hasAttachments, category)
+             subject, date, snippet, bodyText, bodyHTML, flags, hasAttachments, category, listUnsubscribe)
            VALUES (@id, @accountId, @mailboxId, @uid, @messageId, @threadId, @fromName, @fromAddress, @to, @cc,
-             @subject, @date, @snippet, @bodyText, @bodyHtml, @flags, @hasAttachments, @category)`,
+             @subject, @date, @snippet, @bodyText, @bodyHtml, @flags, @hasAttachments, @category, @listUnsubscribe)`,
         )
         .run({
           ...m,
           category: m.category ?? null,
+          listUnsubscribe: m.listUnsubscribe ?? null,
           fromName: m.from.name ?? null,
           fromAddress: m.from.address,
           to: JSON.stringify(m.to),

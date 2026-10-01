@@ -3,8 +3,8 @@ import { ImapFlow } from "imapflow";
 import { waitForGreenMail } from "./greenmail.js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createMockData, InMemorySecretStore, isDemoAccount, isRead, SecretKeys } from "../src/index.js";
-import { connectImap, extractAttachment, loginFor, MailService, parseMessage, syncAccount, type AccountSettings } from "../src/mail/index.js";
-import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
+import { CleanupService, connectImap, extractAttachment, loginFor, MailService, parseMessage, syncAccount, type AccountSettings } from "../src/mail/index.js";
+import { CleanupStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
 import { minimalPdf, sampleReply } from "./fixtures.js";
 
 // Läuft gegen einen lokalen GreenMail-Testserver (nie gegen echte Konten):
@@ -522,6 +522,33 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     // Nächster Abgleich: keine Dubletten
     await service.syncAccountNow(account.id);
     expect(await service.messages({ kind: "mailbox", mailboxId: `${account.id}/Papierkorb` }, 100)).toHaveLength(3);
+  });
+
+  it("Abbestellen: Angabe beim Abgleich gelesen, bei alten Mails vom Server geholt; Abmelde-Mail kommt an", async () => {
+    const leave = `leave-${randomUUID().slice(0, 8)}@example.test`;
+    const raw = rfc822({ from: "Shop <news@shop.example>", subject: "Herbst-Angebote", date: daysAgo(1), messageId: "<herbst@shop.example>", body: "Alles reduziert." })
+      .replace("Content-Type:", `List-Unsubscribe: <mailto:${leave}?subject=Abmelden>,\r\n <https://shop.example/u?id=7>\r\nContent-Type:`);
+    await admin.append("INBOX", raw, [], daysAgo(1));
+    const account = await addAndSync();
+    const mail = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Herbst-Angebote")!;
+    const stored = () => (db.prepare("SELECT listUnsubscribe FROM message WHERE id = ?").get(mail.id) as { listUnsubscribe: string | null }).listUnsubscribe;
+    expect(stored()).toContain(leave);
+    expect(JSON.parse(stored()!)).toMatchObject({ oneClickUrl: null, url: "https://shop.example/u?id=7" }); // ohne Post-Kopfzeile kein Ein-Klick
+
+    // Wie eine Mail von vor dieser Funktion: Angabe fehlt und wird vom Server geholt
+    db.prepare("UPDATE message SET listUnsubscribe = NULL WHERE id = ?").run(mail.id);
+    const cleanup = new CleanupService(new CleanupStore(db), service);
+    const view = await cleanup.unsubscribeInfo(mail.id);
+    expect(view.method).toBe("mail");
+    expect(view.info?.mailto).toEqual({ address: leave, subject: "Abmelden", body: "unsubscribe" });
+
+    expect(await cleanup.unsubscribe(mail.id)).toEqual({ method: "mail" });
+    await service.flushNow(account.id);
+    expect(await receivedBy(leave, "Abmelden")).not.toBeNull();
+    expect((await cleanup.unsubscribeInfo(mail.id)).done?.method).toBe("mail");
+    // Ohne Angabe: kein Abbestellen
+    const other = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Angebot?")!;
+    expect((await cleanup.unsubscribeInfo(other.id)).info).toBeNull();
   });
 
   it("Anhang-Text: PDF wird beim Abgleich gelesen und ist durchsuchbar", async () => {

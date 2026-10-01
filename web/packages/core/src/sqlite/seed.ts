@@ -22,9 +22,9 @@ export function seedIfEmpty(db: Database.Database, data: MockDataSet): boolean {
   );
   const insertMessage = db.prepare(
     `INSERT INTO message (id, accountId, mailboxId, uid, messageId, threadId, fromName, fromAddress, "to", cc, subject, date,
-       snippet, bodyText, bodyHTML, flags, hasAttachments, category, priorityScore, snoozedUntil)
+       snippet, bodyText, bodyHTML, flags, hasAttachments, category, priorityScore, snoozedUntil, listUnsubscribe)
      VALUES (@id, @accountId, @mailboxId, @uid, @messageId, @threadId, @fromName, @fromAddress, @to, @cc, @subject, @date,
-       @snippet, @bodyText, @bodyHtml, @flags, @hasAttachments, @category, @priorityScore, @snoozedUntil)`,
+       @snippet, @bodyText, @bodyHtml, @flags, @hasAttachments, @category, @priorityScore, @snoozedUntil, @listUnsubscribe)`,
   );
   const insertAttachment = db.prepare(
     `INSERT INTO attachment (id, messageId, filename, mimeType, size, localPath, sha256, isInline, contentId, pageCount,
@@ -47,6 +47,7 @@ export function seedIfEmpty(db: Database.Database, data: MockDataSet): boolean {
         ...m,
         fromName: m.from.name ?? null, fromAddress: m.from.address,
         to: JSON.stringify(m.to), cc: JSON.stringify(m.cc), hasAttachments: m.hasAttachments ? 1 : 0,
+        listUnsubscribe: demoListUnsubscribe(m.category ?? null, m.from.address),
       });
     }
     for (const a of data.attachments) {
@@ -58,4 +59,12 @@ export function seedIfEmpty(db: Database.Database, data: MockDataSet): boolean {
     }
   })();
   return true;
+}
+
+/** Beispiel-Newsletter bieten eine Ein-Klick-Abmeldung an (wird bei Beispielkonten nur vermerkt, nie gesendet). */
+function demoListUnsubscribe(category: string | null, address: string): string {
+  if (category !== "newsletter") return "";
+  const domain = address.split("@")[1] ?? "newsletter.example";
+  const url = `https://${domain}/abmelden`;
+  return JSON.stringify({ oneClickUrl: url, url, mailto: { address: `abmelden@${domain}`, subject: "unsubscribe", body: "unsubscribe" } });
 }
