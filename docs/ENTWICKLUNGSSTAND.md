@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft – **W6 abgeschlossen**. Als Nächstes: Feinabstimmung der Modelle (Wunsch des Nutzers)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft und vom Nutzer unter Windows mit echtem Gmail-Konto getestet – **W6 abgeschlossen**. Als Nächstes: Feinabstimmung der Modelle (Wunsch des Nutzers)
 
 ## Überblick
 
@@ -468,3 +468,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   **Grenzen:** Die Regeln erkennen Wochentage („am Dienstag um 9:30“) noch nicht – solche Termine erscheinen erst, wenn die
   Mail geöffnet und vom Modell gelesen wurde. Die Benachrichtigung selbst (Uhrzeit-Auslösung unter Windows) ist ungeprüft.
 
+- **Nutzer-Test (01.10.2026, Windows-Installer):** Gmail-Konto mit **App-Passwort** (IMAP/SMTP) eingerichtet – funktioniert.
+  Zusammenfassungen laut Nutzer „sehr gut“, die übrigen Funktionen (W5/W6) ebenfalls ohne Beanstandung. Damit erstmals
+  mit einem **echten Konto** geprüft (Gmail per App-Passwort). Weiter ungeprüft: OAuth Google/Microsoft mit echten
+  Konten, Uhrzeit-Benachrichtigung des Tagesüberblicks. Nächster Schritt: Feinabstimmung der Modelle.
