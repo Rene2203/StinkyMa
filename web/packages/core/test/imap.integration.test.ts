@@ -484,6 +484,46 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     expect(notified).toEqual([]);
   });
 
+  it("Zeitraum: länger holt ältere Mails ohne Benachrichtigung, kürzer entfernt sie nur lokal", async () => {
+    const notified: string[] = [];
+    service.dispose();
+    service = new MailService(repository, new MailWriter(db), secrets, { now: () => now, onNewMail: (_a, messages) => notified.push(...messages.map((m) => m.subject)) });
+    const account = await addAndSync();
+    expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Uralt")).toBe(false);
+
+    await service.setSyncDays(account.id, 365);
+    await service.syncNow();
+    expect((await service.accounts())[0]?.syncDays).toBe(365);
+    expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Uralt")).toBe(true);
+    expect(notified).toEqual([]); // nachgeladene alte Mail ist keine „neue“ Mail
+
+    await service.setSyncDays(account.id, 30);
+    expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Uralt")).toBe(false);
+    const status = await admin.status("INBOX", { messages: true });
+    expect(status && status.messages).toBe(4); // auf dem Server unverändert
+
+    await service.setSyncDays(account.id, 0); // alle
+    await service.syncNow();
+    expect((await service.messages({ kind: "unifiedInbox" }, 100))).toHaveLength(4);
+  });
+
+  it("Viele Mails verschieben: ein MOVE für alle, lokal mit neuer UID umgehängt", async () => {
+    const account = await addAndSync();
+    const inbox = await service.messages({ kind: "unifiedInbox" }, 100);
+    expect(inbox).toHaveLength(3);
+    await service.move(inbox.map((m) => m.id), "trash");
+    await service.flushNow(account.id);
+    expect(service.pendingChanges()).toBe(0);
+    expect(((await admin.status("Papierkorb", { messages: true })) || { messages: -1 }).messages).toBe(3);
+    expect(((await admin.status("INBOX", { messages: true })) || { messages: -1 }).messages).toBe(1); // nur „Uralt“ (außerhalb des Zeitraums)
+    const trash = await service.messages({ kind: "mailbox", mailboxId: `${account.id}/Papierkorb` }, 100);
+    expect(trash.map((m) => m.subject).sort()).toEqual(["Angebot?", "Grüße aus München", "Wochenangebote"]);
+    expect(trash.every((m) => typeof m.uid === "number")).toBe(true);
+    // Nächster Abgleich: keine Dubletten
+    await service.syncAccountNow(account.id);
+    expect(await service.messages({ kind: "mailbox", mailboxId: `${account.id}/Papierkorb` }, 100)).toHaveLength(3);
+  });
+
   it("Anhang-Text: PDF wird beim Abgleich gelesen und ist durchsuchbar", async () => {
     const boundary = "pdf42";
     await admin.append(

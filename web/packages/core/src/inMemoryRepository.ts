@@ -79,6 +79,11 @@ export class InMemoryMailRepository implements MailRepository {
     return { accounts, mailboxesByAccount, counts, outbox: [] };
   }
 
+  async setSyncDays(accountId: string, days: number | null): Promise<void> {
+    const account = this.#data.accounts.find((a) => a.id === accountId);
+    if (account) account.syncDays = days;
+  }
+
   async setScreener(accountId: string, enabled: boolean): Promise<void> {
     const account = this.#data.accounts.find((a) => a.id === accountId);
     if (!account) return;

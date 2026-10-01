@@ -1,5 +1,5 @@
-import { AppWindow, ImageDown, KeyRound, PenLine, Plus, UserCheck, X } from "lucide-react";
-import { normalizeRemoteContentException } from "@stinkyma/core";
+import { AppWindow, CalendarRange, ImageDown, KeyRound, PenLine, Plus, UserCheck, X } from "lucide-react";
+import { defaultSyncDays, isDemoAccount, normalizeRemoteContentException, syncDayChoices } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 
 // Der Signatur-Editor braucht den großen Editor-Baustein – erst laden, wenn die Optionen offen sind.
@@ -120,6 +120,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
         {state.appSettings && <AppSettingsSection />}
 
         {state.appSettings && <OAuthSection />}
+
+        <SyncRangeSection />
 
         <ScreenerSection />
 
@@ -284,6 +286,38 @@ function ScreenerSection() {
           <span>{t("screener.account", { account: account.displayName || account.email })}</span>
         </label>
       ))}
+    </section>
+  );
+}
+
+/** Zeitraum je Konto: 30 Tage, 3 Monate, 1 Jahr, alle. */
+function SyncRangeSection() {
+  const { store, t } = useUi();
+  const state = useBrowserState();
+  const accounts = Object.values(state.accountsById).filter((a) => !isDemoAccount(a)).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (accounts.length === 0 || !store.canManageAccounts) return null;
+  const label = (days: number) => (days === 0 ? t("syncRange.all") : t(`syncRange.days${days}` as "syncRange.days30"));
+  return (
+    <section className="options-section" aria-labelledby="options-sync-range-heading">
+      <h3 id="options-sync-range-heading">
+        <CalendarRange size={16} aria-hidden="true" /> {t("syncRange.title")}
+      </h3>
+      <p className="hint">{t("syncRange.text")}</p>
+      {accounts.map((account) => (
+        <label key={account.id} className="sync-range-row">
+          <span>{account.displayName || account.email}</span>
+          <select
+            value={account.syncDays ?? defaultSyncDays}
+            data-testid={`sync-range-${account.id}`}
+            onChange={(e) => void store.setSyncDays(account.id, Number(e.target.value))}
+          >
+            {syncDayChoices.map((days) => (
+              <option key={days} value={days}>{label(days)}</option>
+            ))}
+          </select>
+        </label>
+      ))}
+      {accounts.some((a) => a.syncDays === 0) && <p className="hint">{t("syncRange.allHint")}</p>}
     </section>
   );
 }

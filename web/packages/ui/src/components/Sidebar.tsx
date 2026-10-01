@@ -144,6 +144,8 @@ export function Sidebar() {
           <span className="muted small" data-testid="sync-status">
             {!store.canManageAccounts
               ? ""
+              : state.syncProgress
+                ? t("sync.progress", { done: state.syncProgress.done.toLocaleString(locale === "de" ? "de-DE" : "en-GB"), total: state.syncProgress.total.toLocaleString(locale === "de" ? "de-DE" : "en-GB") })
               : state.syncing
                 ? t("sync.running")
                 : state.lastSyncAt

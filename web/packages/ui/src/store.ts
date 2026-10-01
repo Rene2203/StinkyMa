@@ -82,6 +82,12 @@ export interface BrowserState {
   syncing: boolean;
   /** Zeitpunkt des letzten abgeschlossenen Abgleichs (ISO-8601). */
   lastSyncAt: string | null;
+  /** Fortschritt beim Laden vieler Mails (z. B. nach längerem Zeitraum); sonst null. */
+  syncProgress: { accountId: string; mailbox: string; done: number; total: number } | null;
+  /** Wie viele Mails die Liste zeigt (wächst mit „Ältere Mails anzeigen“); 0 = eine Seite. */
+  messageLimit: number;
+  /** Gibt es im Bereich mehr Mails, als die Liste zeigt? */
+  hasMoreMessages: boolean;
   /** Absender (Adressen/Domains), deren externe Inhalte sofort geladen werden. */
   remoteContentExceptions: string[];
   /** Offener Optionen-Dialog, ggf. mit vorgeschlagener Ausnahme (z. B. Domain der geöffneten Mail). */
@@ -170,6 +176,9 @@ export const initialState: BrowserState = {
   error: null,
   syncing: false,
   lastSyncAt: null,
+  syncProgress: null,
+  messageLimit: 0,
+  hasMoreMessages: false,
   remoteContentExceptions: [],
   options: null,
   compose: null,
@@ -551,6 +560,18 @@ export class BrowserStore {
   }
 
   // --- Türsteher ---
+
+  /** Liste um eine Seite ältere Mails verlängern. */
+  async loadMoreMessages(): Promise<void> {
+    this.#set({ messageLimit: Math.max(this.#state.messageLimit, this.pageSize) + this.pageSize });
+    await this.loadMessages();
+  }
+
+  /** Zeitraum eines Kontos (Tage; null = Standard, 0 = alle). Längerer Zeitraum lädt sofort im Hintergrund nach. */
+  async setSyncDays(accountId: string, days: number | null): Promise<void> {
+    await this.#guard(() => this.#repository.setSyncDays(accountId, days));
+    await Promise.all([this.loadSidebar(), this.loadMessages(), this.#loadSyncStatus()]);
+  }
 
   async setScreener(accountId: string, enabled: boolean): Promise<void> {
     await this.#guard(() => this.#repository.setScreener(accountId, enabled));
@@ -947,7 +968,7 @@ export class BrowserStore {
     if (!this.#accounts) return;
     await this.#guard(async () => {
       const status = await this.#accounts!.syncStatus();
-      this.#set({ syncing: status.running, lastSyncAt: status.lastRunAt });
+      this.#set({ syncing: status.running, lastSyncAt: status.lastRunAt, syncProgress: status.progress ?? null });
     });
   }
 
@@ -982,8 +1003,10 @@ export class BrowserStore {
     const request = ++this.#messagesRequest;
     const scope = this.#state.selectedScope;
     await this.#guard(async () => {
-      let messages = await this.#repository.messages(scope, this.pageSize);
+      const limit = Math.max(this.#state.messageLimit, this.pageSize);
+      let messages = await this.#repository.messages(scope, limit);
       if (request !== this.#messagesRequest) return; // überholt
+      const hasMoreMessages = messages.length >= limit;
       const selected = this.#state.selectedMessageId;
       // In „Ungelesen“/„Markiert“ bleibt die geöffnete Mail stehen, auch wenn sie nicht mehr dazugehört
       // (gerade gelesen) – sonst verschwindet sie beim Öffnen. Sie geht erst beim Wechsel der Auswahl.
@@ -993,7 +1016,7 @@ export class BrowserStore {
       }
       // Auswahl bleibt, solange die Mail noch in der Liste oder in den Suchergebnissen steht.
       const keepSelection = selected !== null && (messages.some((m) => m.id === selected) || Boolean(this.#state.searchResults?.some((m) => m.id === selected)));
-      this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null }) });
+      this.#set({ messages, hasMoreMessages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null }) });
     });
   }
 
@@ -1002,7 +1025,7 @@ export class BrowserStore {
     // Ordnerwechsel beendet eine Suche in allen Ordnern; „nur in diesem Ordner“ sucht im neuen Ordner weiter.
     const keepSearch = isSearching(this.#state) && !this.#state.searchAllFolders;
     this.#set({
-      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null,
+      selectedScope: scope, messageLimit: 0, hasMoreMessages: false, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null,
       ...(keepSearch ? {} : { searchText: "", searchResults: null }),
     });
     await Promise.all([this.loadMessages(), keepSearch ? this.runSearch() : Promise.resolve()]);

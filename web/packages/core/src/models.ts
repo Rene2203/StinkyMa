@@ -37,6 +37,19 @@ export interface Account {
   syncError?: string | null;
   /** Signatur (HTML-Fragment aus dem Editor), wird unter neue Mails und Antworten gesetzt. */
   signatureHtml?: string | null;
+  /** Wie weit zurück Mails geladen werden, in Tagen. `null` = Standard (30), `0` = alle. */
+  syncDays?: number | null;
+}
+
+/** Zeitraum für den Abgleich, wenn nichts eingestellt ist (Spezifikation 4.2: zuerst die neuesten 30 Tage). */
+export const defaultSyncDays = 30;
+/** Auswahl in den Optionen: 30 Tage, 3 Monate, 1 Jahr, alle (0). */
+export const syncDayChoices = [30, 90, 365, 0] as const;
+
+/** Ab wann Mails dieses Kontos geladen werden. `0` = alle (ab 1970). */
+export function syncSince(account: Pick<Account, "syncDays">, now: Date): Date {
+  const days = account.syncDays ?? defaultSyncDays;
+  return days === 0 ? new Date(0) : new Date(now.getTime() - days * 86_400_000);
 }
 
 /** Beispielkonten (Mock-Daten) erkennt man an diesem Präfix. */

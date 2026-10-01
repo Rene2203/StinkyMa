@@ -396,6 +396,13 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // Zeitraum für den Abgleich je Konto in Tagen: NULL = Standard (30), 0 = alle Mails.
+    name: "v14-account-sync-days",
+    sql: `
+      ALTER TABLE account ADD COLUMN syncDays INTEGER;
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

@@ -23,6 +23,27 @@ describe("BrowserStore", () => {
     expect(sidebarItem(store.getState(), { kind: "unifiedInbox" })?.unreadCount).toBeGreaterThan(0);
   });
 
+  it("Ältere Mails anzeigen: Liste wächst seitenweise, Ordnerwechsel fängt wieder vorn an", async () => {
+    const small = new BrowserStore(repo, { pageSize: 5 });
+    await small.start();
+    expect(small.getState().messages).toHaveLength(5);
+    expect(small.getState().hasMoreMessages).toBe(true);
+    await small.loadMoreMessages();
+    expect(small.getState().messages.length).toBeGreaterThan(5);
+    expect(small.getState().messages.length).toBeLessThanOrEqual(10);
+    while (small.getState().hasMoreMessages) await small.loadMoreMessages();
+    const all = small.getState().messages.length;
+    expect(all).toBe((await repo.messages({ kind: "unifiedInbox" }, 1000)).length);
+    await small.selectScope({ kind: "unread" });
+    await small.selectScope({ kind: "unifiedInbox" });
+    expect(small.getState().messages).toHaveLength(5);
+  });
+
+  it("Zeitraum je Konto wird gespeichert", async () => {
+    await store.setSyncDays(MockIds.gmail, 0);
+    expect(store.getState().accountsById[MockIds.gmail]?.syncDays).toBe(0);
+  });
+
   it("startet mit dem gemeinsamen Posteingang", () => {
     const state = store.getState();
     expect(state.selectedScope.kind).toBe("unifiedInbox");

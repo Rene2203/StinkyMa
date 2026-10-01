@@ -14,6 +14,13 @@ export interface SyncOptions {
   batchSize?: number;
   /** Nach jedem Ordner – damit die Oberfläche neue Mails sofort zeigt, nicht erst am Ende. */
   onMailboxSynced?: (counts: MailboxCounts) => void;
+  /**
+   * Nur Mails ab diesem Datum zählen als „neu angekommen“ (Benachrichtigung, Regeln). Sonst würde das Nachladen älterer
+   * Mails (längerer Zeitraum) tausende Benachrichtigungen auslösen.
+   */
+  arrivedSince?: Date;
+  /** Fortschritt beim Holen neuer Mails (nach jedem Paket): wie viele geholt, wie viele insgesamt fehlen noch. */
+  onProgress?: (progress: { mailbox: string; done: number; total: number }) => void;
   /** Nur Ordner mit diesen Rollen abgleichen (z. B. nur den Posteingang, wenn der Server neue Mails meldet). */
   roles?: MailboxRole[];
 }
@@ -162,11 +169,14 @@ async function syncMailbox(
           if (extracted) writer.setAttachmentText(`${id}/a${index}`, extracted.text, extracted.source);
         }
         added += 1;
-        newIds.push(id);
-        if ((flagsFromImap(msg.flags) & MessageFlag.seen) === 0) newUnread.push(id);
+        if (!options.arrivedSince || date >= options.arrivedSince.toISOString()) {
+          newIds.push(id);
+          if ((flagsFromImap(msg.flags) & MessageFlag.seen) === 0) newUnread.push(id);
+        }
         // Dem Main-Prozess Luft lassen: Oberfläche und Aktionen bleiben während des Abgleichs bedienbar.
         await new Promise((resolve) => setImmediate(resolve));
       }
+      options.onProgress?.({ mailbox: folder.mailbox.name, done: Math.min(i + batchSize, missing.length), total: missing.length });
     }
 
     // 2. Flags bekannter Mails auffrischen (in W4 effizienter über CONDSTORE/QRESYNC)

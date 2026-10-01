@@ -94,6 +94,11 @@ export function MessageList() {
               onContextMenu={(e) => openMenu(e, message)}
             />
           ))}
+          {state.hasMoreMessages && !state.searchResults && (
+            <li className="rows-more">
+              <button type="button" data-testid="list-more" onClick={() => void store.loadMoreMessages()}>{t("list.more")}</button>
+            </li>
+          )}
         </ul>
       )}
       {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}

@@ -12,6 +12,7 @@ import {
   type Message,
   type MessageFlagName,
   type MessageScope,
+  syncSince,
 } from "../models.js";
 import type { MailOverview, MailRepository } from "../repository.js";
 import { SecretKeys, type SecretStore } from "../secrets.js";
@@ -32,7 +33,7 @@ export { accountsApiMethods } from "../accounts.js";
 const accountColors: AccountColor[] = ["blue", "green", "orange", "purple", "pink", "teal", "red", "yellow"];
 
 export interface MailServiceOptions {
-  /** Zeitraum für den Abgleich in Tagen (Standard 30). */
+  /** Zeitraum für den Abgleich in Tagen, wenn am Konto nichts eingestellt ist (Standard 30). */
   syncDays?: number;
   /** Wird nach jeder Änderung aufgerufen (neue Mails, Flags, Konten) – z. B. um die Oberfläche neu zu laden. */
   onChange?: () => void;
@@ -79,6 +80,8 @@ const maxActionAttempts = 5;
 export class MailService implements MailRepository, AccountsApi {
   #running: Promise<void> | null = null;
   #lastRunAt: string | null = null;
+  #progress: SyncStatus["progress"] = null;
+  #progressNotifiedAt = 0;
   readonly #accountLocks = new Map<string, Promise<unknown>>();
   readonly #clients = new Map<string, ImapFlow>();
   readonly #idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -270,6 +273,20 @@ export class MailService implements MailRepository, AccountsApi {
     for (const accountId of accounts) this.#scheduleFlush(accountId);
   }
 
+  // --- Zeitraum ---
+
+  /** Zeitraum ändern. Kürzer: ältere Mails lokal entfernen (Server unberührt). Länger: gleich nachladen. */
+  async setSyncDays(accountId: string, days: number | null): Promise<void> {
+    const account = this.writer.account(accountId);
+    if (!account) return;
+    const before = syncSince({ syncDays: account.syncDays ?? this.options.syncDays ?? null }, this.#now());
+    await this.repository.setSyncDays(accountId, days);
+    const after = syncSince({ syncDays: days ?? this.options.syncDays ?? null }, this.#now());
+    if (after > before) this.writer.pruneOlderThan(accountId, after.toISOString());
+    this.options.onChange?.();
+    if (after < before && !isDemoAccount(account)) void this.syncNow();
+  }
+
   // --- Türsteher (W6.3) ---
 
   async setScreener(accountId: string, enabled: boolean): Promise<void> {
@@ -459,7 +476,7 @@ export class MailService implements MailRepository, AccountsApi {
   // --- Abgleich ---
 
   async syncStatus(): Promise<SyncStatus> {
-    return { running: this.#running !== null, lastRunAt: this.#lastRunAt };
+    return { running: this.#running !== null, lastRunAt: this.#lastRunAt, progress: this.#progress };
   }
 
   /** Gleicht alle echten Konten ab. Läuft schon ein Abgleich, wird auf ihn gewartet statt doppelt zu starten. */
@@ -477,7 +494,7 @@ export class MailService implements MailRepository, AccountsApi {
     const account = this.writer.account(accountId);
     if (!account) throw new Error("Konto nicht gefunden");
     const firstSync = !account.lastSyncAt;
-    const since = new Date(this.#now().getTime() - (this.options.syncDays ?? 30) * 86_400_000);
+    const since = syncSince({ syncDays: account.syncDays ?? this.options.syncDays ?? null }, this.#now());
     try {
       const result = await this.#withAccount(accountId, async (client) => {
         await this.#flushOutbox(client, accountId);
@@ -489,9 +506,21 @@ export class MailService implements MailRepository, AccountsApi {
         }
         return syncAccount(client, this.writer, account, {
           since,
+          ...(account.lastSyncAt ? { arrivedSince: new Date(new Date(account.lastSyncAt).getTime() - 86_400_000) } : {}),
           ...(options.roles ? { roles: options.roles } : {}),
           onMailboxSynced: (counts) => {
+            this.#progress = null;
             if (counts.added + counts.removed + counts.flagsChanged > 0) this.options.onChange?.();
+          },
+          onProgress: ({ mailbox, done, total }) => {
+            // Nur bei vielen Mails anzeigen; die Oberfläche höchstens alle 2 Sekunden auffrischen
+            if (total < 100) return;
+            this.#progress = done >= total ? null : { accountId, mailbox, done, total };
+            const now = Date.now();
+            if (now - this.#progressNotifiedAt >= 2000 || !this.#progress) {
+              this.#progressNotifiedAt = now;
+              this.options.onChange?.();
+            }
           },
         });
       });
@@ -513,6 +542,7 @@ export class MailService implements MailRepository, AccountsApi {
       }
       return result;
     } catch (error) {
+      this.#progress = null;
       this.writer.setSyncStatus(accountId, {
         syncError: error instanceof MailConnectionError ? error.message : describeConnectionError(error),
       });
@@ -663,7 +693,23 @@ export class MailService implements MailRepository, AccountsApi {
 
   async #flush(client: ImapFlow, accountId: string): Promise<void> {
     let changed = false;
-    for (const action of this.writer.pendingActions(accountId)) {
+    const actions = this.writer.pendingActions(accountId);
+    for (let i = 0; i < actions.length; i++) {
+      // Viele Verschiebungen zwischen denselben Ordnern (z. B. Aufräumen) als ein MOVE-Befehl – statt einer pro Mail
+      const batch = movesBatch(actions, i);
+      if (batch.length > 1) {
+        try {
+          await this.#applyMoves(client, accountId, batch);
+          for (const action of batch) this.writer.completeAction(action.id);
+          changed = true;
+          i += batch.length - 1;
+          continue;
+        } catch (error) {
+          if (!client.usable || error instanceof MailConnectionError) throw error;
+          // Server lehnt das Paket ab: einzeln versuchen (unten)
+        }
+      }
+      const action = actions[i]!;
       try {
         await this.#apply(client, accountId, action);
         this.writer.completeAction(action.id);
@@ -839,6 +885,33 @@ export class MailService implements MailRepository, AccountsApi {
     }
   }
 
+  /** Mehrere Mails mit bekannter UID von einem Ordner in einen anderen – ein MOVE, danach lokal umhängen. */
+  async #applyMoves(client: ImapFlow, accountId: string, batch: PendingAction[]): Promise<void> {
+    const first = batch[0]!.payload as { fromMailboxId: string; toMailboxId: string };
+    const uids = batch.map((a) => Number((a.payload as { uid: number }).uid));
+    const lock = await client.getMailboxLock(this.#pathOf(accountId, first.fromMailboxId));
+    let result: Awaited<ReturnType<ImapFlow["messageMove"]>>;
+    try {
+      result = await client.messageMove(uids.join(","), this.#pathOf(accountId, first.toMailboxId), { uid: true });
+    } finally {
+      lock.release();
+    }
+    const validity = this.writer.mailboxes(accountId).find((m) => m.id === first.toMailboxId)?.uidValidity ?? null;
+    const gone: string[] = [];
+    this.writer.transaction(() => {
+      batch.forEach((action, index) => {
+        const current = this.writer.messageLocation(action.messageId);
+        if (!current) return;
+        const newUid = result ? result.uidMap?.get(uids[index]!) ?? null : null;
+        if (newUid !== null && validity !== null) {
+          this.writer.relocateMessage(action.messageId, { newId: messageIdFor(first.toMailboxId, validity, newUid), mailboxId: first.toMailboxId, uid: newUid });
+        } else gone.push(action.messageId);
+      });
+    });
+    // Neue UID unbekannt: lokale Kopie entfernen, der nächste Abgleich holt sie dort, wo sie wirklich liegt
+    this.writer.deleteMessages(gone);
+  }
+
   // --- Verbindungen ---
 
   /** Vorgänge pro Konto laufen nacheinander über eine wiederverwendete Verbindung. */
@@ -969,4 +1042,18 @@ export class MailService implements MailRepository, AccountsApi {
 function envelopeOf(mailJson: string, from: string): { from: string; to: string[] } {
   const mail = JSON.parse(mailJson) as OutgoingMail;
   return { from, to: [...mail.to, ...mail.cc, ...mail.bcc].map((a) => a.address) };
+}
+
+/** Ab `start`: aufeinanderfolgende Verschiebungen mit bekannter UID zwischen denselben zwei Ordnern (höchstens 500). */
+function movesBatch(actions: PendingAction[], start: number): PendingAction[] {
+  const key = (a: PendingAction) => {
+    const p = a.payload as { fromMailboxId?: string; toMailboxId?: string; uid?: number | null };
+    return a.kind === "move" && p.fromMailboxId && p.toMailboxId && typeof p.uid === "number" ? `${p.fromMailboxId}\n${p.toMailboxId}` : null;
+  };
+  const first = actions[start];
+  const k = first ? key(first) : null;
+  if (!k) return [];
+  const batch: PendingAction[] = [];
+  for (let i = start; i < actions.length && batch.length < 500 && key(actions[i]!) === k; i++) batch.push(actions[i]!);
+  return batch;
 }

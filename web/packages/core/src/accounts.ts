@@ -25,6 +25,8 @@ export interface AddAccountOptions {
 export interface SyncStatus {
   running: boolean;
   lastRunAt: string | null;
+  /** Beim Holen vieler Mails (z. B. nach „alle Mails laden“): Konto, Ordner, geholt / fehlend. Sonst `null`. */
+  progress?: { accountId: string; mailbox: string; done: number; total: number } | null;
 }
 
 /** Verwaltung von Konten und Abgleich – die Oberfläche ruft das über eine Brücke (IPC/HTTP) auf. */

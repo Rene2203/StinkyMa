@@ -208,6 +208,25 @@ export class MailWriter {
     });
   }
 
+  /**
+   * Zeitraum verkürzt: lokale Mails des Kontos vor `sinceIso` entfernen (auf dem Server bleiben sie). Entwürfe und Mails
+   * mit noch nicht übertragenen Änderungen bleiben. Gibt die Anzahl zurück.
+   */
+  pruneOlderThan(accountId: string, sinceIso: string): number {
+    let removed = 0;
+    this.transaction(() => {
+      removed = this.db
+        .prepare(
+          `DELETE FROM message WHERE accountId = ? AND date < ?
+             AND mailboxId NOT IN (SELECT id FROM mailbox WHERE role = 'drafts')
+             AND id NOT IN (SELECT messageId FROM pendingAction)`,
+        )
+        .run(accountId, sinceIso).changes;
+      if (removed) this.deleteOrphanThreads();
+    });
+    return removed;
+  }
+
   /** Nach einem Verschieben auf dem Server: Mail in den Zielordner mit neuer UID umhängen. */
   relocateMessage(id: string, target: { newId: string; mailboxId: string; uid: number | null }): void {
     this.transaction(() => {

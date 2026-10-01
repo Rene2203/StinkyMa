@@ -57,6 +57,11 @@ export interface MailRepository {
    * eigene Adresse als bekannt – nur wirklich neue Absender landen unter „Neue Absender“.
    */
   setScreener(accountId: string, enabled: boolean): Promise<void>;
+  /**
+   * Wie weit zurück Mails geladen werden (Tage; `null` = Standard 30, `0` = alle). Kürzer: ältere Mails verschwinden
+   * aus StinkyMa (auf dem Server bleiben sie). Länger: der nächste Abgleich holt sie nach.
+   */
+  setSyncDays(accountId: string, days: number | null): Promise<void>;
   /** Absender erlauben (Mails erscheinen im Posteingang) oder blockieren (Mails verschwinden aus dem Posteingang). */
   decideSender(address: string, decision: "allow" | "block"): Promise<void>;
 }
@@ -117,6 +122,7 @@ export const mailRepositoryMethods = [
   "openDraft",
   "suggestAddresses",
   "setSignature",
+  "setSyncDays",
   "search",
   "setScreener",
   "decideSender",

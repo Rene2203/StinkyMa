@@ -2676,3 +2676,24 @@ button.ai-activity.idle {
   margin-left: 22px;
   padding: 0;
 }
+
+/* Liste: ältere Mails nachladen */
+.rows-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
+/* Optionen: Zeitraum je Konto */
+.dialog .options-section .sync-range-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0;
+}
+.dialog .options-section .sync-range-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

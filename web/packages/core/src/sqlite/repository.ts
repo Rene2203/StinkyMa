@@ -35,6 +35,7 @@ export function accountFromRow(r: Row): Account {
     authType: str(r.authType) as Account["authType"], color: str(r.color) as Account["color"],
     aiCloudAllowed: bool(r.aiCloudAllowed), sortOrder: num(r.sortOrder), screener: bool(r.screener),
     lastSyncAt: optStr(r.lastSyncAt), syncError: optStr(r.syncError), signatureHtml: optStr(r.signatureHtml),
+    syncDays: optNum(r.syncDays),
   };
 }
 
@@ -178,6 +179,10 @@ export class SqliteMailRepository implements MailRepository {
       if (r.role !== "trash") counts.flagged += r.flaggedUnread;
     }
     return { accounts, mailboxesByAccount, counts, outbox: this.outbox() };
+  }
+
+  async setSyncDays(accountId: string, days: number | null): Promise<void> {
+    this.db.prepare("UPDATE account SET syncDays = ? WHERE id = ?").run(days, accountId);
   }
 
   async setScreener(accountId: string, enabled: boolean): Promise<void> {
