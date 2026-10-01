@@ -1,5 +1,5 @@
-import { Archive, Flag, FlagOff, Mail, MailOpen, Paperclip, Search, SquarePen, Trash2 } from "lucide-react";
-import { displayName, isFlagged, isRead, type Message } from "@stinkyma/core";
+import { Archive, Flag, FlagOff, Mail, MailOpen, Paperclip, Search, ShieldAlert, SquarePen, Trash2 } from "lucide-react";
+import { assessPhishing, displayName, isFlagged, isRead, type Message } from "@stinkyma/core";
 import { useState, type MouseEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { formatListDate } from "../format.js";
@@ -139,6 +139,7 @@ function MessageRow(props: {
           )}
           <span className="row-sender">{displayName(message.from)}</span>
           {message.hasAttachments && <Paperclip className="muted" size={13} aria-label={t("list.hasAttachment")} />}
+          {assessPhishing(message).level === "danger" && <ShieldAlert className="row-phishing" size={13} aria-label={t("phishing.listHint")} data-testid="row-phishing" />}
           <span className="row-date">{formatListDate(message.date, locale, t)}</span>
         </div>
         <div className="row-subject">{message.subject}</div>

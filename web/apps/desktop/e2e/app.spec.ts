@@ -85,6 +85,38 @@ test("Mock-Posteingang, Navigation und Aktionen", async () => {
   await shot("06-Suche");
 });
 
+test("Phishing-Warnung mit Gründen; Kennzeichen in der Liste", async () => {
+  await page.getByRole("searchbox").fill("");
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  const row = rows().filter({ hasText: "Dringend: Ihr Konto wurde gesperrt" });
+  await expect(row.getByTestId("row-phishing")).toBeVisible();
+  await row.click();
+  const banner = page.getByTestId("phishing-banner");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("Betrugsmail");
+  await expect(banner).toContainText("innerhalb von 24 Stunden");
+  await shot("22-Phishing-Warnung");
+  // Harmlose Mail: keine Warnung
+  await rows().filter({ hasText: "Ihre Abschlagsrechnung Oktober" }).click();
+  await expect(page.getByTestId("phishing-banner")).toHaveCount(0);
+});
+
+test("Zu tun: Zahlung erkannt (ohne KI-Modell), Erinnerung setzen, erledigt", async () => {
+  await page.getByRole("searchbox").fill("");
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  await rows().filter({ hasText: "Ihre Abschlagsrechnung Oktober" }).click();
+  const card = page.getByTestId("actions-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("86,00 €");
+  await expect(card).toContainText("einfach erkannt");
+  await card.getByTestId("action-remind").click();
+  await card.getByTestId("reminder-option").first().click();
+  await expect(card.getByText(/Erinnerung/)).toBeVisible();
+  await shot("21-Zu-tun");
+  await card.getByTestId("action-done").click();
+  await expect(card.locator(".action-row.done")).toHaveCount(1);
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

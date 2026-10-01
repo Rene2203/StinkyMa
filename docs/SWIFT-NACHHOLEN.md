@@ -15,6 +15,9 @@ unten abarbeiten.
 
 | Seit | Was | Wo in TypeScript |
 |------|-----|------------------|
+| 01.10.2026 | Migration `v10-message-actions` (Tabellen `messageAction`, `messageActionScan`; `reminder.actionId`, `reminder.status`) | `core/src/sqlite/schema.ts`, `sqlite/actionStore.ts` |
+| 01.10.2026 | Aktionen erkennen (Regeln + KI mit Belegprüfung), Erinnerungen, .ics; Phishing-Check mit Gründen | `core/src/ai/actions.ts`, `core/src/calendar.ts`, `core/src/phishing.ts` |
+| 01.10.2026 | Verschieben einer Mail (neue ID) behält Anhang-Text, Leseergebnis, Aktionen, Erinnerungen | `core/src/sqlite/writer.ts` (`relocateMessage`) |
 | 01.10.2026 | OAuth (Gmail/Outlook): PKCE, Loopback-Anmeldung, XOAUTH2 für IMAP/SMTP, Token-Erneuerung, „Erneut anmelden“ – auf iPad/Mac mit ASWebAuthenticationSession | `web/packages/core/src/oauth.ts`, `node/oauthLoopback.ts`, `mail/mailService.ts` |
 | 01.10.2026 | Bilder/Scans mit KI lesen (Ergebnis in `attachmentAnalysis`, Text in `attachmentText` mit Quelle `vision`) | `core/src/llm/llamaServer.ts`, `core/src/sqlite/aiStore.ts` |
 | 01.10.2026 | Migration `v9-ai-results`: `message.categoryOrigin`, Index `message_on_uncategorized`, Tabelle `threadSummary` | `web/packages/core/src/sqlite/schema.ts`, `sqlite/aiStore.ts` |

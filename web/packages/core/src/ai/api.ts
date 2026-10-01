@@ -1,3 +1,4 @@
+import type { MailAction } from "./actions.js";
 import type { CatalogModel, ModelCapability } from "./catalog.js";
 import type { DocumentType } from "./prompts.js";
 import type { ResultOrigin } from "./tasks.js";
@@ -99,6 +100,23 @@ export interface AttachmentReadingView {
 /** Größte Bildgröße (Base64-Zeichen) je Seite, die die Oberfläche schicken darf. */
 export const maxPageImageChars = 8_000_000;
 
+/** Erkannte Aktion für die Anzeige (Karte über der Mail). */
+export interface ActionView extends MailAction {
+  id: string;
+  messageId: string;
+  status: "open" | "done" | "dismissed";
+  origin: ResultOrigin;
+  /** Geplante Erinnerung (falls gesetzt) */
+  reminder: { id: string; dueDate: string } | null;
+}
+
+export interface MessageActionsView {
+  messageId: string;
+  actions: ActionView[];
+  /** Woher: Gerät/Server/Cloud oder Regeln; null = nicht untersucht (z. B. gesendete Mail, Newsletter) */
+  origin: ResultOrigin | null;
+}
+
 export interface AIApi {
   status(): Promise<AIStatus>;
   update(patch: Partial<AISettings>): Promise<AIStatus>;
@@ -119,6 +137,17 @@ export interface AIApi {
    * gerenderten Seiten (höchstens 3). Der gelesene Text wird durchsuchbar.
    */
   readAttachment(attachmentId: string, pageImages?: AIImage[]): Promise<AttachmentReadingView>;
+  /**
+   * Termine, Fristen, To-dos und Zahlungen einer Mail. Beim ersten Öffnen erkannt (Modell, sonst Regeln) und
+   * gespeichert; danach sofort.
+   */
+  messageActions(messageId: string): Promise<MessageActionsView>;
+  setActionStatus(actionId: string, status: "open" | "done" | "dismissed"): Promise<void>;
+  /** Erinnerung (Windows-Benachrichtigung) zum Zeitpunkt `dueIso` (ISO-8601). */
+  remind(actionId: string, dueIso: string): Promise<void>;
+  cancelReminder(reminderId: string): Promise<void>;
+  /** Kalendereintrag (.ics) erzeugen und mit dem Standard-Kalender öffnen. */
+  addToCalendar(actionId: string): Promise<void>;
 }
 
-export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment"] as const satisfies readonly (keyof AIApi)[];
+export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar"] as const satisfies readonly (keyof AIApi)[];

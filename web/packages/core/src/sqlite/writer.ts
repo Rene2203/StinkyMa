@@ -228,6 +228,12 @@ export class MailWriter {
         return;
       }
       const attachments = this.db.prepare("SELECT * FROM attachment WHERE messageId = ?").all(id) as Row[];
+      // Was per Fremdschlüssel an der Mail hängt, würde beim Löschen mitgelöscht – vorher sichern, danach umhängen.
+      const attachmentTexts = this.db.prepare("SELECT * FROM attachmentText WHERE attachmentId IN (SELECT id FROM attachment WHERE messageId = ?)").all(id) as Row[];
+      const analyses = this.db.prepare("SELECT * FROM attachmentAnalysis WHERE attachmentId IN (SELECT id FROM attachment WHERE messageId = ?)").all(id) as Row[];
+      const actions = this.db.prepare("SELECT * FROM messageAction WHERE messageId = ?").all(id) as Row[];
+      const scan = this.db.prepare("SELECT * FROM messageActionScan WHERE messageId = ?").get(id) as Row | undefined;
+      const reminderIds = (this.db.prepare("SELECT id FROM reminder WHERE messageId = ?").all(id) as { id: string }[]).map((r) => r.id);
       this.db.prepare("DELETE FROM message WHERE id = ?").run(id);
       const columns = Object.keys(row).map((c) => `"${c}"`).join(", ");
       const params = Object.keys(row).map((c) => `@${c}`).join(", ");
@@ -238,9 +244,23 @@ export class MailWriter {
         `INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId, pageCount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       );
-      attachments.forEach((a, i) =>
-        insertAttachment.run(`${target.newId}/a${i}`, target.newId, a.filename, a.mimeType, a.size, a.isInline, a.contentId, a.pageCount),
-      );
+      const newAttachmentId = new Map<string, string>();
+      attachments.forEach((a, i) => {
+        insertAttachment.run(`${target.newId}/a${i}`, target.newId, a.filename, a.mimeType, a.size, a.isInline, a.contentId, a.pageCount);
+        newAttachmentId.set(String(a.id), `${target.newId}/a${i}`);
+      });
+      const reinsert = (table: string, rows: Row[], change: (row: Row) => Row) => {
+        for (const row of rows) {
+          const next = change(row);
+          const keys = Object.keys(next);
+          this.db.prepare(`INSERT OR REPLACE INTO ${table} (${keys.map((k) => `"${k}"`).join(", ")}) VALUES (${keys.map((k) => `@${k}`).join(", ")})`).run(next);
+        }
+      };
+      reinsert("attachmentText", attachmentTexts.filter((r) => newAttachmentId.has(String(r.attachmentId))), (r) => ({ ...r, attachmentId: newAttachmentId.get(String(r.attachmentId)) }));
+      reinsert("attachmentAnalysis", analyses.filter((r) => newAttachmentId.has(String(r.attachmentId))), (r) => ({ ...r, attachmentId: newAttachmentId.get(String(r.attachmentId)) }));
+      reinsert("messageAction", actions, (r) => ({ ...r, messageId: target.newId }));
+      if (scan) reinsert("messageActionScan", [scan], (r) => ({ ...r, messageId: target.newId }));
+      for (const reminderId of reminderIds) this.db.prepare("UPDATE reminder SET messageId = ? WHERE id = ?").run(target.newId, reminderId);
     });
   }
 

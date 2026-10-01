@@ -4,7 +4,7 @@
 import { writeFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
-import { evalHoldoutMails, evalMails, evaluateProvider, formatEvalReports, modelCatalog, type EvalReport } from "../src/index.js";
+import { evalHoldoutMails, evalMails, evaluateActions, evaluateProvider, formatActionsReports, formatEvalReports, modelCatalog, type ActionsEvalReport, type EvalReport } from "../src/index.js";
 import { fileNameFromUrl, LlamaCppProvider } from "../src/llm/index.js";
 
 const args = process.argv.slice(2);
@@ -18,6 +18,9 @@ const flag = (name: string) => {
 const out = flag("--out");
 // --holdout: nur den Kontrollsatz (ohne Zusammenfassungen); --all: Testsatz + Kontrollsatz
 const holdout = args.includes("--holdout");
+// --actions: nur der Aktionen-Messlauf (W6.1), inklusive Vergleichswert „Regeln ohne KI“
+const actionsOnly = args.includes("--actions");
+if (actionsOnly) args.splice(args.indexOf("--actions"), 1);
 const all = args.includes("--all");
 for (const name of ["--holdout", "--all"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
 const mails = holdout ? evalHoldoutMails : all ? [...evalMails, ...evalHoldoutMails] : evalMails;
@@ -27,6 +30,24 @@ const gpu = gpuIndex !== -1;
 if (gpu) args.splice(gpuIndex, 1);
 const [directory, ...ids] = args;
 if (!directory) throw new Error("Modellordner fehlt.");
+
+if (actionsOnly) {
+  const [directoryArg, ...idsArg] = args;
+  const reports: ActionsEvalReport[] = [await evaluateActions(null)];
+  for (const model of modelCatalog.filter((m) => idsArg.length === 0 || idsArg.includes(m.id))) {
+    const provider = new LlamaCppProvider({ id: model.id, displayName: model.name, modelPath: join(directoryArg ?? "", fileNameFromUrl(model.url)), gpu: gpu ? "auto" : false, maxThreads: threads, idleUnloadMs: 0 });
+    try {
+      await provider.load();
+      reports.push(await evaluateActions(provider, { onProgress: (d, t) => process.stderr.write(`\r${model.id}: ${d}/${t}   `) }));
+      process.stderr.write("\n");
+      if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
+    } finally {
+      await provider.dispose();
+    }
+  }
+  console.log(formatActionsReports(reports));
+  process.exit(0);
+}
 
 const models = modelCatalog.filter((m) => ids.length === 0 || ids.includes(m.id));
 const reports: EvalReport[] = [];

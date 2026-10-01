@@ -1,5 +1,7 @@
 import type { Message, MessageCategory } from "../models.js";
-import { evalMails, evalThreads, type EvalMail, type EvalThread } from "./evalSet.js";
+import { evalActionCases, evalHoldoutMails, evalMails, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
+import { extractActions, ruleActions, type MailAction } from "./actions.js";
+import { cleanMailText } from "./prepare.js";
 import { categories } from "./prompts.js";
 import { AIRouter, GrantPolicy } from "./router.js";
 import { categorizeMessage, summarizeThread } from "./tasks.js";
@@ -229,5 +231,79 @@ export function formatEvalReports(reports: EvalReport[], context: { machine: str
       `- Zusammenfassung: ${missing.length === 0 ? "keine" : missing.map((o) => `${o.id}${o.ok ? "" : " ungültig"}${o.missingFacts.length ? ` fehlt: ${o.missingFacts.join(", ")}` : ""}${o.waitingOnCorrect ? "" : " / wer-ist-dran falsch"}${o.forbiddenFound.length ? ` / erfunden: ${o.forbiddenFound.join(", ")}` : ""}`).join("; ")}`,
     );
   }
+  return lines.join("\n");
+}
+
+// --- Aktionen (W6.1) ---
+
+export interface ActionsEvalReport {
+  name: string;
+  /** Anteil der erwarteten Angaben (Datum/Uhrzeit/Betrag), die gefunden wurden */
+  recall: number;
+  expectedTotal: number;
+  /** Aktionen in Mails, in denen nichts erkannt werden darf */
+  falsePositives: number;
+  fallbacks: number;
+  medianMs: number;
+  misses: string[];
+}
+
+function actionMatches(action: MailAction, expected: EvalActionCase["expected"][number]): boolean {
+  const digits = (value: string | null) => (value ?? "").replace(/[^\d,]/g, "");
+  return (!expected.date || action.date === expected.date) && (!expected.time || action.time === expected.time) && (!expected.amount || digits(action.amount) === digits(expected.amount));
+}
+
+/** Aktionen-Messlauf; ohne Anbieter nur mit Regeln (Vergleichswert). */
+export async function evaluateActions(provider: AIProvider | null, options: { cases?: EvalActionCase[]; onProgress?: (done: number, total: number) => void } = {}): Promise<ActionsEvalReport> {
+  const cases = options.cases ?? evalActionCases;
+  const all = [...evalMails, ...evalHoldoutMails];
+  const router = provider ? new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() }) : null;
+  let expectedTotal = 0;
+  let found = 0;
+  let falsePositives = 0;
+  let fallbacks = 0;
+  const durations: number[] = [];
+  const misses: string[] = [];
+  for (const [index, testCase] of cases.entries()) {
+    const mail = all.find((m) => m.id === testCase.mailId);
+    if (!mail) throw new Error(`Testmail ${testCase.mailId} fehlt`);
+    const message = evalMailToMessage(mail);
+    let actions: MailAction[];
+    if (router) {
+      const result = await extractActions(router, message);
+      actions = result.actions;
+      if (result.origin === "rules") fallbacks++;
+      else durations.push(result.durationMs);
+    } else {
+      actions = ruleActions(message.subject, cleanMailText(message.bodyText ?? "", 2000), new Date(message.date));
+    }
+    if (testCase.expected.length === 0) {
+      falsePositives += actions.length;
+      if (actions.length) misses.push(`${testCase.mailId}: ${actions.length} unnötig`);
+    }
+    for (const expected of testCase.expected) {
+      const keys = Object.keys(expected).length;
+      expectedTotal += keys;
+      const best = Math.max(0, ...actions.map((a) => Object.entries(expected).filter(([k]) => actionMatches(a, { [k]: (expected as Record<string, string>)[k] })).length));
+      found += best;
+      if (best < keys) misses.push(`${testCase.mailId}: erwartet ${JSON.stringify(expected)}, erkannt ${JSON.stringify(actions.map((a) => [a.date, a.time, a.amount]))}`);
+    }
+    options.onProgress?.(index + 1, cases.length);
+  }
+  return {
+    name: provider?.displayName ?? "Regeln (ohne KI)",
+    recall: expectedTotal ? found / expectedTotal : 0,
+    expectedTotal,
+    falsePositives,
+    fallbacks,
+    medianMs: median(durations),
+    misses,
+  };
+}
+
+export function formatActionsReports(reports: ActionsEvalReport[]): string {
+  const lines = ["| Verfahren | Angaben gefunden | unnötige Aktionen | Regel-Rückfall | Zeit (Median) |", "|---|---|---|---|---|"];
+  for (const r of reports) lines.push(`| ${r.name} | ${percent(r.recall)} (von ${r.expectedTotal}) | ${r.falsePositives} | ${r.fallbacks} | ${seconds(r.medianMs)} |`);
+  for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
   return lines.join("\n");
 }

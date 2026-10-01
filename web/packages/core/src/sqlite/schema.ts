@@ -323,6 +323,37 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    name: "v10-message-actions",
+    // Erkannte Aktionen (Termin, Frist, To-do, Zahlung) je Mail samt Beleg-Zitat und Status; welche Mails schon
+    // untersucht sind; Erinnerungen hängen an einer Aktion und haben einen Status (offen, gemeldet, abgesagt).
+    sql: `
+      CREATE TABLE messageAction (
+        id TEXT PRIMARY KEY NOT NULL,
+        messageId TEXT NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        date TEXT,
+        time TEXT,
+        amount TEXT,
+        quote TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        origin TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      );
+      CREATE INDEX messageAction_on_messageId ON messageAction(messageId);
+      CREATE INDEX messageAction_open_on_date ON messageAction(date) WHERE status = 'open';
+      CREATE TABLE messageActionScan (
+        messageId TEXT PRIMARY KEY NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        origin TEXT NOT NULL,
+        promptVersion INTEGER NOT NULL,
+        scannedAt TEXT NOT NULL
+      );
+      ALTER TABLE reminder ADD COLUMN actionId TEXT;
+      ALTER TABLE reminder ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';
+      CREATE INDEX reminder_pending_on_dueDate ON reminder(dueDate) WHERE status = 'pending';
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

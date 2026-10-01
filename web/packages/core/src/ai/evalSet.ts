@@ -276,3 +276,50 @@ export const evalThreads: EvalThread[] = [
     waitingOn: "nobody",
   },
 ];
+
+/** Erwartete Aktionen (W6.1) – jede Erwartung muss von einer erkannten Aktion erfüllt werden (Datum/Uhrzeit/Betrag). */
+export interface EvalActionCase {
+  mailId: string;
+  /** leer = in dieser Mail darf nichts erkannt werden (Werbung, reine Info) */
+  expected: { date?: string; time?: string; amount?: string }[];
+}
+
+// Maildatum im Messlauf: Mittwoch, 30.09.2026
+export const evalActionCases: EvalActionCase[] = [
+  { mailId: "i01", expected: [{ date: "2026-10-15", amount: "84,20" }] },
+  { mailId: "i02", expected: [{ amount: "39,99" }] },
+  { mailId: "i03", expected: [{ date: "2026-10-10", amount: "236,50" }] },
+  { mailId: "i04", expected: [{ amount: "3.480,00" }] },
+  { mailId: "i07", expected: [{ date: "2027-01-01", amount: "418,00" }] },
+  { mailId: "i08", expected: [{ amount: "65,00" }] },
+  { mailId: "i10", expected: [{ amount: "78,30" }] },
+  { mailId: "i12", expected: [{ date: "2026-11-04", amount: "612,00" }] },
+  { mailId: "a01", expected: [{ date: "2026-10-14", time: "08:30" }] },
+  { mailId: "a02", expected: [{ date: "2026-10-01", time: "10:00" }] },
+  { mailId: "a03", expected: [{ date: "2026-10-21", time: "19:30" }] },
+  { mailId: "a04", expected: [{ date: "2026-10-18", time: "09:15" }] },
+  { mailId: "a05", expected: [{ date: "2026-11-07" }] },
+  { mailId: "a07", expected: [{ date: "2026-10-29", time: "11:40" }] },
+  { mailId: "a09", expected: [{ date: "2026-11-15", time: "18:00" }] },
+  { mailId: "a10", expected: [{ date: "2026-10-20", time: "14:00" }] },
+  { mailId: "w05", expected: [{ date: "2026-10-31" }] },
+  { mailId: "x06", expected: [{ date: "2026-10-12", time: "09:00" }] },
+  { mailId: "x09", expected: [{ date: "2026-10-22", time: "07:14" }] },
+  { mailId: "n01", expected: [] },
+  { mailId: "n03", expected: [] },
+  { mailId: "n07", expected: [] },
+  { mailId: "x05", expected: [] },
+  { mailId: "x08", expected: [] },
+  { mailId: "p03", expected: [] },
+  { mailId: "p12", expected: [] },
+  // Kontrollsatz
+  { mailId: "hi2", expected: [{ amount: "96,40" }] },
+  { mailId: "hi4", expected: [{ date: "2026-10-15", amount: "58,10" }] },
+  { mailId: "ha1", expected: [{ date: "2026-10-17", time: "10:20" }] },
+  { mailId: "ha2", expected: [{ date: "2026-11-04", time: "15:00" }] },
+  { mailId: "ha3", expected: [{ date: "2026-11-13", time: "14:00" }] },
+  { mailId: "ha4", expected: [{ date: "2026-10-21", time: "09:00" }] },
+  { mailId: "hn3", expected: [] },
+  { mailId: "hn4", expected: [] },
+  { mailId: "hx4", expected: [] },
+];

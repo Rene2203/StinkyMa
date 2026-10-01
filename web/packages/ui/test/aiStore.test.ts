@@ -53,6 +53,22 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
       if (options.fail) throw new Error(options.fail);
       return { attachmentId: id, documentType: "invoice", title: "Rechnung", summary: "Rechnung über 10 €", text: "10 €", origin: "onDevice", modelName: "Gemma", createdAt: "", durationMs: 1000 };
     },
+    messageActions: async (messageId) => {
+      calls.push(`actions:${messageId}`);
+      return { messageId, origin: "rules", actions: [{ id: "a1", messageId, type: "payment", title: "Zahlung", date: "2026-10-15", time: null, amount: "84,20 €", quote: "…", status: "open", origin: "rules", reminder: null }] };
+    },
+    setActionStatus: async (id, status) => {
+      calls.push(`status:${id}:${status}`);
+    },
+    remind: async (id, due) => {
+      calls.push(`remind:${id}:${due}`);
+    },
+    cancelReminder: async (id) => {
+      calls.push(`cancel:${id}`);
+    },
+    addToCalendar: async (id) => {
+      calls.push(`calendar:${id}`);
+    },
     summarize: async (threadId) => {
       calls.push(`summarize:${threadId}`);
       await new Promise<void>((resolve) => (release = resolve));
@@ -183,5 +199,25 @@ describe("BrowserStore – KI", () => {
     expect(store.canReadAttachments).toBe(false);
     await store.downloadVision();
     expect(ai.calls).toContain("downloadVision");
+  });
+
+  it("lädt erkannte Aktionen der geöffneten Mail und reicht Erinnern/Kalender/Erledigt durch", async () => {
+    const ai = fakeAI();
+    const store = await setup(ai);
+    const first = store.getState().messages[0];
+    if (!first) throw new Error("keine Mail");
+    await store.selectMessage(first.id);
+    await flush();
+    expect(store.getState().actions).toMatchObject({ messageId: first.id, actions: [{ id: "a1", amount: "84,20 €" }] });
+    await store.remind("a1", new Date("2026-10-14T07:00:00.000Z"));
+    await store.addToCalendar("a1");
+    await store.setActionStatus("a1", "done");
+    expect(ai.calls).toEqual(expect.arrayContaining(["remind:a1:2026-10-14T07:00:00.000Z", "calendar:a1", "status:a1:done"]));
+    // Wechsel zu einer anderen Mail: Karte der alten Mail verschwindet sofort
+    const second = store.getState().messages[1];
+    if (!second) throw new Error("keine zweite Mail");
+    const opening = store.selectMessage(second.id);
+    expect(store.getState().actions?.messageId ?? second.id).not.toBe(first.id);
+    await opening;
   });
 });

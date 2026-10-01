@@ -1943,3 +1943,169 @@ button.attachment-open:hover {
   border-radius: 6px;
   padding: 4px 12px;
 }
+
+/* Erkannte Aktionen (Termine, Fristen, Zahlungen) */
+
+.actions-card {
+  margin: 10px 0 14px;
+  padding: 8px 12px 10px;
+  border: 1px solid color-mix(in srgb, var(--teal) 35%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--teal) 5%, var(--bg));
+}
+
+.actions-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--teal);
+}
+
+.actions-header strong {
+  color: var(--fg);
+  font-size: 13px;
+}
+
+.actions-origin {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.actions-card ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.action-row + .action-row {
+  border-top: 1px solid var(--border);
+}
+
+.action-row.done .action-title {
+  text-decoration: line-through;
+  color: var(--fg-muted);
+}
+
+.action-icon {
+  flex-shrink: 0;
+}
+
+.action-appointment { color: var(--blue); }
+.action-deadline { color: var(--orange); }
+.action-todo { color: var(--purple); }
+.action-payment { color: var(--green); }
+
+.action-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.action-title {
+  font-weight: 500;
+}
+
+.action-reminder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.reminder-menu {
+  position: relative;
+}
+
+.reminder-options {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.reminder-options button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  padding: 6px 8px;
+  border-radius: 5px;
+  text-align: left;
+}
+
+.reminder-options button:hover {
+  background: var(--bg-hover);
+}
+
+/* Phishing-Warnung */
+
+.phishing-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--orange) 50%, var(--border));
+  background: color-mix(in srgb, var(--orange) 10%, var(--bg));
+  color: var(--fg);
+}
+
+.phishing-banner.danger {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  background: color-mix(in srgb, var(--danger) 9%, var(--bg));
+}
+
+.phishing-banner > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--orange);
+}
+
+.phishing-banner.danger > svg {
+  color: var(--danger);
+}
+
+.phishing-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.phishing-text ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.row-phishing {
+  color: var(--danger);
+  flex-shrink: 0;
+}

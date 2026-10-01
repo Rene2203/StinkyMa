@@ -1,5 +1,5 @@
 import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, Pencil, Reply, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
-import { displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
+import { assessPhishing, displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { formatBytes, formatFullDate, formatList } from "../format.js";
@@ -9,6 +9,8 @@ import { CategoryChip } from "./CategoryChip.js";
 import { composeLabels } from "../composeLabels.js";
 import { SafeHtml } from "./SafeHtml.js";
 import { SummaryCard } from "./SummaryCard.js";
+import { ActionsCard } from "./ActionsCard.js";
+import { PhishingBanner } from "./PhishingBanner.js";
 
 export function MessageDetail() {
   const { store, t, locale } = useUi();
@@ -83,7 +85,14 @@ export function MessageDetail() {
           <h2 className="thread-subject" data-testid="thread-subject">{message.subject}</h2>
           {isDraft && <p className="draft-banner"><Pencil size={14} aria-hidden="true" /> {t("draft.banner")}</p>}
           {message.category && <CategoryChip category={message.category} />}
+          {!isDraft && (
+            <PhishingBanner
+              key={message.id}
+              assessment={assessPhishing(message, { attachmentNames: (state.attachmentsByMessageId[message.id] ?? []).map((a) => a.filename) })}
+            />
+          )}
           {state.summary?.threadId === message.threadId && <SummaryCard summary={state.summary} />}
+          {state.actions?.messageId === message.id && <ActionsCard view={state.actions} />}
           {thread.map((m) => (
             <ThreadMessage
               key={`${message.id}-${m.id}`}

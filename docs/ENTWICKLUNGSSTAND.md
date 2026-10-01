@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. W5.5 (Bilder/Scans) und OAuth (Gmail/Outlook) fertig, lokal geprüft. Offen: Test durch den Nutzer (OAuth braucht eine eigene App-Registrierung, Anleitung `docs/OAUTH-EINRICHTEN.md`), Zusammenfassungs-Prompt v3
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent** in Arbeit: W6.1 (Zu tun: Termine/Fristen/Zahlungen) und W6.2 (Phishing-Check) fertig, lokal geprüft. Als Nächstes W6.3 Türsteher, W6.4 Regeln, W6.5 Antwortentwürfe, W6.6 Tages-Digest; danach Feinabstimmung der Modelle (Wunsch des Nutzers)
 
 ## Überblick
 
@@ -353,4 +353,26 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   die eben gesetzte Markierung „gelesen“ mit dem alten Serverstand überschreiben – die Mail sah kurz wieder ungelesen aus,
   bis die Warteschlange beim Server war. Jetzt gewinnt eine noch nicht übertragene lokale Änderung. Regressionstest gegen
   GreenMail (scheitert ohne die Korrektur nachweislich).
+- **01.10.2026 – Entscheidung Nutzer:** W6 (Assistent) bauen, danach Feinabstimmung der Modelle. Türsteher-Standard nach
+  meinem Vorschlag: aus, beim Hinzufügen eines Kontos einmal fragen (noch nicht vom Nutzer bestätigt).
+- **Container-Neustart** während eines Messlaufs: Dateien blieben erhalten, Messlauf lief weiter. GreenMail startete danach
+  unter Last nicht (Startzeit 2 s zu knapp) → Startskript mit `-Dgreenmail.startup.timeout=30000`.
+- **W6.1 – Zu tun (Aktionen) (lokal geprüft):** `core/ai/actions.ts`: KI-Aufgabe mit Pflicht-Zitat (was nicht in der Mail
+  steht, fällt weg; Beträge nur, wenn sie wörtlich vorkommen; Termine nur mit Datum), Regeln ohne KI (Datum, Uhrzeit,
+  Spanne, Betrag, Schlüsselwörter, Werbung ausgenommen). Migration `v10-message-actions`, `ActionStore`, Erinnerungen
+  (Windows-Benachrichtigung, jede genau einmal), Kalendereintrag als .ics (öffnet Outlook/Kalender).
+  App: Karte „Zu tun“ über der Mail – sofort mit Regeln, das Modell verfeinert im Hintergrund und die Karte aktualisiert
+  sich; Erinnern (1 Std. vorher / Vortag / am Tag / morgen früh), In den Kalender, Erledigt, Ausblenden. Nicht untersucht:
+  Gesendet, Entwürfe, Papierkorb, Spam, Newsletter, Verdächtiges.
+  **Messung** (35 Mails aus Test- und Kontrollsatz, 43 erwartete Angaben): Regeln allein 93,0 % ohne Fehlalarm; Gemma 4 E2B
+  97,7 % (Ziel ≥ 95 %), aber 4 überflüssige To-dos, ~7,8 s je Mail auf 4 CPU-Kernen. Ehrlich: Die Regeln wurden an diesem Satz
+  verbessert – Kontrollmails sind beigemischt, trotzdem eher optimistisch.
+  **Gefunden und behoben:** Beim Verschieben (Archivieren) einer Mail gingen Anhang-Text (Suche in Scans!), Leseergebnis und
+  neue Aktionen verloren, weil die Zeile neu angelegt wird – jetzt ziehen sie mit (Test).
+- **W6.2 – Phishing-Check (lokal geprüft):** `core/phishing.ts` ohne KI: Marke im Namen + nachgeahmte Domain/Freemail,
+  „Chef“ von Freemail, Link-Text ≠ Link-Ziel, IP-Links, Kurzlinks, Druck, Datenabfrage, Zahlung per Link, „zu gut um wahr zu
+  sein“, Gutscheinkarten, riskante Anhänge; KI-Einordnung „verdächtig“ zählt mit. Warnleiste mit verständlichen Gründen und
+  Rat, Schild-Symbol in der Liste. **Messung:** Regeln allein 10/14 Betrugsmails, mit Gemma-Einordnung 13/14 – in Test- und
+  Kontrollsatz **0 Fehlalarme** bei 94 echten Mails.
+  **Ungeprüft:** echte Phishing-Mails (HTML, Weiterleitungen); Absender-Vertrauen („kenne ich“) noch nicht eingebaut.
 

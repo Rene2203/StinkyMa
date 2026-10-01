@@ -1,5 +1,16 @@
 # Changelog
 
+## W6 – Assistent (in Arbeit)
+
+### Neu
+- **Zu tun:** Termine, Fristen, Zahlungen und Bitten werden über der Mail angezeigt – sofort (Regeln), auf Wunsch mit KI
+  verfeinert. Erinnerung per Windows-Benachrichtigung, Kalendereintrag (.ics), erledigt/ausblenden. Migration `v10-message-actions`.
+- **Phishing-Check:** Warnleiste mit nachvollziehbaren Gründen (gefälschter Absender, irreführende Links, Druck, Datenabfrage,
+  Gutscheinkarten …) und Kennzeichen in der Liste.
+
+### Behoben
+- Archivierte/verschobene Mails verloren den gelesenen Anhang-Text (Suche in Scans) und KI-Leseergebnisse.
+
 ## W5 – KI-Basis (in Arbeit)
 
 ### Behoben

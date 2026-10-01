@@ -28,7 +28,7 @@ import {
 import { MailService, type OAuthBroker } from "@stinkyma/core/mail";
 import { AIService, ModelStore, RuntimeStore } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { AIResultStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -43,6 +43,7 @@ let mainWindow: BrowserWindow | null = null;
 let service: MailService | null = null;
 let ai: AIService | null = null;
 let syncTimer: NodeJS.Timeout | null = null;
+let reminderTimer: NodeJS.Timeout | null = null;
 let tray: Tray | null = null;
 let settings: SettingsFile | null = null;
 /** Wird gerade wirklich beendet (Menü „Beenden“, Abmelden)? Sonst schließt das Fenster nur in den Infobereich. */
@@ -153,6 +154,18 @@ function setUpServices(): void {
       return service.attachmentContent(attachmentId);
     },
     results: new AIResultStore(db),
+    actions: new ActionStore(db, () => randomUUID()),
+    message: (messageId) => repository.message(messageId),
+    onActionsUpdated: () => notifyRenderer(),
+    // Kalendereintrag: .ics im Temp-Ordner ablegen und mit dem Standardprogramm (Outlook, Kalender) öffnen
+    openCalendarFile: async (ics, filename) => {
+      const dir = join(app.getPath("temp"), "StinkyMa-Kalender");
+      mkdirSync(dir, { recursive: true });
+      const path = join(dir, safeFilename(filename));
+      writeFileSync(path, ics, "utf8");
+      const error = await shell.openPath(path);
+      if (error) throw new Error(`Der Kalender konnte nicht geöffnet werden: ${error}`);
+    },
     thread: (threadId) => repository.thread(threadId),
     ownAddresses: async () => (await repository.accounts()).map((account) => account.email),
     settings: { load: () => settingsFile?.ai ?? null, save: (next) => settingsFile?.setAI(next) },
@@ -178,6 +191,29 @@ function notifyRenderer(): void {
 function startSync(): void {
   void service?.syncNow().finally(() => service?.startWatching());
   syncTimer = setInterval(() => void service?.syncNow(), syncIntervalMs);
+  // Erinnerungen: jede halbe Minute fällige melden (auch wenn das Fenster im Infobereich ist)
+  checkReminders();
+  reminderTimer = setInterval(checkReminders, 30_000);
+}
+
+/** Fällige Erinnerungen als Windows-Benachrichtigung; Klick öffnet die Mail. */
+function checkReminders(): void {
+  const due = ai?.takeDueReminders() ?? [];
+  if (due.length === 0 || !Notification.isSupported()) return;
+  const de = german();
+  const minimal = settings?.settings.notifications === "minimal";
+  for (const reminder of due) {
+    // Erinnerungen hat der Nutzer selbst gesetzt – sie kommen auch bei „Benachrichtigungen aus“ (nur nicht mit Inhalt bei „minimal“)
+    const notification = new Notification({
+      title: de ? "Erinnerung" : "Reminder",
+      body: minimal ? (de ? "Eine Erinnerung ist fällig." : "A reminder is due.") : reminder.text,
+    });
+    notification.on("click", () => {
+      showWindow();
+      if (reminder.messageId) mainWindow?.webContents.send("mail:open", reminder.messageId);
+    });
+    notification.show();
+  }
 }
 
 /**
@@ -436,6 +472,7 @@ app.whenReady().then(() => {
 app.on("before-quit", () => {
   quitting = true;
   if (syncTimer) clearInterval(syncTimer);
+  if (reminderTimer) clearInterval(reminderTimer);
   if (notifyTimer) clearTimeout(notifyTimer);
   // Offene IMAP-Verbindungen sofort trennen, damit die App ohne Verzögerung beendet wird.
   service?.dispose();

@@ -17,6 +17,7 @@ import {
   type AIStatus,
   type SummaryView,
   type AttachmentReadingView,
+  type MessageActionsView,
   type AIImage,
   type Attachment,
   type Mailbox,
@@ -95,6 +96,8 @@ export interface BrowserState {
   reading: ReadingState | null;
   /** Anbieter mit Anmeldung per Browser (App-Registrierung hinterlegt). */
   oauthProviders: OAuthProviderId[];
+  /** Erkannte Termine, Fristen, To-dos, Zahlungen der geöffneten Mail. */
+  actions: MessageActionsView | null;
 }
 
 export interface ReadingState {
@@ -137,6 +140,7 @@ export const initialState: BrowserState = {
   summary: null,
   reading: null,
   oauthProviders: [],
+  actions: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -320,6 +324,43 @@ export class BrowserStore {
     }
   }
 
+  // --- Aktionen (Termine, Fristen, Zahlungen) ---
+
+  async #loadActions(messageId: string): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    try {
+      const view = await ai.messageActions(messageId);
+      if (this.#state.selectedMessageId === messageId) this.#set({ actions: view });
+    } catch {
+      // Zusatz – Fehler hier nicht melden
+    }
+  }
+
+  async #changeAction(change: (ai: AIApi) => Promise<void>): Promise<void> {
+    const ai = this.#ai;
+    const messageId = this.#state.actions?.messageId;
+    if (!ai || !messageId) return;
+    await this.#guard(() => change(ai));
+    await this.#loadActions(messageId);
+  }
+
+  setActionStatus(actionId: string, status: "open" | "done" | "dismissed"): Promise<void> {
+    return this.#changeAction((ai) => ai.setActionStatus(actionId, status));
+  }
+
+  remind(actionId: string, due: Date): Promise<void> {
+    return this.#changeAction((ai) => ai.remind(actionId, due.toISOString()));
+  }
+
+  cancelReminder(reminderId: string): Promise<void> {
+    return this.#changeAction((ai) => ai.cancelReminder(reminderId));
+  }
+
+  addToCalendar(actionId: string): Promise<void> {
+    return this.#changeAction((ai) => ai.addToCalendar(actionId));
+  }
+
   closeSummary(): void {
     this.#set({ summary: null });
   }
@@ -454,7 +495,7 @@ export class BrowserStore {
       const thread = await this.#repository.thread(message.threadId);
       if (request === this.#threadRequest) this.#set({ thread: thread.length ? thread : [message] });
     });
-    await this.#loadCachedSummary();
+    await Promise.all([this.#loadCachedSummary(), this.#loadActions(message.id)]);
   }
 
   // --- Schreiben ---
@@ -704,7 +745,7 @@ export class BrowserStore {
       }
       // Auswahl bleibt, solange die Mail noch in der Liste oder in den Suchergebnissen steht.
       const keepSelection = selected !== null && (messages.some((m) => m.id === selected) || Boolean(this.#state.searchResults?.some((m) => m.id === selected)));
-      this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null }) });
+      this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null }) });
     });
   }
 
@@ -713,7 +754,7 @@ export class BrowserStore {
     // Ordnerwechsel beendet eine Suche in allen Ordnern; „nur in diesem Ordner“ sucht im neuen Ordner weiter.
     const keepSearch = isSearching(this.#state) && !this.#state.searchAllFolders;
     this.#set({
-      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null,
+      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null,
       ...(keepSearch ? {} : { searchText: "", searchResults: null }),
     });
     await Promise.all([this.loadMessages(), keepSearch ? this.runSearch() : Promise.resolve()]);
@@ -755,13 +796,15 @@ export class BrowserStore {
     const request = ++this.#threadRequest;
     this.#set({ selectedMessageId: id });
     if (id === null) {
-      this.#set({ thread: [], attachmentsByMessageId: {}, summary: null });
+      this.#set({ thread: [], attachmentsByMessageId: {}, summary: null, actions: null });
       return;
     }
     const message = this.#find(id);
     if (!message) return;
     if (this.#state.summary && this.#state.summary.threadId !== message.threadId) this.#set({ summary: null });
+    if (this.#state.actions?.messageId !== id) this.#set({ actions: null });
     void this.#loadCachedSummary();
+    void this.#loadActions(id);
     await this.#guard(async () => {
       const thread = await this.#repository.thread(message.threadId);
       const attachmentsByMessageId: Record<string, Attachment[]> = {};

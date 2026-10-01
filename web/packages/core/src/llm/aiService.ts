@@ -1,4 +1,8 @@
-import { categorizeWindowDays, maxPageImageChars, normalizeAISettings, type AIApi, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
+import { actionsPromptVersion, extractActions, ruleActions } from "../ai/actions.js";
+import { cleanMailText } from "../ai/prepare.js";
+import { calendarFileName, toICalendar } from "../calendar.js";
+import type { ActionStatus, ActionStore, StoredAction } from "../sqlite/actionStore.js";
+import { categorizeWindowDays, maxPageImageChars, normalizeAISettings, type ActionView, type MessageActionsView, type AIApi, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
 import { modelCatalog, type CatalogModel } from "../ai/catalog.js";
 import { promptVersions } from "../ai/prompts.js";
 import { AIRouter, GrantPolicy } from "../ai/router.js";
@@ -34,6 +38,13 @@ export interface AIServiceOptions {
   /** Inhalt eines Anhangs (ggf. vom Mailserver geholt). */
   attachmentContent?: (attachmentId: string) => Promise<{ filename: string; mimeType: string; content: Uint8Array }>;
   createVisionProvider?: (model: CatalogModel, paths: { server: string; model: string; mmproj: string }, settings: AISettings) => ManagedProvider;
+  /** Erkannte Aktionen und Erinnerungen (W6.1). */
+  actions?: ActionStore;
+  message?: (messageId: string) => Promise<Message | null>;
+  /** Kalenderdatei mit dem Standardprogramm öffnen (Windows: Outlook/Kalender). */
+  openCalendarFile?: (ics: string, filename: string) => Promise<void>;
+  /** Aktionen einer Mail wurden im Hintergrund verfeinert (Modell) – Oberfläche neu laden. */
+  onActionsUpdated?: (messageId: string) => void;
   /** Status hat sich geändert (Download-Fortschritt, Einstellungen, Einordnung). */
   onStatus?: (status: AIStatus) => void;
   /** Eine Mail hat eine Kategorie bekommen – Oberfläche neu laden. */
@@ -359,6 +370,125 @@ export class AIService implements AIApi {
     this.#vision = null;
     if (current && this.#active === current.provider) this.#active = null;
     await current?.provider.dispose();
+  }
+
+  // --- Aktionen und Erinnerungen (W6.1) ---
+
+  readonly #scanning = new Map<string, Promise<void>>();
+
+  #actionStore(): ActionStore {
+    if (!this.options.actions) throw new Error("Aktionen sind hier nicht verfügbar.");
+    return this.options.actions;
+  }
+
+  #actionsView(messageId: string, origin: MessageActionsView["origin"]): MessageActionsView {
+    const store = this.#actionStore();
+    const reminders = store.remindersForMessage(messageId);
+    const view = (a: StoredAction): ActionView => {
+      const reminder = reminders.find((r) => r.actionId === a.id);
+      return { ...a, reminder: reminder ? { id: reminder.id, dueDate: reminder.dueDate } : null };
+    };
+    return { messageId, actions: store.actions(messageId).filter((a) => a.status !== "dismissed").map(view), origin };
+  }
+
+  /**
+   * Aktionen einer Mail – ohne Warten: beim ersten Öffnen sofort die Regel-Erkennung; steht ein Modell bereit, verfeinert
+   * es im Hintergrund und meldet sich über `onActionsUpdated` (die Oberfläche lädt dann neu).
+   */
+  async messageActions(messageId: string): Promise<MessageActionsView> {
+    const store = this.#actionStore();
+    const scan = store.scan(messageId);
+    if (scan && scan.promptVersion === actionsPromptVersion && scan.origin !== "rules") return this.#actionsView(messageId, scan.origin as MessageActionsView["origin"]);
+    const message = await this.options.message?.(messageId);
+    if (!message) return { messageId, actions: [], origin: null };
+    const role = store.mailboxRole(messageId);
+    // Nur empfangene Mails; Werbung und Verdächtiges nicht (dort will niemand „Termine“ aus Lockangeboten)
+    if (role === "sent" || role === "drafts" || role === "trash" || role === "spam" || message.category === "newsletter" || message.category === "spam_suspect") {
+      return { messageId, actions: [], origin: null };
+    }
+    if (!scan || scan.promptVersion !== actionsPromptVersion) {
+      const actions = ruleActions(message.subject, cleanMailText(message.bodyText ?? message.snippet, 2000), new Date(message.date));
+      store.saveScan(messageId, actions, { origin: "rules", promptVersion: actionsPromptVersion, at: (this.options.now?.() ?? new Date()).toISOString() });
+    }
+    if (await this.#modelReady()) void this.#refineActions(message);
+    return this.#actionsView(messageId, "rules");
+  }
+
+  /** Modell-Erkennung im Hintergrund (je Mail höchstens einmal gleichzeitig). */
+  #refineActions(message: Message): Promise<void> {
+    const running = this.#scanning.get(message.id);
+    if (running) return running;
+    const work = (async () => {
+      try {
+        const { router } = await this.#router();
+        const result = await extractActions(router, message);
+        // Versagt das Modell zweimal, bleibt es bei den Regeln (schon gespeichert)
+        if (result.origin === "rules") return;
+        this.#actionStore().saveScan(message.id, result.actions, { origin: result.origin, promptVersion: actionsPromptVersion, at: (this.options.now?.() ?? new Date()).toISOString() });
+        this.options.onActionsUpdated?.(message.id);
+      } catch (error) {
+        if (!(error instanceof AINotConfiguredError || error instanceof AIBlockedError)) {
+          this.#error = error instanceof Error ? error.message : String(error);
+        }
+      }
+    })();
+    this.#scanning.set(message.id, work);
+    void work.finally(() => this.#scanning.delete(message.id));
+    return work;
+  }
+
+  /** Für Tests: wartet, bis laufende Hintergrund-Erkennungen fertig sind. */
+  async settled(): Promise<void> {
+    await Promise.all([...this.#scanning.values()]);
+  }
+
+  async #modelReady(): Promise<boolean> {
+    const model = this.#settings.enabled && this.#settings.modelId ? this.#model(this.#settings.modelId) : undefined;
+    return !!model && (await this.options.store.status(model)).state === "installed";
+  }
+
+  async setActionStatus(actionId: string, status: ActionStatus): Promise<void> {
+    if (status !== "open" && status !== "done" && status !== "dismissed") throw new Error("Ungültiger Status.");
+    this.#actionStore().setStatus(actionId, status);
+  }
+
+  async remind(actionId: string, dueIso: string): Promise<void> {
+    const store = this.#actionStore();
+    const action = store.action(actionId);
+    if (!action) throw new Error("Die Aktion gibt es nicht mehr.");
+    const due = new Date(dueIso);
+    if (Number.isNaN(due.getTime())) throw new Error("Ungültiger Zeitpunkt.");
+    for (const existing of store.remindersForMessage(action.messageId).filter((r) => r.actionId === actionId)) store.cancelReminder(existing.id);
+    store.addReminder({ messageId: action.messageId, actionId, dueDate: due.toISOString(), text: action.title });
+  }
+
+  async cancelReminder(reminderId: string): Promise<void> {
+    this.#actionStore().cancelReminder(reminderId);
+  }
+
+  async addToCalendar(actionId: string): Promise<void> {
+    const action = this.#actionStore().action(actionId);
+    if (!action?.date) throw new Error("Für einen Kalendereintrag fehlt das Datum.");
+    if (!this.options.openCalendarFile) throw new Error("Kalender ist hier nicht verfügbar.");
+    const message = await this.options.message?.(action.messageId);
+    const ics = toICalendar(
+      {
+        uid: `${action.id}@stinkyma`,
+        title: action.type === "payment" ? `Zahlung: ${action.title}${action.amount ? ` (${action.amount})` : ""}` : action.type === "deadline" ? `Frist: ${action.title}` : action.title,
+        date: action.date,
+        time: action.type === "appointment" ? action.time : null,
+        description: [action.quote, message ? `Aus der Mail „${message.subject}“` : ""].filter(Boolean).join("\n\n"),
+        alarmMinutesBefore: action.type === "appointment" && action.time ? 60 : undefined,
+      },
+      this.options.now?.() ?? new Date(),
+    );
+    await this.options.openCalendarFile(ics, calendarFileName(action.title, action.date));
+  }
+
+  /** Fällige Erinnerungen (für Benachrichtigungen; jede genau einmal). */
+  takeDueReminders(): { id: string; messageId: string | null; text: string }[] {
+    if (!this.options.actions) return [];
+    return this.options.actions.takeDueReminders((this.options.now?.() ?? new Date()).toISOString());
   }
 
   #view(stored: StoredSummary, thread: Message[]): SummaryView {
