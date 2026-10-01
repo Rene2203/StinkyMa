@@ -1,4 +1,4 @@
-import { AppWindow, ImageDown, PenLine, Plus, X } from "lucide-react";
+import { AppWindow, ImageDown, KeyRound, PenLine, Plus, X } from "lucide-react";
 import { normalizeRemoteContentException } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -118,6 +118,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
 
         {state.appSettings && <AppSettingsSection />}
 
+        {state.appSettings && <OAuthSection />}
+
         <section className="options-section" aria-labelledby="options-signature-heading">
           <h3 id="options-signature-heading">
             <PenLine size={16} aria-hidden="true" /> {t("signature.title")}
@@ -192,3 +194,41 @@ function AppSettingsSection() {
   );
 }
 
+
+/** Eigene App-Registrierung für die Anmeldung per Browser (Google, Microsoft). */
+function OAuthSection() {
+  const { store, t } = useUi();
+  const state = useBrowserState();
+  const clients = state.appSettings?.oauthClients;
+  const [googleId, setGoogleId] = useState(clients?.google.clientId ?? "");
+  const [googleSecret, setGoogleSecret] = useState(clients?.google.clientSecret ?? "");
+  const [microsoftId, setMicrosoftId] = useState(clients?.microsoft.clientId ?? "");
+  const [saved, setSaved] = useState(false);
+  if (!clients) return null;
+  const dirty = googleId !== clients.google.clientId || googleSecret !== clients.google.clientSecret || microsoftId !== clients.microsoft.clientId;
+  const save = async () => {
+    await store.updateAppSettings({ oauthClients: { google: { clientId: googleId.trim(), clientSecret: googleSecret.trim() }, microsoft: { clientId: microsoftId.trim() } } });
+    setSaved(true);
+  };
+  const field = (label: string, value: string, set: (v: string) => void, testId: string) => (
+    <label className="setting-field">
+      <span className="small">{label}</span>
+      <input value={value} spellCheck={false} autoComplete="off" data-testid={testId} onChange={(e) => { set(e.target.value); setSaved(false); }} />
+    </label>
+  );
+  return (
+    <section className="options-section" aria-labelledby="options-oauth-heading">
+      <h3 id="options-oauth-heading">
+        <KeyRound size={16} aria-hidden="true" /> {t("oauth.title")}
+      </h3>
+      <p className="hint">{t("oauth.text")}</p>
+      {field(t("oauth.googleId"), googleId, setGoogleId, "oauth-google-id")}
+      {field(t("oauth.googleSecret"), googleSecret, setGoogleSecret, "oauth-google-secret")}
+      {field(t("oauth.microsoftId"), microsoftId, setMicrosoftId, "oauth-microsoft-id")}
+      <div className="setting-actions">
+        <button type="button" disabled={!dirty} data-testid="oauth-save" onClick={() => void save()}>{t("oauth.save")}</button>
+        {saved && !dirty && <span className="muted small" role="status">{t("oauth.saved")}</span>}
+      </div>
+    </section>
+  );
+}

@@ -12,6 +12,7 @@ import {
   type AppSettings,
   type AppSettingsApi,
   type AIApi,
+  type OAuthProviderId,
   type AISettings,
   type AIStatus,
   type SummaryView,
@@ -92,6 +93,8 @@ export interface BrowserState {
   summary: SummaryState | null;
   /** „Mit KI lesen“ für den Anhang in der Vorschau. */
   reading: ReadingState | null;
+  /** Anbieter mit Anmeldung per Browser (App-Registrierung hinterlegt). */
+  oauthProviders: OAuthProviderId[];
 }
 
 export interface ReadingState {
@@ -133,6 +136,7 @@ export const initialState: BrowserState = {
   ai: null,
   summary: null,
   reading: null,
+  oauthProviders: [],
 };
 
 // --- Abgeleitete Werte ---
@@ -346,6 +350,7 @@ export class BrowserStore {
     await this.#guard(async () => {
       this.#set({ appSettings: await settings.update(patch) });
     });
+    if ("oauthClients" in patch) await this.#loadOAuthProviders();
   }
 
   async #loadAppSettings(): Promise<void> {
@@ -429,6 +434,7 @@ export class BrowserStore {
       this.#loadRemoteContentExceptions(),
       this.#loadAppSettings(),
       this.#loadAI(),
+      this.#loadOAuthProviders(),
     ]);
   }
 
@@ -626,6 +632,27 @@ export class BrowserStore {
     if (this.#state.selectedScope.kind === "mailbox" && this.#state.selectedScope.mailboxId.startsWith(accountId)) {
       await this.selectScope({ kind: "unifiedInbox" });
     }
+    await this.reload();
+  }
+
+  async #loadOAuthProviders(): Promise<void> {
+    if (!this.#accounts) return;
+    await this.#guard(async () => this.#set({ oauthProviders: await this.#accounts!.oauthProviders() }));
+  }
+
+  /** Konto per Anmeldung im Browser. Fehler an den Dialog (nicht als Banner). */
+  async addOAuthAccount(provider: OAuthProviderId, removeDemoAccounts: boolean): Promise<Account> {
+    if (!this.#accounts) throw new Error("Kontoverwaltung ist hier nicht verfügbar.");
+    const account = await this.#accounts.addOAuthAccount(provider, { removeDemoAccounts });
+    await this.selectScope({ kind: "unifiedInbox" });
+    await this.reload();
+    return account;
+  }
+
+  /** Abgelaufene Anmeldung erneuern (öffnet den Browser). */
+  async reauthorize(accountId: string): Promise<void> {
+    if (!this.#accounts) return;
+    await this.#guard(() => this.#accounts!.reauthorize(accountId));
     await this.reload();
   }
 

@@ -4,7 +4,12 @@ import { defaultAppSettings, normalizeAppSettings } from "../src/index.js";
 describe("App-Einstellungen", () => {
   it("Standard: Infobereich an, Autostart aus, Benachrichtigung mit Absender/Betreff", () => {
     expect(normalizeAppSettings(undefined)).toEqual(defaultAppSettings);
-    expect(defaultAppSettings).toEqual({ closeToTray: true, launchAtLogin: false, notifications: "full" });
+    expect(defaultAppSettings).toEqual({
+      closeToTray: true,
+      launchAtLogin: false,
+      notifications: "full",
+      oauthClients: { google: { clientId: "", clientSecret: "" }, microsoft: { clientId: "" } },
+    });
   });
 
   it("übernimmt Gültiges, ersetzt Kaputtes durch den Standard", () => {
@@ -12,7 +17,15 @@ describe("App-Einstellungen", () => {
       closeToTray: false,
       launchAtLogin: false,
       notifications: "full",
+      oauthClients: defaultAppSettings.oauthClients,
     });
     expect(normalizeAppSettings({ notifications: "minimal" }).notifications).toBe("minimal");
+  });
+
+  it("App-Registrierung für die Anmeldung per Browser: getrimmt, Kaputtes wird leer", () => {
+    expect(normalizeAppSettings({ oauthClients: { google: { clientId: " 123.apps.example ", clientSecret: 7 }, microsoft: "kaputt" } }).oauthClients).toEqual({
+      google: { clientId: "123.apps.example", clientSecret: "" },
+      microsoft: { clientId: "" },
+    });
   });
 });

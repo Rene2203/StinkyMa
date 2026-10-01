@@ -18,11 +18,12 @@ import { SecretKeys, type SecretStore } from "../secrets.js";
 import type { SqliteMailRepository } from "../sqlite/repository.js";
 import type { MailWriter, PendingAction } from "../sqlite/writer.js";
 import { messageIdFor, syncAccount, type SyncResult } from "./accountSync.js";
-import { connectImap, describeConnectionError, loginFor, MailConnectionError, testImapLogin } from "./connection.js";
+import { connectImap, describeConnectionError, loginFor, MailConnectionError, testImapLogin, type ImapLogin } from "./connection.js";
+import { OAuthError, oauthProviders, parseStoredOAuth, tokenNeedsRefresh, type OAuthProviderId, type OAuthTokens, type StoredOAuth } from "../oauth.js";
 import { imapFlagName } from "./flags.js";
 import type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus } from "../accounts.js";
 import type { ComposeDraft, OutgoingMail } from "../compose.js";
-import { buildMessage, sendRaw, smtpLoginFor, SmtpRejectedError } from "./smtp.js";
+import { buildMessage, sendRaw, smtpLoginFor, SmtpRejectedError, type SmtpLogin } from "./smtp.js";
 import { extractAttachment } from "./parse.js";
 
 export type { AccountSettings, AccountsApi, AddAccountOptions, SyncStatus };
@@ -44,6 +45,20 @@ export interface MailServiceOptions {
   onNewMail?: (accountId: string, messages: Message[]) => void;
   /** Wartezeit vor dem Abgleich, nachdem der Server neue Mails gemeldet hat (bündelt mehrere Meldungen). */
   watchDebounceMs?: number;
+  /** Anmeldung im Browser (OAuth) – stellt die Plattform bereit (Windows: Standardbrowser + Loopback). */
+  oauth?: OAuthBroker;
+  /** Nur für Tests: andere Server statt Gmail/Outlook (z. B. GreenMail). */
+  oauthServers?: {
+    imap: { host: string; port: number; security: Account["imapSecurity"] };
+    smtp: { host: string; port: number; security: Account["smtpSecurity"] };
+  };
+}
+
+/** Anmeldung und Token-Erneuerung bei Google/Microsoft. Fehlt die App-Registrierung, ist der Anbieter nicht „configured“. */
+export interface OAuthBroker {
+  configured(): OAuthProviderId[];
+  signIn(provider: OAuthProviderId, loginHint?: string): Promise<OAuthTokens & { email: string | null }>;
+  refresh(provider: OAuthProviderId, refreshToken: string): Promise<OAuthTokens>;
 }
 
 /** Nach so vielen Fehlversuchen (Server lehnt ab, nicht: offline) wird eine Aktion verworfen. */
@@ -308,7 +323,62 @@ export class MailService implements MailRepository, AccountsApi {
   async addAccount(settings: AccountSettings, password: string, options: AddAccountOptions): Promise<Account> {
     const test = await this.testConnection(settings, password);
     if (!test.ok) throw new Error(test.error);
+    return this.#createAccount(settings, "password", options, (id) => this.secrets.set(SecretKeys.accountPassword(id), password));
+  }
 
+  oauthProviders(): Promise<OAuthProviderId[]> {
+    return Promise.resolve(this.options.oauth?.configured() ?? []);
+  }
+
+  /** Konto per Browser-Anmeldung: Adresse kommt vom Anbieter, Servereinstellungen sind fest (Gmail/Outlook). */
+  async addOAuthAccount(providerId: OAuthProviderId, options: AddAccountOptions): Promise<Account> {
+    const broker = this.options.oauth;
+    if (!broker || !broker.configured().includes(providerId)) throw new Error("Für diesen Anbieter ist die Anmeldung per Browser noch nicht eingerichtet (Optionen → Konten).");
+    const provider = oauthProviders[providerId];
+    const tokens = await broker.signIn(providerId);
+    if (!tokens.email) throw new Error(`${provider.label} hat keine E-Mail-Adresse mitgeteilt. Bitte erneut versuchen.`);
+    const settings: AccountSettings = {
+      email: tokens.email,
+      displayName: tokens.email,
+      provider: provider.account.provider,
+      username: tokens.email,
+      imapHost: this.options.oauthServers?.imap.host ?? provider.account.imap.host,
+      imapPort: this.options.oauthServers?.imap.port ?? provider.account.imap.port,
+      imapSecurity: this.options.oauthServers?.imap.security ?? "tls",
+      smtpHost: this.options.oauthServers?.smtp.host ?? provider.account.smtp.host,
+      smtpPort: this.options.oauthServers?.smtp.port ?? provider.account.smtp.port,
+      smtpSecurity: this.options.oauthServers?.smtp.security ?? provider.account.smtp.security,
+    };
+    try {
+      await testImapLogin({ ...loginFor(settings, ""), accessToken: tokens.accessToken });
+    } catch (error) {
+      throw new Error(error instanceof MailConnectionError ? error.message : describeConnectionError(error));
+    }
+    const stored: StoredOAuth = { provider: providerId, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresAt: tokens.expiresAt };
+    return this.#createAccount(settings, "oauth2", options, (id) => this.secrets.set(SecretKeys.oauthRefreshToken(id), JSON.stringify(stored)));
+  }
+
+  /** Erneut anmelden (Token widerrufen/abgelaufen). Nur mit derselben Adresse – sonst wäre es ein anderes Konto. */
+  async reauthorize(accountId: string): Promise<void> {
+    const account = this.writer.account(accountId);
+    if (!account || account.authType !== "oauth2") throw new Error("Dieses Konto meldet sich nicht per Browser an.");
+    const stored = parseStoredOAuth(await this.secrets.get(SecretKeys.oauthRefreshToken(accountId)));
+    const providerId: OAuthProviderId = stored?.provider ?? (account.provider === "outlook" ? "microsoft" : "google");
+    const broker = this.options.oauth;
+    if (!broker) throw new Error("Anmeldung per Browser ist hier nicht verfügbar.");
+    const tokens = await broker.signIn(providerId, account.email);
+    if (tokens.email && tokens.email !== account.email.toLowerCase()) {
+      throw new Error(`Angemeldet als ${tokens.email}, erwartet ${account.email}. Bitte mit dem richtigen Konto anmelden.`);
+    }
+    await this.secrets.set(SecretKeys.oauthRefreshToken(accountId), JSON.stringify({ provider: providerId, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresAt: tokens.expiresAt } satisfies StoredOAuth));
+    this.#dropClient(accountId);
+    this.writer.setSyncStatus(accountId, { syncError: null });
+    this.options.onChange?.();
+    void this.syncNow();
+    this.#watch(accountId);
+  }
+
+  async #createAccount(settings: AccountSettings, authType: Account["authType"], options: AddAccountOptions, storeSecret: (accountId: string) => Promise<void>): Promise<Account> {
     const existing = (await this.repository.accounts()).find(
       (a) => a.email.toLowerCase() === settings.email.trim().toLowerCase() && !isDemoAccount(a),
     );
@@ -330,14 +400,14 @@ export class MailService implements MailRepository, AccountsApi {
       smtpHost: settings.smtpHost.trim(),
       smtpPort: settings.smtpPort,
       smtpSecurity: settings.smtpSecurity,
-      authType: "password",
+      authType,
       color: accountColors.find((c) => !used.has(c)) ?? "blue",
       aiCloudAllowed: false,
       sortOrder: this.writer.nextSortOrder(),
       lastSyncAt: null,
       syncError: null,
     };
-    await this.secrets.set(SecretKeys.accountPassword(account.id), password);
+    await storeSecret(account.id);
     this.writer.insertAccount(account);
     this.options.onChange?.();
     void this.syncNow();
@@ -350,6 +420,7 @@ export class MailService implements MailRepository, AccountsApi {
     this.#dropClient(accountId);
     this.writer.deleteAccount(accountId);
     await this.secrets.remove(SecretKeys.accountPassword(accountId));
+    await this.secrets.remove(SecretKeys.oauthRefreshToken(accountId));
     this.options.onChange?.();
   }
 
@@ -448,9 +519,9 @@ export class MailService implements MailRepository, AccountsApi {
     const account = this.writer.account(accountId);
     if (!account || this.#disposed) return;
     try {
-      const password = await this.secrets.get(SecretKeys.accountPassword(accountId));
-      if (password === null) return;
-      const client = await connectImap(loginFor(account, password), { maxIdleTimeMs: 4 * 60_000 });
+      const login = await this.#imapLogin(account);
+      if (!login) return;
+      const client = await connectImap(login, { maxIdleTimeMs: 4 * 60_000 });
       entry.client = client;
       let debounce: ReturnType<typeof setTimeout> | null = null;
       const onServerChange = () => {
@@ -579,10 +650,10 @@ export class MailService implements MailRepository, AccountsApi {
     for (const row of rows) {
       if (!row.sentAt) {
         try {
-          const password = await this.secrets.get(SecretKeys.accountPassword(accountId));
-          if (password === null) throw new MailConnectionError("Kein Passwort gespeichert. Bitte das Konto neu einrichten.");
+          const login = await this.#smtpLogin(account);
+          if (!login) throw new MailConnectionError(account.authType === "oauth2" ? "Keine Anmeldung gespeichert. Bitte erneut anmelden." : "Kein Passwort gespeichert. Bitte das Konto neu einrichten.");
           const raw = Buffer.from(row.raw);
-          await sendRaw(smtpLoginFor(account, password), { raw, envelope: envelopeOf(row.mail, account.email) });
+          await sendRaw(login, { raw, envelope: envelopeOf(row.mail, account.email) });
           this.writer.markOutgoingSent(row.id, this.#now().toISOString());
           changed = true;
         } catch (error) {
@@ -746,15 +817,64 @@ export class MailService implements MailRepository, AccountsApi {
     return run;
   }
 
+  // --- Zugangsdaten: Passwort oder OAuth-Token ---
+
+  /** Erneuerungen je Konto bündeln (mehrere Verbindungen gleichzeitig → ein Token-Abruf). */
+  readonly #tokenRefresh = new Map<string, Promise<string>>();
+
+  /** Passwort bzw. gültiges Zugriffstoken; `null`, wenn nichts gespeichert ist. */
+  async #secretFor(account: Account): Promise<{ password: string } | { accessToken: string } | null> {
+    if (account.authType !== "oauth2") {
+      const password = await this.secrets.get(SecretKeys.accountPassword(account.id));
+      return password === null ? null : { password };
+    }
+    const stored = parseStoredOAuth(await this.secrets.get(SecretKeys.oauthRefreshToken(account.id)));
+    if (!stored) return null;
+    if (!tokenNeedsRefresh(stored, this.#now())) return { accessToken: stored.accessToken };
+    const running = this.#tokenRefresh.get(account.id);
+    if (running) return { accessToken: await running };
+    const refresh = (async () => {
+      const broker = this.options.oauth;
+      if (!broker) throw new MailConnectionError("Anmeldung per Browser ist hier nicht verfügbar.");
+      try {
+        const tokens = await broker.refresh(stored.provider, stored.refreshToken);
+        await this.secrets.set(SecretKeys.oauthRefreshToken(account.id), JSON.stringify({ ...tokens, provider: stored.provider } satisfies StoredOAuth));
+        return tokens.accessToken;
+      } catch (error) {
+        // Offline o. Ä.: als Verbindungsfehler melden (Warteschlange bleibt); widerrufen: klar zum Neu-Anmelden auffordern
+        if (error instanceof OAuthError) throw new MailConnectionError(error.message);
+        throw new MailConnectionError(describeConnectionError(error));
+      }
+    })();
+    this.#tokenRefresh.set(account.id, refresh);
+    try {
+      return { accessToken: await refresh };
+    } finally {
+      this.#tokenRefresh.delete(account.id);
+    }
+  }
+
+  async #imapLogin(account: Account): Promise<ImapLogin | null> {
+    const secret = await this.#secretFor(account);
+    if (!secret) return null;
+    return "accessToken" in secret ? { ...loginFor(account, ""), accessToken: secret.accessToken } : loginFor(account, secret.password);
+  }
+
+  async #smtpLogin(account: Account): Promise<SmtpLogin | null> {
+    const secret = await this.#secretFor(account);
+    if (!secret) return null;
+    return "accessToken" in secret ? { ...smtpLoginFor(account, ""), accessToken: secret.accessToken } : smtpLoginFor(account, secret.password);
+  }
+
   async #client(accountId: string): Promise<ImapFlow> {
     const existing = this.#clients.get(accountId);
     if (existing?.usable) return existing;
     if (existing) this.#dropClient(accountId);
     const account = this.writer.account(accountId);
     if (!account) throw new Error("Konto nicht gefunden");
-    const password = await this.secrets.get(SecretKeys.accountPassword(accountId));
-    if (password === null) throw new MailConnectionError("Kein Passwort gespeichert. Bitte das Konto neu einrichten.");
-    const client = await connectImap(loginFor(account, password));
+    const login = await this.#imapLogin(account);
+    if (!login) throw new MailConnectionError(account.authType === "oauth2" ? "Keine Anmeldung gespeichert. Bitte erneut anmelden." : "Kein Passwort gespeichert. Bitte das Konto neu einrichten.");
+    const client = await connectImap(login);
     client.on("close", () => {
       if (this.#clients.get(accountId) === client) this.#clients.delete(accountId);
     });

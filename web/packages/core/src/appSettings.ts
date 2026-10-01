@@ -11,12 +11,18 @@ export interface AppSettings {
   launchAtLogin: boolean;
   /** Benachrichtigungen: mit Absender und Betreff, nur „Neue Mail“ oder aus. */
   notifications: NotificationMode;
+  /**
+   * Eigene App-Registrierung für die Anmeldung per Browser (OAuth). Leer = nicht eingerichtet. Das „Secret“ einer
+   * Google-Desktop-App ist laut Google nicht geheim; Microsoft braucht keins.
+   */
+  oauthClients: { google: { clientId: string; clientSecret: string }; microsoft: { clientId: string } };
 }
 
 export const defaultAppSettings: AppSettings = {
   closeToTray: true,
   launchAtLogin: false,
   notifications: "full",
+  oauthClients: { google: { clientId: "", clientSecret: "" }, microsoft: { clientId: "" } },
 };
 
 export interface AppSettingsApi {
@@ -37,5 +43,15 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
     closeToTray: typeof value.closeToTray === "boolean" ? value.closeToTray : defaultAppSettings.closeToTray,
     launchAtLogin: typeof value.launchAtLogin === "boolean" ? value.launchAtLogin : defaultAppSettings.launchAtLogin,
     notifications: notifications === "full" || notifications === "minimal" || notifications === "off" ? notifications : defaultAppSettings.notifications,
+    oauthClients: normalizeOAuthClients(value.oauthClients),
+  };
+}
+
+function normalizeOAuthClients(raw: unknown): AppSettings["oauthClients"] {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, Record<string, unknown> | undefined>;
+  const text = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 300) : "");
+  return {
+    google: { clientId: text(value.google?.clientId), clientSecret: text(value.google?.clientSecret) },
+    microsoft: { clientId: text(value.microsoft?.clientId) },
   };
 }

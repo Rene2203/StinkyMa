@@ -252,6 +252,11 @@ export class MailWriter {
       .run(action.accountId, action.messageId, action.kind, JSON.stringify(action.payload), action.createdAt);
   }
 
+  /** Liegt für diese Mail noch eine Änderung in der Warteschlange (noch nicht beim Server)? */
+  hasPendingAction(accountId: string, messageId: string): boolean {
+    return this.db.prepare("SELECT 1 FROM pendingAction WHERE accountId = ? AND messageId = ? LIMIT 1").get(accountId, messageId) !== undefined;
+  }
+
   pendingActions(accountId: string): PendingAction[] {
     return (this.db.prepare("SELECT * FROM pendingAction WHERE accountId = ? ORDER BY id").all(accountId) as Row[]).map((r) => ({
       id: Number(r.id),

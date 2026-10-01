@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. W5.5 (Bilder/Scans) fertig. Als Nächstes: OAuth für Gmail/Outlook. Offen: Zusammenfassungs-Prompt v3, Test durch den Nutzer
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. W5.5 (Bilder/Scans) und OAuth (Gmail/Outlook) fertig, lokal geprüft. Offen: Test durch den Nutzer (OAuth braucht eine eigene App-Registrierung, Anleitung `docs/OAUTH-EINRICHTEN.md`), Zusammenfassungs-Prompt v3
 
 ## Überblick
 
@@ -335,4 +335,22 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   - **Ungeprüft:** Windows mit Vulkan/GPU, HEIC-Fotos vom iPhone (nicht unterstützt – Hinweis erscheint), automatisches
     Lesen im Hintergrund (bewusst nur auf Klick: ~45 s je Bild auf schwacher Hardware). **Noch offen:** Sprachnachrichten
     (Gemma 4 kann Audio, llama.cpp meldet es als experimentell).
+- **Windows-CI Lauf #63 (W5.5) grün:** die Bild-Laufzeit wird unter echtem Windows geladen (ZIP, Prüfsumme), mit dem
+  Windows-tar entpackt und `llama-server.exe` antwortet (Testmodell).
+- **OAuth für Gmail und Outlook (lokal geprüft):** `core/src/oauth.ts` (plattformneutral: PKCE mit Web Crypto, Anmeldeseite,
+  Code-Tausch, Erneuerung, Adresse aus dem ID-Token), `core/node/oauthLoopback.ts` (Rückleitung nur auf 127.0.0.1/::1,
+  `state`-Prüfung, Zeitlimit, Abbruch). `MailService`: Konten mit `authType: "oauth2"`, IMAP/SMTP per XOAUTH2, Token wird
+  rechtzeitig und je Konto nur einmal erneuert (auch bei gleichzeitigen Verbindungen), widerrufen → Warnung am Konto +
+  „Erneut anmelden“ (nur mit derselben Adresse). Gespeichert wird nur das Token (DPAPI), kein Passwort.
+  App: „Mit Google/Microsoft anmelden“ im Konto-Dialog (nur für eingerichtete Anbieter), Optionen → „Anmeldung per Browser“
+  für die eigene App-Registrierung (Client-ID), Anleitung `docs/OAUTH-EINRICHTEN.md`.
+  Tests: 11 Unit-Tests gegen nachgestellten Anbieter (PKCE, state, Abbruch, Zeitlimit, Rotation, widerrufen ohne
+  Anbieter-Details), 5 Integrationstests gegen GreenMail (XOAUTH2-Abgleich, Senden, einmalige Erneuerung, widerrufen +
+  Neu-Anmeldung), E2E in der App („Mit Google anmelden“ → Mails da, nur Token verschlüsselt gespeichert).
+  **Ungeprüft:** echte Google-/Microsoft-Anmeldung (braucht die Registrierung des Nutzers), Google-„Testen“-Modus (Tokens
+  7 Tage), Firmenkonten mit Admin-Sperre.
+- **Fehler gefunden und behoben (beim E2E-Lauf unter Last):** Lief beim Öffnen einer Mail gerade ein Abgleich, konnte er
+  die eben gesetzte Markierung „gelesen“ mit dem alten Serverstand überschreiben – die Mail sah kurz wieder ungelesen aus,
+  bis die Warteschlange beim Server war. Jetzt gewinnt eine noch nicht übertragene lokale Änderung. Regressionstest gegen
+  GreenMail (scheitert ohne die Korrektur nachweislich).
 

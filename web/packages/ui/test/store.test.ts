@@ -241,14 +241,20 @@ describe("BrowserStore", () => {
       testConnection: async () => ({ ok: true as const }),
       addAccount: async () => { calls.push("add"); return (await repo.accounts())[0]!; },
       removeAccount: async (id: string) => { calls.push(`remove:${id}`); },
+      addOAuthAccount: async (provider: string) => { calls.push(`oauth:${provider}`); return (await repo.accounts())[0]!; },
+      reauthorize: async (id: string) => { calls.push(`reauth:${id}`); },
+      oauthProviders: async () => ["google" as const],
     };
     const managed = new BrowserStore(repo, { accounts });
     await managed.start();
     expect(managed.canManageAccounts).toBe(true);
     expect(managed.getState().lastSyncAt).toBe("2026-09-30T10:00:00.000Z");
+    expect(managed.getState().oauthProviders).toEqual(["google"]);
     await managed.syncNow();
     await managed.removeAccount(MockIds.gmail);
-    expect(calls).toEqual(["sync", `remove:${MockIds.gmail}`]);
+    await managed.addOAuthAccount("google", true);
+    await managed.reauthorize(MockIds.gmail);
+    expect(calls).toEqual(["sync", `remove:${MockIds.gmail}`, "oauth:google", `reauth:${MockIds.gmail}`]);
     expect(managed.getState().syncing).toBe(false);
   });
 

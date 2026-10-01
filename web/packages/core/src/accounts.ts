@@ -1,3 +1,4 @@
+import type { OAuthProviderId } from "./oauth.js";
 import type { Account, ConnectionSecurity } from "./models.js";
 
 /** Eingaben aus dem Dialog „Konto hinzufügen“. */
@@ -27,11 +28,17 @@ export interface SyncStatus {
 /** Verwaltung von Konten und Abgleich – die Oberfläche ruft das über eine Brücke (IPC/HTTP) auf. */
 export interface AccountsApi {
   addAccount(settings: AccountSettings, password: string, options: AddAccountOptions): Promise<Account>;
+  /** Konto per Anmeldung im Browser (OAuth) hinzufügen – Gmail, Outlook. */
+  addOAuthAccount(provider: OAuthProviderId, options: AddAccountOptions): Promise<Account>;
+  /** Abgelaufene/widerrufene OAuth-Anmeldung erneuern. */
+  reauthorize(accountId: string): Promise<void>;
+  /** Für welche Anbieter eine App-Registrierung (Client-ID) eingerichtet ist. */
+  oauthProviders(): Promise<OAuthProviderId[]>;
   testConnection(settings: AccountSettings, password: string): Promise<{ ok: true } | { ok: false; error: string }>;
   removeAccount(accountId: string): Promise<void>;
   syncNow(): Promise<void>;
   syncStatus(): Promise<SyncStatus>;
 }
 
-export const accountsApiMethods = ["addAccount", "testConnection", "removeAccount", "syncNow", "syncStatus"] as const satisfies readonly (keyof AccountsApi)[];
+export const accountsApiMethods = ["addAccount", "addOAuthAccount", "reauthorize", "oauthProviders", "testConnection", "removeAccount", "syncNow", "syncStatus"] as const satisfies readonly (keyof AccountsApi)[];
 

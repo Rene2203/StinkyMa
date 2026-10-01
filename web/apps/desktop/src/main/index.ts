@@ -5,6 +5,11 @@ import { totalmem } from "node:os";
 import { join } from "node:path";
 import {
   aiMethods,
+  oauthProviders,
+  refreshTokens,
+  type OAuthClient,
+  type OAuthProviderConfig,
+  type OAuthProviderId,
   accountsApiMethods,
   appSettingsMethods,
   attachmentFilesMethods,
@@ -20,9 +25,9 @@ import {
   type AttachmentFiles,
   type Message,
 } from "@stinkyma/core";
-import { MailService } from "@stinkyma/core/mail";
+import { MailService, type OAuthBroker } from "@stinkyma/core/mail";
 import { AIService, ModelStore, RuntimeStore } from "@stinkyma/core/llm";
-import { EncryptedFileSecretStore } from "@stinkyma/core/node";
+import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
 import { AIResultStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
@@ -56,6 +61,61 @@ function dataPath(file: string): string {
   return join(app.getPath("userData"), file);
 }
 
+/**
+ * Nur für automatische Tests: Anmeldeseite/Token-Endpunkt eines Test-Anbieters und GreenMail statt Gmail.
+ * JSON: { authorizeUrl, tokenUrl, imap: {host, port, security}, smtp: {host, port, security} }.
+ */
+const testOAuth = (() => {
+  try {
+    return process.env.STINKYMA_TEST_OAUTH ? (JSON.parse(process.env.STINKYMA_TEST_OAUTH) as {
+      authorizeUrl: string; tokenUrl: string;
+      imap: { host: string; port: number; security: "tls" | "starttls" | "none" };
+      smtp: { host: string; port: number; security: "tls" | "starttls" | "none" };
+    }) : null;
+  } catch {
+    return null;
+  }
+})();
+
+/** Anmeldung per Browser (OAuth) mit der in den Optionen hinterlegten App-Registrierung. */
+const oauthBroker: OAuthBroker = {
+  configured() {
+    const clients = settings?.settings.oauthClients;
+    const list: OAuthProviderId[] = [];
+    if (clients?.google.clientId) list.push("google");
+    if (clients?.microsoft.clientId) list.push("microsoft");
+    return list;
+  },
+  async signIn(providerId, loginHint) {
+    const { provider, client } = oauthSetup(providerId);
+    const tokens = await signInWithLoopback({
+      provider,
+      client,
+      loginHint,
+      // Test: der „Browser“ folgt nur der Weiterleitung des Test-Anbieters
+      openBrowser: testOAuth ? async (url) => void (await fetch(url, { redirect: "follow" })) : (url) => shell.openExternal(url),
+    });
+    showWindow();
+    return tokens;
+  },
+  refresh(providerId, refreshToken) {
+    const { provider, client } = oauthSetup(providerId);
+    return refreshTokens(provider, client, refreshToken);
+  },
+};
+
+function oauthSetup(providerId: OAuthProviderId): { provider: OAuthProviderConfig; client: OAuthClient } {
+  const clients = settings?.settings.oauthClients;
+  const client: OAuthClient | null =
+    providerId === "google"
+      ? clients?.google.clientId ? { clientId: clients.google.clientId, clientSecret: clients.google.clientSecret || undefined } : null
+      : clients?.microsoft.clientId ? { clientId: clients.microsoft.clientId } : null;
+  if (!client) throw new Error("Für diesen Anbieter ist keine App-Registrierung hinterlegt (Optionen → Anmeldung per Browser).");
+  const base = oauthProviders[providerId];
+  const provider = testOAuth ? { ...base, authorizeUrl: testOAuth.authorizeUrl, tokenUrl: testOAuth.tokenUrl } : base;
+  return { provider, client };
+}
+
 function setUpServices(): void {
   // Beim ersten Start enthält die Datenbank Beispielkonten; sie verschwinden, sobald ein echtes Konto eingerichtet wird.
   const db = openDatabase(process.env.STINKYMA_DB ?? dataPath("mail.sqlite"));
@@ -76,6 +136,8 @@ function setUpServices(): void {
 
   const repository = new SqliteMailRepository(db);
   service = new MailService(repository, new MailWriter(db), secrets, {
+    oauth: oauthBroker,
+    ...(testOAuth ? { oauthServers: { imap: testOAuth.imap, smtp: testOAuth.smtp } } : {}),
     onChange: notifyRenderer,
     onNewMail: (_accountId, messages) => showNewMailNotification(messages),
   });
@@ -215,7 +277,7 @@ const appSettingsApi: AppSettingsApi = {
     return next;
   },
   async available() {
-    return { closeToTray: true, launchAtLogin: loginItemSupported, notifications: Notification.isSupported() };
+    return { closeToTray: true, launchAtLogin: loginItemSupported, notifications: Notification.isSupported(), oauthClients: true };
   },
 };
 

@@ -12,3 +12,4 @@ export * from "./files.js";
 export * from "./search.js";
 export * from "./appSettings.js";
 export * from "./ai/index.js";
+export * from "./oauth.js";

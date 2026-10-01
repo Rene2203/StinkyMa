@@ -2,6 +2,9 @@
 
 ## W5 – KI-Basis (in Arbeit)
 
+### Behoben
+- Eine eben geöffnete Mail konnte während eines laufenden Abgleichs kurz wieder als ungelesen erscheinen.
+
 ### Neu
 - **KI-Kern** (`@stinkyma/core`, plattformneutral): Anbieter-Schnittstelle, zentrale Freigabe-Prüfung (Mails verlassen
   das Gerät nur mit Freigabe je Konto und Aufgabe, nie stilles Ausweichen), Übertragungsprotokoll, Eingabe-Bereinigung,
@@ -10,6 +13,9 @@
 - **Lokale KI in der Windows-App:** Optionen → KI (Modell laden mit Fortschritt, fortsetzbar, Prüfsumme; verwenden; löschen),
   „Zusammenfassen“ mit Herkunftsangabe, automatische Einordnung neuer Mails im Hintergrund. Alles auf dem eigenen Rechner
   (llama.cpp, CPU oder Grafikkarte über Vulkan). Migration `v9-ai-results`.
+- **Anmeldung per Browser (OAuth) für Gmail und Outlook:** „Mit Google/Microsoft anmelden“ statt App-Passwort; IMAP/SMTP
+  per XOAUTH2, automatische Token-Erneuerung, „Erneut anmelden“ bei abgelaufener Anmeldung. Benötigt eine eigene
+  App-Registrierung (Anleitung `docs/OAUTH-EINRICHTEN.md`, Eintrag unter Optionen).
 - **Bilder und Scans mit KI lesen:** in der Anhang-Vorschau „Mit KI lesen“ für Fotos, Bildschirmfotos und gescannte PDFs –
   Art, Kurzbeschreibung und vollständiger Text, danach durchsuchbar. Läuft auf dem eigenen Rechner (llama.cpp-Programm,
   erst bei Bedarf geladen, Prüfsumme). Text- und Bildmodell nie gleichzeitig im Speicher.

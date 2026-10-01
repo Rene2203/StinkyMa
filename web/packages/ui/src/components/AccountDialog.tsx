@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight, ExternalLink, Info, Lock, X } from "lucide-react";
-import { detectProvider, guessSettings, isDemoAccount, type AccountSettings, type ConnectionSecurity } from "@stinkyma/core";
+import { ChevronDown, ChevronRight, ExternalLink, Globe, Info, Lock, X } from "lucide-react";
+import { detectProvider, guessSettings, isDemoAccount, type AccountSettings, type ConnectionSecurity, type OAuthProviderId } from "@stinkyma/core";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
 
@@ -41,6 +41,22 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
+
+  const signInWith = async (provider: OAuthProviderId) => {
+    setBusy(true);
+    setError(null);
+    setWaitingFor(provider);
+    try {
+      await store.addOAuthAccount(provider, hasDemo && removeDemo);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e));
+    } finally {
+      setBusy(false);
+      setWaitingFor(null);
+    }
+  };
+  const [waitingFor, setWaitingFor] = useState<OAuthProviderId | null>(null);
 
   const oauthOnly = detected?.auth === "oauth-required";
   const needsAppPassword = detected?.auth === "app-password";
@@ -105,12 +121,28 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
           </button>
         </header>
 
+        {state.oauthProviders.length > 0 && (
+          <div className="oauth-buttons" data-testid="oauth-buttons">
+            {state.oauthProviders.map((provider) => (
+              <button key={provider} type="button" className="oauth-button" disabled={busy} data-testid={`oauth-${provider}`} onClick={() => void signInWith(provider)}>
+                <Globe size={16} aria-hidden="true" /> {t(`oauth.signIn.${provider}`)}
+              </button>
+            ))}
+            {waitingFor && <p className="hint" role="status">{t("oauth.waiting")}</p>}
+            <p className="oauth-divider muted small">{t("oauth.or")}</p>
+          </div>
+        )}
+
         <label>
           {t("dialog.email")}
           <input type="email" autoFocus required value={email} data-testid="account-email" autoComplete="off" onChange={(e) => setEmail(e.target.value)} />
         </label>
         {detected && <p className="hint">{t("dialog.detected", { provider: detected.label })}</p>}
-        {oauthOnly && detected && <p className="hint warning"><Info size={14} /> {t("dialog.oauthRequired", { provider: detected.label })}</p>}
+        {oauthOnly && detected && (
+          <p className="hint warning">
+            <Info size={14} /> {state.oauthProviders.includes("microsoft") ? t("oauth.useButton", { provider: detected.label }) : t("dialog.oauthRequired", { provider: detected.label })}
+          </p>
+        )}
 
         <label>
           {needsAppPassword ? t("dialog.appPassword") : t("dialog.password")}

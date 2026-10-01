@@ -15,6 +15,8 @@ unten abarbeiten.
 
 | Seit | Was | Wo in TypeScript |
 |------|-----|------------------|
+| 01.10.2026 | OAuth (Gmail/Outlook): PKCE, Loopback-Anmeldung, XOAUTH2 für IMAP/SMTP, Token-Erneuerung, „Erneut anmelden“ – auf iPad/Mac mit ASWebAuthenticationSession | `web/packages/core/src/oauth.ts`, `node/oauthLoopback.ts`, `mail/mailService.ts` |
+| 01.10.2026 | Bilder/Scans mit KI lesen (Ergebnis in `attachmentAnalysis`, Text in `attachmentText` mit Quelle `vision`) | `core/src/llm/llamaServer.ts`, `core/src/sqlite/aiStore.ts` |
 | 01.10.2026 | Migration `v9-ai-results`: `message.categoryOrigin`, Index `message_on_uncategorized`, Tabelle `threadSummary` | `web/packages/core/src/sqlite/schema.ts`, `sqlite/aiStore.ts` |
 | 01.10.2026 | KI-Kern: Router mit Freigabe-Prüfung, Prompts (v2), Antwortprüfung, Testsatz + Messlauf | `web/packages/core/src/ai/` |
 | 01.10.2026 | Lokale KI: Modell-Download (fortsetzbar, SHA-256), llama.cpp-Anbieter, KI-Dienst (Zusammenfassen, Einordnen im Hintergrund) – auf dem iPad über MLX/llama.cpp-Swift nachzubauen | `web/packages/core/src/llm/` |

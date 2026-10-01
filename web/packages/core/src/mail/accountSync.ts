@@ -168,7 +168,9 @@ async function syncMailbox(
       for await (const msg of client.fetch(batch.join(","), { uid: true, flags: true }, { uid: true })) {
         const local = known.get(msg.uid);
         const flags = flagsFromImap(msg.flags);
-        if (local && local.flags !== flags) {
+        // Noch nicht übertragene Änderung (z. B. eben geöffnet = gelesen): lokaler Stand gewinnt, sonst sähe die Mail
+        // kurz wieder ungelesen aus, bis die Warteschlange beim Server ist.
+        if (local && local.flags !== flags && !writer.hasPendingAction(account.id, local.id)) {
           writer.updateFlags(local.id, flags);
           flagsChanged += 1;
         }

@@ -1,3 +1,4 @@
+import { defaultAppSettings } from "@stinkyma/core";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ describe("Einstellungsdatei", () => {
     first.update({ notifications: "off", launchAtLogin: true });
     first.setFlag("trayHintShown");
     const second = new SettingsFile(path);
-    expect(second.settings).toEqual({ closeToTray: true, launchAtLogin: true, notifications: "off" });
+    expect(second.settings).toEqual({ ...defaultAppSettings, closeToTray: true, launchAtLogin: true, notifications: "off" });
     expect(second.flag("trayHintShown")).toBe(true);
     expect(JSON.parse(readFileSync(path, "utf8")).notifications).toBe("off");
   });

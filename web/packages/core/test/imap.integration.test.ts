@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ImapFlow } from "imapflow";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createMockData, InMemorySecretStore, isDemoAccount, isRead, SecretKeys } from "../src/index.js";
-import { extractAttachment, MailService, parseMessage, type AccountSettings } from "../src/mail/index.js";
+import { connectImap, extractAttachment, loginFor, MailService, parseMessage, syncAccount, type AccountSettings } from "../src/mail/index.js";
 import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
 import { minimalPdf, sampleReply } from "./fixtures.js";
 
@@ -189,6 +189,26 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     const archived = await service.messages({ kind: "mailbox", mailboxId: `${target.accountId}/Archiv` }, 100);
     expect(archived).toHaveLength(1);
     expect((await service.attachments(archived[0]!.id)).map((a) => a.filename)).toEqual(["Angebot.pdf"]);
+  });
+
+  it("Abgleich überschreibt eine noch nicht übertragene Änderung nicht (Mail bleibt gelesen)", async () => {
+    const account = await addAndSync();
+    const target = (await service.messages({ kind: "unifiedInbox" }, 100)).find((m) => m.subject === "Grüße aus München")!;
+    expect(isRead(target)).toBe(false);
+    // Wie beim Öffnen während eines laufenden Abgleichs: lokal gelesen + Auftrag in der Warteschlange, Server noch ungelesen
+    const writer = new MailWriter(db);
+    writer.updateFlags(target.id, target.flags | 1);
+    writer.enqueueAction({ accountId: account.id, messageId: target.id, kind: "flag", payload: { flag: "seen", enabled: true }, createdAt: now.toISOString() });
+    const client = await connectImap(loginFor(account, "geheim"));
+    try {
+      await syncAccount(client, writer, account, { since: daysAgo(30) });
+    } finally {
+      await client.logout();
+    }
+    expect(isRead((await service.message(target.id))!)).toBe(true);
+    // Nach dem Übertragen gilt wieder der Server
+    await service.flushNow(account.id);
+    expect(await serverFlags("Grüße aus München")).toContain("\\Seen");
   });
 
   it("offline: Änderungen bleiben in der Warteschlange und werden später übertragen", async () => {

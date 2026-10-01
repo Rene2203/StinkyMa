@@ -7,6 +7,8 @@ export interface ImapLogin {
   security: ConnectionSecurity;
   username: string;
   password: string;
+  /** OAuth-Zugriffstoken (XOAUTH2) statt Passwort – Gmail/Outlook. */
+  accessToken?: string;
 }
 
 export function loginFor(account: Pick<Account, "imapHost" | "imapPort" | "imapSecurity" | "username">, password: string): ImapLogin {
@@ -20,7 +22,7 @@ export async function connectImap(login: ImapLogin, options: { timeoutMs?: numbe
     port: login.port,
     secure: login.security === "tls",
     doSTARTTLS: login.security === "starttls" ? true : login.security === "none" ? false : undefined,
-    auth: { user: login.username, pass: login.password },
+    auth: login.accessToken ? { user: login.username, accessToken: login.accessToken } : { user: login.username, pass: login.password },
     logger: false,
     disableAutoIdle: true,
     connectionTimeout: options.timeoutMs ?? 20_000,
@@ -35,7 +37,7 @@ export async function connectImap(login: ImapLogin, options: { timeoutMs?: numbe
     await client.connect();
   } catch (error) {
     client.close();
-    throw new MailConnectionError(describeConnectionError(error), error);
+    throw new MailConnectionError(login.accessToken && isAuthError(error) ? "Anmeldung mit dem Konto-Token fehlgeschlagen. Bitte erneut anmelden." : describeConnectionError(error), error);
   }
   return client;
 }
@@ -44,6 +46,11 @@ export class MailConnectionError extends Error {
   constructor(message: string, override readonly cause?: unknown) {
     super(message);
   }
+}
+
+function isAuthError(error: unknown): boolean {
+  const e = error as { authenticationFailed?: boolean; responseText?: string };
+  return !!e?.authenticationFailed || /auth|login|credentials|invalid/i.test(e?.responseText ?? "");
 }
 
 /** Verständliche deutsche Fehlermeldung – ohne Zugangsdaten. */

@@ -11,6 +11,8 @@ export interface SmtpLogin {
   security: ConnectionSecurity;
   user: string;
   pass: string;
+  /** OAuth-Zugriffstoken (XOAUTH2) statt Passwort. */
+  accessToken?: string;
 }
 
 export function smtpLoginFor(account: Pick<Account, "smtpHost" | "smtpPort" | "smtpSecurity" | "username">, password: string): SmtpLogin {
@@ -72,7 +74,11 @@ export async function sendRaw(login: SmtpLogin, message: Pick<BuiltMessage, "raw
     secure: login.security === "tls",
     requireTLS: login.security === "starttls",
     ignoreTLS: login.security === "none",
-    auth: login.security === "none" && !login.pass ? undefined : { user: login.user, pass: login.pass },
+    auth: login.accessToken
+      ? { type: "OAuth2", user: login.user, accessToken: login.accessToken }
+      : login.security === "none" && !login.pass
+        ? undefined
+        : { user: login.user, pass: login.pass },
     connectionTimeout: timeout,
     greetingTimeout: timeout,
     socketTimeout: timeout * 2,

@@ -1,4 +1,4 @@
-import { AlertTriangle, Plus, RefreshCw, Send, Settings, X } from "lucide-react";
+import { AlertTriangle, LogIn, Plus, RefreshCw, Send, Settings, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -55,6 +55,18 @@ export function Sidebar() {
                   >
                     <title>{t("sync.accountError", { error: section.account.syncError })}</title>
                   </AlertTriangle>
+                )}
+                {store.canManageAccounts && section.account.authType === "oauth2" && section.account.syncError && (
+                  <button
+                    type="button"
+                    className="icon-button heading-action"
+                    title={t("oauth.reauth")}
+                    aria-label={`${t("oauth.reauth")}: ${section.account.displayName}`}
+                    data-testid="account-reauth"
+                    onClick={() => void store.reauthorize(section.account!.id)}
+                  >
+                    <LogIn size={13} />
+                  </button>
                 )}
                 {store.canManageAccounts && !isDemoAccount(section.account) && (
                   <button
