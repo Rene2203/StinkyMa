@@ -52,7 +52,7 @@ export function addressForm(text: string, from?: EmailAddress): AddressForm {
 }
 
 /** Wörter, die nach „Hallo Tom,“ kleingeschrieben weitergehen (Substantive bleiben groß). */
-const continuesLower = /^(ja|nein|da|dazu|dafür|darauf|danach|damit|heute|morgen|gestern|jetzt|gleich|leider|gern|gerne|leider|klar|super|danke|vielen|herzlichen|ich|wir|das|der|die|es|wann|wie|was|wo|schön|toll|sehr|natürlich|selbstverständlich|okay|ok|prima|genau|bitte|kein|keine|zum|zur|am|im|bis|mit|für|ob|und|aber|dann|so|hier|anbei|lass|lasst|kannst|könntest|können|könnten|hast|habe|hab|bin|würde|wäre|komme|passt|sorry|tut|entschuldige|entschuldigen|vorab|kurze|kurz|gut|alles|eine?|einen?)$/i;
+const continuesLower = /^(ja|nein|welche|welcher|welches|welchen|welchem|beide|beides|warum|wieso|weshalb|wer|wem|wen|soll|sollen|darf|magst|möchtest|würdest|habt|seid|da|dazu|dafür|darauf|danach|damit|heute|morgen|gestern|jetzt|gleich|leider|gern|gerne|leider|klar|super|danke|vielen|herzlichen|ich|wir|das|der|die|es|wann|wie|was|wo|schön|toll|sehr|natürlich|selbstverständlich|okay|ok|prima|genau|bitte|kein|keine|zum|zur|am|im|bis|mit|für|ob|und|aber|dann|so|hier|anbei|lass|lasst|kannst|könntest|können|könnten|hast|habe|hab|bin|würde|wäre|komme|passt|sorry|tut|entschuldige|entschuldigen|vorab|kurze|kurz|gut|alles|eine?|einen?)$/i;
 
 /** Anrede und Antwort zusammensetzen: „Hallo Tom,\nja, ich komme gern.“ */
 export function joinGreeting(greeting: string, text: string): string {

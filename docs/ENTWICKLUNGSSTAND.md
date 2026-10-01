@@ -403,6 +403,12 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Geprüft: Unit-Tests (Regeln, RuleService mit SQLite, Store), E2E gegen GreenMail (Regel anlegen → neue Mail landet im
   Ordner „Verein“ auf dem Server). Verschachtelte Ordner („INBOX/Verein“) werden auch über den letzten
   Namensteil gefunden (Unit-Test). **Ungeprüft:** echte Konten mit vielen Ordnern; Gemma E4B/Qwen siehe `docs/KI-MESSUNG.md`.
+- **W6.5 – Antwortvorschläge (lokal geprüft):** Knopf in der Mail (nur mit Modell): drei feste Plätze (zusagen/danken,
+  absagen/später, nachfragen), Anrede du/Sie und „Hallo Tom,“ per Regeln, Gruß aus der Signatur. Verworfen wird, was
+  Platzhalter, falsche Anrede oder erfundene Zahlen enthält. Klick öffnet „Antworten“ mit dem Text – nie automatisch senden.
+  **Messung** Gemma 4 E2B: 12/12 Mails mit ≥ 2 Vorschlägen, du/Sie 12/12, 7 s (Prompt v1: nur 2/12). Details und alle
+  Vorschläge zum Lesen: `docs/KI-MESSUNG.md`. Geprüft: Unit-Tests (Anrede, Gruß, Filter), Store-Test, E2E mit Testmodell.
+  **Ungeprüft:** in der Windows-App mit echtem Modell; Mails mit langem Verlauf.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,

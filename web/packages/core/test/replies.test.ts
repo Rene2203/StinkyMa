@@ -45,5 +45,6 @@ describe("Antwortvorschläge: Regeln", () => {
     expect(joinGreeting("Hallo Tom,", "Ich bin dabei.")).toBe("Hallo Tom,\nich bin dabei.");
     expect(joinGreeting("Guten Tag,", "Vielen Dank für Ihr Angebot.")).toBe("Guten Tag,\nvielen Dank für Ihr Angebot.");
     expect(joinGreeting("Hallo Max,", "Samstag passt mir gut.")).toBe("Hallo Max,\nSamstag passt mir gut.");
+    expect(joinGreeting("Hallo Lena,", "Welches Rezept meinst du?")).toBe("Hallo Lena,\nwelches Rezept meinst du?");
   });
 });

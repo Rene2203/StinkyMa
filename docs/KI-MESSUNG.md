@@ -143,6 +143,27 @@ benutzt), z. B. „Rechnungen von stadtwerke.example in Steuer 2026“. Richtig 
 - Qwen 3.5 2B liefert ohne Regeln oft gar nichts Brauchbares (15 von 36).
 - Offen: Verneinung („nicht markieren, nur archivieren“) – Regeln und E2B markieren trotzdem. Im Formular sichtbar.
 
+## Antwortvorschläge (W6.5, 01.10.2026)
+
+12 Mails aus dem Testsatz, auf die man antworten würde (8 du, 4 Sie). `eval-models.ts --replies`, 4 CPU-Kerne. Gezählt wird,
+was die Prüfung übrig lässt (keine Platzhalter, richtige Anrede, keine erfundenen Zahlen); die Qualität lässt sich nur
+lesend beurteilen – alle Vorschläge stehen in der Ausgabe des Messlaufs.
+
+| Modell / Prompt | ≥ 2 Vorschläge | du/Sie richtig | Zeit (Median) |
+|---|---|---|---|
+| Gemma 4 E2B, v1 (freie Liste) | 2/12 | 11/12 | 5,3 s |
+| Gemma 4 E4B, v1 | 12/12 | 11/12 | 27,3 s |
+| **Gemma 4 E2B, v2 (drei feste Plätze)** | **12/12** | **12/12** | **7,0 s** |
+
+- v1 ließ das Modell die Anzahl wählen – E2B hörte meist nach einem Vorschlag auf. v2 gibt drei Plätze vor (zusagen/danken,
+  absagen/später, nachfragen); unpassende bleiben leer.
+- du/Sie: v1 siezte „Sarah“ (Mail ohne Anrede, nur mit Vornamen unterschrieben) – jetzt zählt die Unterschrift mit.
+- Gelesen: meist natürlich und brauchbar. Schwächen von E2B: gelegentlich holprig („gerne übernehme die Anfragen“), manche
+  Rückfrage wenig sinnvoll („wann haben Sie das Angebot fertiggestellt?“ auf ein fertiges Angebot). Deshalb nur Vorschläge,
+  die im Editor geändert werden können – gesendet wird nie automatisch.
+- Ausreißer bei der Zeit (bis 35 s) – bei drei Plätzen schreibt das Modell manchmal lange; Kandidat für die Feinabstimmung
+  (maxLength je Platz kürzer).
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,
