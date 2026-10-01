@@ -105,7 +105,7 @@ if (summariesOnly) {
       const { loadMs } = await provider.load();
       for (const [label, set] of [["Testsatz", evalThreads], ["Kontrollsatz", evalHoldoutThreads]] as const) {
         const report = await evaluateProvider(provider, { loadMs, mails: [], threads: set, ...(summaryV2 ? { summaryPromptVersion: 2 as const } : {}), onProgress: (p) => process.stderr.write(`\r${model.id} ${label}: ${p.done}/${p.total}   `) });
-        reports.push({ ...report, providerId: `${report.providerId} ${summaryV2 ? "v2" : "v3"} (${label})` });
+        reports.push({ ...report, displayName: `${report.displayName} ${summaryV2 ? "v2" : "v3"} (${label})` });
         process.stderr.write("\n");
         if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
       }
