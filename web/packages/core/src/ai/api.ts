@@ -1,5 +1,7 @@
 import type { CatalogModel, ModelCapability } from "./catalog.js";
+import type { DocumentType } from "./prompts.js";
 import type { ResultOrigin } from "./tasks.js";
+import type { AIImage } from "./types.js";
 
 // Schnittstelle Oberfläche ↔ KI-Dienst (Windows: IPC zum Hauptprozess, später Server: HTTP). Plattformneutral.
 
@@ -15,9 +17,11 @@ export interface AISettings {
   autoCategorize: boolean;
   /** Grafikkarte nutzen, falls vorhanden. */
   useGpu: boolean;
+  /** Bilder und Scans verstehen (lädt Bild-Baustein und Bild-Laufzeit nach). */
+  vision: boolean;
 }
 
-export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true };
+export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true, vision: false };
 
 export function normalizeAISettings(raw: unknown): AISettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -26,6 +30,7 @@ export function normalizeAISettings(raw: unknown): AISettings {
     modelId: typeof value.modelId === "string" && value.modelId ? value.modelId : null,
     autoCategorize: typeof value.autoCategorize === "boolean" ? value.autoCategorize : defaultAISettings.autoCategorize,
     useGpu: typeof value.useGpu === "boolean" ? value.useGpu : defaultAISettings.useGpu,
+    vision: typeof value.vision === "boolean" ? value.vision : defaultAISettings.vision,
   };
 }
 
@@ -53,7 +58,12 @@ export interface AIStatus {
   ramGb: number;
   /** Ist ein Modell gewählt, geladen bzw. ladbar und die KI an? */
   ready: boolean;
-  download: { modelId: string; receivedBytes: number; totalBytes: number } | null;
+  download: { kind: "model" | "vision"; modelId: string; receivedBytes: number; totalBytes: number } | null;
+  /**
+   * Bilder verstehen: „unavailable“ = gewähltes Modell oder dieses System kann es nicht; „missing“ = Bild-Baustein
+   * bzw. Laufzeit fehlen noch (`missingBytes` zu laden); „ready“ = einsatzbereit.
+   */
+  vision: { state: "unavailable" | "missing" | "downloading" | "ready"; missingBytes: number };
   /** Hintergrund-Einordnung: noch offene Mails (null = läuft nicht). */
   categorizing: { remaining: number } | null;
   /** Letzter Fehler (Download, Laden des Modells) – verständlich, ohne Mail-Inhalte. */
@@ -73,6 +83,22 @@ export interface SummaryView {
   stale: boolean;
 }
 
+/** Ergebnis „Mit KI lesen“ für einen Anhang (Bild oder gescanntes PDF). */
+export interface AttachmentReadingView {
+  attachmentId: string;
+  documentType: DocumentType;
+  title: string;
+  summary: string;
+  text: string;
+  origin: Exclude<ResultOrigin, "rules">;
+  modelName: string;
+  createdAt: string;
+  durationMs: number;
+}
+
+/** Größte Bildgröße (Base64-Zeichen) je Seite, die die Oberfläche schicken darf. */
+export const maxPageImageChars = 8_000_000;
+
 export interface AIApi {
   status(): Promise<AIStatus>;
   update(patch: Partial<AISettings>): Promise<AIStatus>;
@@ -84,6 +110,15 @@ export interface AIApi {
   cachedSummary(threadId: string): Promise<SummaryView | null>;
   /** Fasst die Konversation zusammen (nur auf ausdrücklichen Wunsch – Klick). */
   summarize(threadId: string): Promise<SummaryView>;
+  /** Bild-Baustein und Bild-Laufzeit laden (Fortschritt über Status-Meldungen). */
+  downloadVision(): Promise<void>;
+  /** Gespeichertes Leseergebnis eines Anhangs – oder null. */
+  attachmentReading(attachmentId: string): Promise<AttachmentReadingView | null>;
+  /**
+   * Anhang mit KI lesen (nur auf Klick). Bilder liest der Dienst selbst; für PDFs schickt die Oberfläche die
+   * gerenderten Seiten (höchstens 3). Der gelesene Text wird durchsuchbar.
+   */
+  readAttachment(attachmentId: string, pageImages?: AIImage[]): Promise<AttachmentReadingView>;
 }
 
-export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize"] as const satisfies readonly (keyof AIApi)[];
+export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment"] as const satisfies readonly (keyof AIApi)[];

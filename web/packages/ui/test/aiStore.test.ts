@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createMockData, InMemoryMailRepository, type AIApi, type AIStatus, type SummaryView } from "@stinkyma/core";
+import { createMockData, InMemoryMailRepository, type AIApi, type AIStatus, type AttachmentFiles, type SummaryView } from "@stinkyma/core";
 import { BrowserStore, selectedMessage } from "../src/store.js";
 
 // Testdaten erfunden.
 
 function status(overrides: Partial<AIStatus> = {}): AIStatus {
   return {
-    settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true },
+    settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true },
     models: [],
+    vision: { state: "ready", missingBytes: 0 },
     ramGb: 8,
     ready: true,
     download: null,
@@ -24,7 +25,7 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     status: async () => status({ ready: options.ready ?? true }),
     update: async (patch) => {
       calls.push(`update:${JSON.stringify(patch)}`);
-      return status({ settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, ...patch } });
+      return status({ settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, ...patch } });
     },
     download: async (id) => {
       calls.push(`download:${id}`);
@@ -39,6 +40,18 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     cachedSummary: async (threadId) => {
       calls.push(`cached:${threadId}`);
       return options.cached ?? null;
+    },
+    downloadVision: async () => {
+      calls.push("downloadVision");
+    },
+    attachmentReading: async (id) => {
+      calls.push(`reading:${id}`);
+      return null;
+    },
+    readAttachment: async (id, pages) => {
+      calls.push(`read:${id}:${pages?.length ?? 0}`);
+      if (options.fail) throw new Error(options.fail);
+      return { attachmentId: id, documentType: "invoice", title: "Rechnung", summary: "Rechnung über 10 €", text: "10 €", origin: "onDevice", modelName: "Gemma", createdAt: "", durationMs: 1000 };
     },
     summarize: async (threadId) => {
       calls.push(`summarize:${threadId}`);
@@ -135,7 +148,40 @@ describe("BrowserStore – KI", () => {
 
   it("übernimmt Status-Meldungen (Fortschritt)", async () => {
     const store = await setup(fakeAI());
-    store.setAIStatus(status({ download: { modelId: "m", receivedBytes: 5, totalBytes: 10 } }));
+    store.setAIStatus(status({ download: { kind: "model", modelId: "m", receivedBytes: 5, totalBytes: 10 } }));
     expect(store.getState().ai?.download?.receivedBytes).toBe(5);
+  });
+
+  it("liest einen Anhang in der Vorschau mit KI – PDF-Seiten werden mitgeschickt, Fehler in der Karte", async () => {
+    const ai = fakeAI();
+    const files: AttachmentFiles = { open: async () => undefined, save: async () => true, read: async () => ({ filename: "x", mimeType: "image/png", contentBase64: "" }) };
+    const store = new BrowserStore(new InMemoryMailRepository(createMockData(new Date("2026-09-29T10:00:00Z"))), { ai: ai.api, files });
+    await store.start();
+    expect(store.canReadAttachments).toBe(true);
+    await store.showAttachment({ id: "anhang-1", filename: "Scan.pdf", mimeType: "application/pdf" });
+    await flush();
+    expect(ai.calls).toContain("reading:anhang-1");
+    await store.readAttachmentWithAI([{ mimeType: "image/jpeg", base64: "AAAA" }]);
+    expect(store.getState().reading).toMatchObject({ attachmentId: "anhang-1", busy: false, view: { summary: "Rechnung über 10 €" } });
+    expect(ai.calls).toContain("read:anhang-1:1");
+    store.closePreview();
+    expect(store.getState().reading).toBeNull();
+
+    const failing = fakeAI({ fail: "Error invoking remote method 'ai': Error: Bildformat nicht lesbar" });
+    const store2 = new BrowserStore(new InMemoryMailRepository(createMockData()), { ai: failing.api, files });
+    await store2.start();
+    await store2.showAttachment({ id: "b", filename: "Foto.png", mimeType: "image/png" });
+    await store2.readAttachmentWithAI();
+    expect(store2.getState().reading?.error).toBe("Bildformat nicht lesbar");
+    expect(store2.getState().error).toBeNull();
+  });
+
+  it("ohne Bild-Einstellung kein „Mit KI lesen“", async () => {
+    const ai = fakeAI();
+    const store = await setup(ai);
+    store.setAIStatus(status({ vision: { state: "missing", missingBytes: 10 } }));
+    expect(store.canReadAttachments).toBe(false);
+    await store.downloadVision();
+    expect(ai.calls).toContain("downloadVision");
   });
 });

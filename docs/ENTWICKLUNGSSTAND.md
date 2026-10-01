@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. Offen: Zusammenfassungs-Prompt v3, Test durch den Nutzer, W5.5 (Bilder)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. W5.5 (Bilder/Scans) fertig. Als Nächstes: OAuth für Gmail/Outlook. Offen: Zusammenfassungs-Prompt v3, Test durch den Nutzer
 
 ## Überblick
 
@@ -317,4 +317,22 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Prompt v2: Kategorie 98,8 % (Testsatz) / 92,9 % (Kontrollsatz, nie zum Feintuning), Phishing 9/10 bzw. 3/4, ~3,7 s je Mail.
   Gemma 4 E4B fehlerfrei, aber ~doppelt so langsam (Option für starke Rechner). Qwen 3.5 2B langsamer und ungenauer.
   **Offen:** „wer ist dran“ 60 % bei Gemma, Fakten 92 % (Ziel 95 %) → Prompt v3 für Zusammenfassungen. Messung auf N97/GPU fehlt.
+- **01.10.2026 – Entscheidung Nutzer:** zuerst W5.5 (Bilder), dann OAuth; Server (S1) später.
+- **W5.5 – Bilder und Scans mit KI lesen (lokal geprüft):** node-llama-cpp kann keine Bilder – deshalb für Bilder das
+  Programm `llama-server` aus llama.cpp (feste Version b11320, SHA-256 geprüft, erst bei Bedarf geladen: Windows 33 MB
+  inkl. Vulkan, entpackt mit dem tar des Systems). Läuft nur auf 127.0.0.1 mit zufälligem Schlüssel (über die Umgebung,
+  nicht die Befehlszeile), Fehlertexte des Servers werden nicht weitergereicht. Gemessen: Start mit `--fit off` 14 s statt
+  4,5 min. Text- und Bildmodell liegen nie gleichzeitig im Speicher (der KI-Dienst wechselt; per Test geprüft).
+  - Optionen → KI: „Bilder und Scans verstehen“ (lädt Bild-Baustein ~1 GB + Laufzeit). Anhang-Vorschau: „Mit KI lesen“
+    für Bilder (PNG/JPEG/WebP/GIF/BMP) und PDFs (die App schickt die ersten 3 gerenderten Seiten). Ergebnis-Karte mit Art,
+    Titel, Beschreibung, gelesenem Text und Herkunft; gespeichert in `attachmentAnalysis`, Text im Suchindex
+    (echter PDF-Text hat Vorrang).
+  - Ergebnis mit Gemma 4 E2B auf 4 CPU-Kernen: erfundenes Rechnungsfoto fehlerfrei gelesen (Nummer, Datum, Beträge, IBAN),
+    41–47 s; gescannter Brief (PDF ohne Textebene) fehlerfrei, 53 s. Danach über die Suche auffindbar.
+  - Tests: 15 neue Unit-Tests (Anfrage-Aufbau, Client ohne Weitergabe von Server-Fehlertexten, Laufzeit-Download/Entpacken/
+    Prüfsumme, Speicherung, Formatprüfung, Wechsel Text↔Bild), echte Laufzeit mit Testmodell (auch in der Windows-CI),
+    E2E mit echtem Gemma gegen GreenMail (Foto, Scan, Suche, gespeichertes Ergebnis – nur lokal, Modelle 4 GB).
+  - **Ungeprüft:** Windows mit Vulkan/GPU, HEIC-Fotos vom iPhone (nicht unterstützt – Hinweis erscheint), automatisches
+    Lesen im Hintergrund (bewusst nur auf Klick: ~45 s je Bild auf schwacher Hardware). **Noch offen:** Sprachnachrichten
+    (Gemma 4 kann Audio, llama.cpp meldet es als experimentell).
 

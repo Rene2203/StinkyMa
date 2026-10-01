@@ -10,6 +10,9 @@
 - **Lokale KI in der Windows-App:** Optionen → KI (Modell laden mit Fortschritt, fortsetzbar, Prüfsumme; verwenden; löschen),
   „Zusammenfassen“ mit Herkunftsangabe, automatische Einordnung neuer Mails im Hintergrund. Alles auf dem eigenen Rechner
   (llama.cpp, CPU oder Grafikkarte über Vulkan). Migration `v9-ai-results`.
+- **Bilder und Scans mit KI lesen:** in der Anhang-Vorschau „Mit KI lesen“ für Fotos, Bildschirmfotos und gescannte PDFs –
+  Art, Kurzbeschreibung und vollständiger Text, danach durchsuchbar. Läuft auf dem eigenen Rechner (llama.cpp-Programm,
+  erst bei Bedarf geladen, Prüfsumme). Text- und Bildmodell nie gleichzeitig im Speicher.
 - **Standardmodell Gemma 4 E2B** (Messlauf, `docs/KI-MESSUNG.md`), Prompt v2 mit besserer Phishing-Erkennung.
 - **Testsatz und Messlauf:** deutscher Testsatz (80 Mails, 10 Konversationen, Kontrollsatz mit 28 Mails), Messskript.
 

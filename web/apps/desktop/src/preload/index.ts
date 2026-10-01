@@ -6,7 +6,7 @@ const mailMethods = ["accounts", "mailboxes", "messages", "thread", "message", "
 const accountMethods = ["addAccount", "testConnection", "removeAccount", "syncNow", "syncStatus"];
 const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
-const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize"];
+const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment"];
 
 const bridge = (channel: string, methods: string[]) =>
   Object.fromEntries(methods.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channel, method, args)]));

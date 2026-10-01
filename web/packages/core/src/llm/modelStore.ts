@@ -96,57 +96,8 @@ export class ModelStore {
     return this.pathFor(model);
   }
 
-  async #downloadFile(file: ModelFile, target: string, signal: AbortSignal | undefined, onProgress: (received: number) => void): Promise<void> {
-    const partial = `${target}.part`;
-    let offset = (await fileSize(partial)) ?? 0;
-    if (offset > file.sizeBytes) {
-      await rm(partial, { force: true });
-      offset = 0;
-    }
-    const hash = createHash("sha256");
-    if (offset > 0) {
-      // Schon geladenen Teil in die Prüfsumme aufnehmen
-      for await (const chunk of createReadStream(partial)) hash.update(chunk as Buffer);
-    }
-
-    if (offset < file.sizeBytes) {
-      const response = await this.fetchImpl(file.url, {
-        headers: offset > 0 ? { Range: `bytes=${offset}-` } : {},
-        redirect: "follow",
-        signal,
-      });
-      if (offset > 0 && response.status === 200) {
-        // Server kann nicht fortsetzen → von vorn
-        offset = 0;
-        hash.destroy();
-        await rm(partial, { force: true });
-        return this.#downloadFile(file, target, signal, onProgress);
-      }
-      if (!(response.ok || response.status === 206) || !response.body) {
-        throw new Error(`Download fehlgeschlagen (HTTP ${response.status}).`);
-      }
-      let received = offset;
-      onProgress(received);
-      const counter = new Transform({
-        transform(chunk: Buffer, _encoding, callback) {
-          received += chunk.length;
-          hash.update(chunk);
-          onProgress(received);
-          callback(null, chunk);
-        },
-      });
-      await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), counter, createWriteStream(partial, { flags: offset > 0 ? "a" : "w" }), { signal });
-      if (received !== file.sizeBytes) {
-        if (received > file.sizeBytes) await rm(partial, { force: true });
-        throw new Error("Download unvollständig – bitte erneut versuchen (wird fortgesetzt).");
-      }
-    }
-
-    if (hash.digest("hex") !== file.sha256) {
-      await rm(partial, { force: true });
-      throw new ModelChecksumError(fileNameFromUrl(file.url));
-    }
-    await rename(partial, target);
+  #downloadFile(file: ModelFile, target: string, signal: AbortSignal | undefined, onProgress: (received: number) => void): Promise<void> {
+    return downloadVerified(this.fetchImpl, file, target, signal, onProgress);
   }
 
   /** Modell samt Teildateien und Bild-Baustein löschen. */
@@ -165,4 +116,67 @@ async function fileSize(path: string): Promise<number | null> {
 
 async function isFile(path: string): Promise<boolean> {
   return existsSync(path) && (await stat(path)).isFile();
+}
+
+/**
+ * Lädt eine Datei mit bekannter Größe und SHA-256 nach `target` (über `target.part`, fortsetzbar per HTTP-Range).
+ * Erst nach bestandener Prüfung erscheint die Datei unter ihrem Namen.
+ */
+export async function downloadVerified(
+  fetchImpl: typeof fetch,
+  file: ModelFile,
+  target: string,
+  signal: AbortSignal | undefined,
+  onProgress: (received: number) => void,
+): Promise<void> {
+  const partial = `${target}.part`;
+  let offset = (await fileSize(partial)) ?? 0;
+  if (offset > file.sizeBytes) {
+    await rm(partial, { force: true });
+    offset = 0;
+  }
+  const hash = createHash("sha256");
+  if (offset > 0) {
+    // Schon geladenen Teil in die Prüfsumme aufnehmen
+    for await (const chunk of createReadStream(partial)) hash.update(chunk as Buffer);
+  }
+
+  if (offset < file.sizeBytes) {
+    const response = await fetchImpl(file.url, {
+      headers: offset > 0 ? { Range: `bytes=${offset}-` } : {},
+      redirect: "follow",
+      signal,
+    });
+    if (offset > 0 && response.status === 200) {
+      // Server kann nicht fortsetzen → von vorn
+      offset = 0;
+      hash.destroy();
+      await rm(partial, { force: true });
+      return downloadVerified(fetchImpl, file, target, signal, onProgress);
+    }
+    if (!(response.ok || response.status === 206) || !response.body) {
+      throw new Error(`Download fehlgeschlagen (HTTP ${response.status}).`);
+    }
+    let received = offset;
+    onProgress(received);
+    const counter = new Transform({
+      transform(chunk: Buffer, _encoding, callback) {
+        received += chunk.length;
+        hash.update(chunk);
+        onProgress(received);
+        callback(null, chunk);
+      },
+    });
+    await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), counter, createWriteStream(partial, { flags: offset > 0 ? "a" : "w" }), { signal });
+    if (received !== file.sizeBytes) {
+      if (received > file.sizeBytes) await rm(partial, { force: true });
+      throw new Error("Download unvollständig – bitte erneut versuchen (wird fortgesetzt).");
+    }
+  }
+
+  if (hash.digest("hex") !== file.sha256) {
+    await rm(partial, { force: true });
+    throw new ModelChecksumError(fileNameFromUrl(file.url));
+  }
+  await rename(partial, target);
 }

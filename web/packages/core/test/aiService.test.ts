@@ -114,7 +114,7 @@ describe("AIService", () => {
     install("klein");
     const status = await service.update({ enabled: true, modelId: "klein", autoCategorize: false });
     expect(status.ready).toBe(true);
-    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true });
+    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true, vision: false });
     await expect(service.update({ modelId: "gibt-es-nicht" })).rejects.toThrow(/Unbekanntes Modell/);
   });
 

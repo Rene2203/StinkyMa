@@ -4,7 +4,7 @@ import type { AIMessage, JsonSchema } from "./types.js";
 // Versionierte Prompt-Vorlagen (5.5). Auf Deutsch, kurz und eindeutig – für ~3B-Modelle formuliert.
 // Ändert sich eine Vorlage, steigt die Version (Ergebnisse lassen sich so nachvollziehen und neu messen).
 
-export const promptVersions = { categorize: 2, summarize: 2 } as const;
+export const promptVersions = { categorize: 2, summarize: 2, readImage: 1 } as const;
 
 export const categories: readonly MessageCategory[] = [
   "personal", "work", "newsletter", "notification", "invoice", "appointment", "spam_suspect",
@@ -78,4 +78,30 @@ Erfinde nichts. Nenne Beträge, Daten und Namen genau so, wie sie in den Mails s
     },
     { role: "user", content: thread },
   ];
+}
+
+export const documentTypes = ["invoice", "receipt", "contract", "letter", "form", "ticket", "screenshot", "photo", "other"] as const;
+export type DocumentType = (typeof documentTypes)[number];
+
+export const readImageSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    documentType: { type: "string", enum: documentTypes },
+    title: { type: "string", maxLength: 120 },
+    summary: { type: "string", maxLength: 400 },
+    text: { type: "string", maxLength: 6000 },
+  },
+  required: ["documentType", "title", "summary", "text"],
+  additionalProperties: false,
+};
+
+/** Bild(er) eines Dokuments lesen: Art, Titel, kurze Beschreibung und der vollständige sichtbare Text. */
+export function readImagePrompt(context: { filename: string; pages: number }): { system: string; user: string } {
+  return {
+    system: `Du liest Bilder von Dokumenten (Fotos, Scans, Bildschirmfotos) und antwortest nur mit JSON:
+{"documentType": "${documentTypes.join(" | ")}", "title": "kurzer Titel", "summary": "1–2 Sätze auf Deutsch: Was ist es, von wem, wichtigste Angaben (Beträge, Daten, Fristen)", "text": "der vollständige sichtbare Text, Zeile für Zeile"}
+Schreibe Zahlen, Beträge, Daten, Namen und Nummern (IBAN, Rechnungsnummer) exakt so ab, wie sie im Bild stehen. Erfinde nichts; Unlesbares lässt du weg.
+Ist kein Text zu sehen (Foto), beschreibe das Bild in "summary" und lasse "text" leer.`,
+    user: context.pages > 1 ? `Datei: ${context.filename} (${context.pages} Seiten, in Reihenfolge)` : `Datei: ${context.filename}`,
+  };
 }

@@ -1818,3 +1818,78 @@ button.attachment-open:hover {
   background: color-mix(in srgb, var(--green) 16%, transparent);
   font-weight: 500;
 }
+
+/* KI: Bilder lesen */
+
+.vision-row .vision-setup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vision-row .vision-setup > span {
+  flex: 1;
+}
+
+.vision-row button:not(.link-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+}
+
+.viewer-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--purple) 45%, var(--border));
+  background: color-mix(in srgb, var(--purple) 8%, var(--bg));
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 3px 10px;
+  margin-right: 4px;
+}
+
+.viewer-read:disabled {
+  opacity: 0.55;
+}
+
+.reading-card {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--purple) 35%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--purple) 6%, var(--bg));
+  text-align: left;
+}
+
+.reading-card p {
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+
+.reading-card .dimmed {
+  opacity: 0.55;
+}
+
+.reading-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reading-text {
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}

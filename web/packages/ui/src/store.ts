@@ -15,6 +15,8 @@ import {
   type AISettings,
   type AIStatus,
   type SummaryView,
+  type AttachmentReadingView,
+  type AIImage,
   type Attachment,
   type Mailbox,
   type MailRepository,
@@ -88,6 +90,15 @@ export interface BrowserState {
   ai: AIStatus | null;
   /** Zusammenfassung der geöffneten Konversation. */
   summary: SummaryState | null;
+  /** „Mit KI lesen“ für den Anhang in der Vorschau. */
+  reading: ReadingState | null;
+}
+
+export interface ReadingState {
+  attachmentId: string;
+  view: AttachmentReadingView | null;
+  busy: boolean;
+  error: string | null;
 }
 
 export interface SummaryState {
@@ -121,6 +132,7 @@ export const initialState: BrowserState = {
   appSettingsAvailable: {},
   ai: null,
   summary: null,
+  reading: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -254,6 +266,56 @@ export class BrowserStore {
     }
   }
 
+  /** Bild-Baustein und Bild-Laufzeit laden (Fehler stehen im Status, nicht im Banner). */
+  async downloadVision(): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    try {
+      await ai.downloadVision();
+    } catch {
+      // steht in status.error
+    }
+    await this.#loadAI();
+  }
+
+  /** Kann der Anhang in der Vorschau mit KI gelesen werden (Modell bereit, Bilder eingeschaltet)? */
+  get canReadAttachments(): boolean {
+    const ai = this.#state.ai;
+    return !!ai?.ready && ai.settings.vision && ai.vision.state === "ready";
+  }
+
+  /**
+   * Anhang in der Vorschau mit KI lesen – nur auf Klick. Für PDFs schickt die Oberfläche die gerenderten Seiten mit.
+   * Fehler erscheinen in der Karte.
+   */
+  async readAttachmentWithAI(pageImages?: AIImage[]): Promise<void> {
+    const ai = this.#ai;
+    const attachmentId = this.#state.preview?.attachmentId;
+    if (!ai || !attachmentId || this.#state.reading?.busy) return;
+    const previous = this.#state.reading?.attachmentId === attachmentId ? this.#state.reading.view : null;
+    this.#set({ reading: { attachmentId, view: previous, busy: true, error: null } });
+    try {
+      const view = await ai.readAttachment(attachmentId, pageImages);
+      if (this.#state.reading?.attachmentId === attachmentId) this.#set({ reading: { attachmentId, view, busy: false, error: null } });
+    } catch (e) {
+      const error = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e);
+      if (this.#state.reading?.attachmentId === attachmentId) this.#set({ reading: { attachmentId, view: previous, busy: false, error } });
+    }
+  }
+
+  async #loadCachedReading(attachmentId: string): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    try {
+      const view = await ai.attachmentReading(attachmentId);
+      if (view && this.#state.preview?.attachmentId === attachmentId && !this.#state.reading?.busy) {
+        this.#set({ reading: { attachmentId, view, busy: false, error: null } });
+      }
+    } catch {
+      // Zusatz – Fehler hier nicht melden
+    }
+  }
+
   closeSummary(): void {
     this.#set({ summary: null });
   }
@@ -303,12 +365,14 @@ export class BrowserStore {
   /** Vorschau in der App (PDF, Bild, Text); andere Formate öffnen im Standardprogramm. */
   async showAttachment(attachment: { id: string; filename: string; mimeType: string }): Promise<void> {
     const kind = previewKind(attachment.filename, attachment.mimeType);
-    if (kind && this.#files) this.#set({ preview: { attachmentId: attachment.id, filename: attachment.filename, kind } });
-    else await this.openAttachment(attachment.id);
+    if (kind && this.#files) {
+      this.#set({ preview: { attachmentId: attachment.id, filename: attachment.filename, kind }, reading: null });
+      void this.#loadCachedReading(attachment.id);
+    } else await this.openAttachment(attachment.id);
   }
 
   closePreview(): void {
-    this.#set({ preview: null });
+    this.#set({ preview: null, reading: null });
   }
 
   /** Inhalt für die Vorschau (Fehler an den Vorschau-Dialog, nicht ins Banner). */

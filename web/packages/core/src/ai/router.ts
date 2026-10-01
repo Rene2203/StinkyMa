@@ -43,7 +43,7 @@ export const passThroughGuard: PrivacyGuard = {
 
 /** Protokoll jeder Übertragung außerhalb des Geräts (Datenschutz-Dashboard, 7.6). */
 export interface AITransferLog {
-  record(entry: { at: string; providerId: string; privacyClass: PrivacyClass; task: AITask; accountIds: string[]; characters: number }): void;
+  record(entry: { at: string; providerId: string; privacyClass: PrivacyClass; task: AITask; accountIds: string[]; characters: number; images: number }): void;
 }
 
 /**
@@ -72,6 +72,9 @@ export class AIRouter {
     if (!provider) {
       throw new AINotConfiguredError("Für diese Aufgabe ist noch kein KI-Modell eingerichtet.");
     }
+    if (request.messages.some((m) => m.images?.length) && !provider.acceptsImages) {
+      throw new AINotConfiguredError("Das gewählte KI-Modell kann keine Bilder lesen.");
+    }
     if (context.accountIds.length === 0) throw new AIBlockedError("Ohne Konto keine Freigabe-Prüfung möglich.");
     for (const accountId of new Set(context.accountIds)) {
       if (!this.options.policy.isAllowed(accountId, request.task, provider.privacyClass)) {
@@ -91,6 +94,7 @@ export class AIRouter {
       task: request.task,
       accountIds: [...new Set(context.accountIds)],
       characters: outgoing.messages.reduce((sum, m) => sum + m.content.length, 0),
+      images: outgoing.messages.reduce((sum, m) => sum + (m.images?.length ?? 0), 0),
     });
     return guard.incoming(await provider.generate(outgoing, signal));
   }

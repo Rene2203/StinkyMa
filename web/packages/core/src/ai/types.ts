@@ -5,11 +5,19 @@
 export type PrivacyClass = "onDevice" | "ownServer" | "cloud";
 
 /** Aufgaben der KI (5.5). Weitere folgen in späteren Phasen. */
-export type AITask = "categorize" | "summarize";
+export type AITask = "categorize" | "summarize" | "readImage";
+
+/** Bild als Eingabe (Foto, Scan, Bildschirmfoto) – nur für Modelle mit Bild-Baustein. */
+export interface AIImage {
+  mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif" | "image/bmp";
+  base64: string;
+}
 
 export interface AIMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  /** Bilder zu dieser Nachricht (vor dem Text). */
+  images?: AIImage[];
 }
 
 /** Vereinfachtes JSON-Schema für strukturierte Ausgaben (lokale Modelle erzwingen es per Grammatik). */
@@ -43,6 +51,8 @@ export interface AIProvider {
   readonly id: string;
   readonly displayName: string;
   readonly privacyClass: PrivacyClass;
+  /** Versteht Bilder in `AIMessage.images`. */
+  readonly acceptsImages?: boolean;
   /** Kontextlänge in Tokens (Eingabe + Ausgabe). */
   readonly contextWindow: number;
   generate(request: AIRequest, signal?: AbortSignal): Promise<AIResponse>;

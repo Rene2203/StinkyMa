@@ -21,7 +21,7 @@ import {
   type Message,
 } from "@stinkyma/core";
 import { MailService } from "@stinkyma/core/mail";
-import { AIService, ModelStore } from "@stinkyma/core/llm";
+import { AIService, ModelStore, RuntimeStore } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore } from "@stinkyma/core/node";
 import { AIResultStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
@@ -84,6 +84,12 @@ function setUpServices(): void {
   const settingsFile = settings;
   ai = new AIService({
     store: new ModelStore(dataPath("models")),
+    // Bild-Laufzeit (llama-server) erst bei Bedarf – „Bilder und Scans verstehen“ in den Optionen
+    runtime: new RuntimeStore(dataPath("runtime")),
+    attachmentContent: (attachmentId) => {
+      if (!service) throw new Error("Datenbank ist noch nicht bereit");
+      return service.attachmentContent(attachmentId);
+    },
     results: new AIResultStore(db),
     thread: (threadId) => repository.thread(threadId),
     ownAddresses: async () => (await repository.accounts()).map((account) => account.email),

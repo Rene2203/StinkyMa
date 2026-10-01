@@ -55,10 +55,11 @@ jobs:
           if ((Get-FileHash $model -Algorithm SHA256).Hash -ne "270CBA1BD5109F42D03350F60406024560464DB173C0E387D91F0426D3BD256D") { throw "Prüfsumme des Testmodells stimmt nicht" }
           "STINKYMA_TEST_MODEL=$model" | Out-File -FilePath $env:GITHUB_ENV -Append
           "STINKYMA_E2E_MODEL=$model" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Tests (Kern, Oberfläche, IMAP-Integration, llama.cpp)
+      - name: Tests (Kern, Oberfläche, IMAP-Integration, llama.cpp inkl. Bild-Laufzeit)
         run: npm test
         env:
           GREENMAIL_IMAP_PORT: "3143"
+          STINKYMA_TEST_LLAMA_RUNTIME: "1"
       - name: App bauen
         run: npm run build
       - name: E2E-Test der Windows-App (mit Screenshots, Konto-Einrichtung gegen den Test-Mailserver, KI mit Testmodell)

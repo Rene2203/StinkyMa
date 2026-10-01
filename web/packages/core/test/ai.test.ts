@@ -146,7 +146,7 @@ describe("AIRouter", () => {
     expect(provider.requests[0]?.messages[0]?.content).toBe("Hallo [X]");
     expect(response.text).toBe("ANTWORT");
     expect(log.entries).toEqual([
-      { at: "2026-10-01T10:00:00.000Z", providerId: "fake-cloud", privacyClass: "cloud", task: "categorize", accountIds: ["a1"], characters: 9 },
+      { at: "2026-10-01T10:00:00.000Z", providerId: "fake-cloud", privacyClass: "cloud", task: "categorize", accountIds: ["a1"], characters: 9, images: 0 },
     ]);
   });
 });

@@ -1,8 +1,8 @@
 import type { Message, MessageCategory } from "../models.js";
 import { mailForModel, threadForModel } from "./prepare.js";
-import { categories, categorizePrompt, categorizeSchema, summarizePrompt, summarizeSchema } from "./prompts.js";
+import { categories, categorizePrompt, categorizeSchema, documentTypes, readImagePrompt, readImageSchema, summarizePrompt, summarizeSchema, type DocumentType } from "./prompts.js";
 import type { AIRouter } from "./router.js";
-import type { AIRequest, AIResponse, PrivacyClass } from "./types.js";
+import type { AIImage, AIRequest, AIResponse, PrivacyClass } from "./types.js";
 
 /** Woher ein Ergebnis stammt – die Oberfläche zeigt es an (5.0: Gerät / eigener Server / Cloud / Regeln). */
 export type ResultOrigin = PrivacyClass | "rules";
@@ -123,4 +123,51 @@ export async function summarizeThread(
   const result = await runParsed(router, request, accountIds, parseSummary, options.signal);
   if (!result) throw new Error("Das Modell hat keine brauchbare Zusammenfassung geliefert. Bitte noch einmal versuchen.");
   return { ...result.value, origin: result.response.privacyClass as ThreadSummary["origin"], providerId: result.response.providerId, durationMs: result.durationMs };
+}
+
+export interface ImageReading {
+  documentType: DocumentType;
+  title: string;
+  summary: string;
+  text: string;
+  origin: Exclude<ResultOrigin, "rules">;
+  providerId: string;
+  durationMs: number;
+}
+
+export function parseImageReading(text: string): Pick<ImageReading, "documentType" | "title" | "summary" | "text"> | null {
+  const value = extractJson(text) as { documentType?: unknown; title?: unknown; summary?: unknown; text?: unknown } | null;
+  if (!value || typeof value.summary !== "string") return null;
+  const documentType = (documentTypes as readonly string[]).includes(String(value.documentType)) ? (value.documentType as DocumentType) : "other";
+  const title = typeof value.title === "string" ? value.title.trim() : "";
+  const body = typeof value.text === "string" ? value.text.trim() : "";
+  if (!value.summary.trim() && !body) return null;
+  return { documentType, title, summary: value.summary.trim(), text: body };
+}
+
+/** Höchstens so viele Seiten/Bilder auf einmal – kleine Modelle und schwache Rechner. */
+export const maxImagesPerReading = 3;
+
+/** Liest ein Dokument aus Bildern (Foto, Scan, gerenderte PDF-Seiten). Ohne gültige Antwort: Fehler. */
+export async function readDocumentImages(
+  router: AIRouter,
+  images: AIImage[],
+  options: { filename: string; accountIds: string[]; signal?: AbortSignal },
+): Promise<ImageReading> {
+  if (images.length === 0) throw new Error("Kein Bild zum Lesen.");
+  const pages = images.slice(0, maxImagesPerReading);
+  const prompt = readImagePrompt({ filename: options.filename, pages: pages.length });
+  const request: AIRequest = {
+    task: "readImage",
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user, images: pages },
+    ],
+    jsonSchema: readImageSchema,
+    maxTokens: 1500,
+    temperature: 0,
+  };
+  const result = await runParsed(router, request, options.accountIds, parseImageReading, options.signal);
+  if (!result) throw new Error("Das Modell konnte das Bild nicht lesen. Bitte noch einmal versuchen.");
+  return { ...result.value, origin: result.response.privacyClass as ImageReading["origin"], providerId: result.response.providerId, durationMs: result.durationMs };
 }

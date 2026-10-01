@@ -45,3 +45,34 @@ describe.skipIf(!modelPath)("LlamaCppProvider (echtes Modell)", () => {
     await provider.dispose();
   });
 });
+
+// Echte Bild-Laufzeit (llama-server): lädt die festgelegte llama.cpp-Version (mit Prüfsumme), entpackt sie und
+// startet sie mit dem Testmodell. Nur mit STINKYMA_TEST_LLAMA_RUNTIME=1 (lädt ~20–35 MB aus dem Internet).
+describe.skipIf(!modelPath || process.env.STINKYMA_TEST_LLAMA_RUNTIME !== "1")("Bild-Laufzeit llama-server (echt)", () => {
+  it("lädt, startet nur auf 127.0.0.1, antwortet im JSON-Schema und beendet sich", async () => {
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { LlamaServerProvider, RuntimeStore } = await import("../src/llm/index.js");
+    const dir = mkdtempSync(join(tmpdir(), "stinkyma-runtime-"));
+    const provider = await (async () => {
+      const serverPath = await new RuntimeStore(dir).download();
+      return new LlamaServerProvider({ id: "rt", displayName: "RT", serverPath, modelPath: modelPath ?? "", gpu: false, idleUnloadMs: 0 });
+    })();
+    try {
+      const response = await provider.generate({
+        task: "categorize",
+        messages: [{ role: "user", content: "Betreff: Ihre Rechnung" }],
+        jsonSchema: categorizeSchema,
+        maxTokens: 150,
+      });
+      expect(typeof (extractJson(response.text) as { category?: unknown } | null)?.category).toBe("string");
+      expect(provider.isLoaded).toBe(true);
+      await provider.unload();
+      expect(provider.isLoaded).toBe(false);
+    } finally {
+      await provider.dispose();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 300_000);
+});

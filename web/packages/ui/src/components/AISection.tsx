@@ -34,6 +34,7 @@ export function AISection() {
             <input type="checkbox" checked={settings.useGpu} data-testid="ai-use-gpu" onChange={(e) => void store.updateAI({ useGpu: e.target.checked })} />
             <span>{t("ai.useGpu")}</span>
           </label>
+          <VisionRow />
         </>
       )}
       {ai.categorizing && (
@@ -52,6 +53,45 @@ export function AISection() {
         ))}
       </ul>
     </section>
+  );
+}
+
+/** „Bilder und Scans verstehen“: lädt Bild-Baustein und Bild-Laufzeit nach (nur, wenn das Modell es kann). */
+function VisionRow() {
+  const { store, t, locale } = useUi();
+  const state = useBrowserState();
+  const ai = state.ai;
+  if (!ai || ai.vision.state === "unavailable") return null;
+  const download = ai.download?.kind === "vision" ? ai.download : null;
+  return (
+    <div className="vision-row" data-testid="ai-vision">
+      {ai.vision.state === "ready" ? (
+        <label className="checkbox">
+          <input type="checkbox" checked={ai.settings.vision} data-testid="ai-vision-enabled" onChange={(e) => void store.updateAI({ vision: e.target.checked })} />
+          <span>
+            {t("ai.vision")}
+            <span className="hint block">{t("ai.visionHint")}</span>
+          </span>
+        </label>
+      ) : download ? (
+        <div className="model-progress">
+          <span className="small">{t("ai.vision")}</span>
+          <progress value={download.receivedBytes / Math.max(1, download.totalBytes)} max={1} aria-label={t("ai.vision")} />
+          <span className="muted small">{t("ai.model.progress", { done: formatBytes(download.receivedBytes, locale), total: formatBytes(download.totalBytes, locale) })}</span>
+          <button type="button" className="link-button" onClick={() => void store.cancelModelDownload()}>{t("ai.model.cancel")}</button>
+        </div>
+      ) : (
+        <div className="vision-setup">
+          <span>
+            {t("ai.vision")}
+            <span className="hint block">{t("ai.visionHint")}</span>
+          </span>
+          <button type="button" data-testid="ai-vision-download" disabled={ai.download !== null} onClick={() => void store.downloadVision()}>
+            <Download size={15} aria-hidden="true" /> {t("ai.visionDownload", { size: formatBytes(ai.vision.missingBytes, locale) })}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

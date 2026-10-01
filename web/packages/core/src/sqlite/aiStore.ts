@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import type { DocumentType } from "../ai/prompts.js";
 import type { ResultOrigin } from "../ai/tasks.js";
 import type { Message, MessageCategory } from "../models.js";
 import { messageFromRow } from "./repository.js";
@@ -19,7 +20,23 @@ export interface StoredSummary {
   createdAt: string;
 }
 
-/** KI-Ergebnisse in der Datenbank (Migration v9). */
+/** Gespeichertes Leseergebnis eines Anhangs (Tabelle attachmentAnalysis). */
+export interface StoredReading {
+  attachmentId: string;
+  documentType: DocumentType;
+  title: string;
+  summary: string;
+  text: string;
+  modelId: string;
+  privacyClass: string;
+  analyzedAt: string;
+  durationMs: number;
+}
+
+/** Quelle im Suchindex für Text, den die KI aus Bildern gelesen hat. */
+export const visionTextSource = "vision";
+
+/** KI-Ergebnisse in der Datenbank (Migration v9; Anhang-Lesen in der Tabelle attachmentAnalysis aus v1). */
 export class AIResultStore {
   constructor(private readonly db: Database.Database) {}
 
@@ -89,5 +106,69 @@ export class AIResultStore {
            lastMessageDate = excluded.lastMessageDate, messageCount = excluded.messageCount, createdAt = excluded.createdAt`,
       )
       .run({ ...summary, openPoints: JSON.stringify(summary.openPoints) });
+  }
+
+  /** Konto, Dateiname und Typ eines Anhangs (für Freigabe-Prüfung und Anzeige). */
+  attachmentInfo(attachmentId: string): { accountId: string; filename: string; mimeType: string } | null {
+    const row = this.db
+      .prepare("SELECT message.accountId AS accountId, attachment.filename AS filename, attachment.mimeType AS mimeType FROM attachment JOIN message ON message.id = attachment.messageId WHERE attachment.id = ?")
+      .get(attachmentId) as { accountId: string; filename: string; mimeType: string } | undefined;
+    return row ?? null;
+  }
+
+  reading(attachmentId: string): StoredReading | null {
+    const row = this.db.prepare("SELECT * FROM attachmentAnalysis WHERE attachmentId = ?").get(attachmentId) as Row | undefined;
+    if (!row) return null;
+    let extracted: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(String(row.extractedJSON ?? "{}")) as unknown;
+      if (parsed && typeof parsed === "object") extracted = parsed as Record<string, unknown>;
+    } catch {
+      extracted = {};
+    }
+    return {
+      attachmentId,
+      documentType: (typeof extracted.documentType === "string" ? extracted.documentType : "other") as DocumentType,
+      title: typeof extracted.title === "string" ? extracted.title : "",
+      summary: String(row.summary ?? ""),
+      text: typeof extracted.text === "string" ? extracted.text : "",
+      modelId: String(row.modelId),
+      privacyClass: String(row.privacyClass),
+      analyzedAt: String(row.analyzedAt),
+      durationMs: typeof extracted.durationMs === "number" ? extracted.durationMs : 0,
+    };
+  }
+
+  /**
+   * Speichert das Leseergebnis und macht den Text durchsuchbar. Text, den die App selbst aus einem PDF gelesen hat,
+   * bleibt im Suchindex (er ist genauer); Bilder und Scans ohne Textebene bekommen den KI-Text.
+   */
+  saveReading(reading: StoredReading): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO attachmentAnalysis (attachmentId, summary, extractedJSON, modelId, privacyClass, analyzedAt)
+           VALUES (@attachmentId, @summary, @extractedJSON, @modelId, @privacyClass, @analyzedAt)
+           ON CONFLICT(attachmentId) DO UPDATE SET summary = excluded.summary, extractedJSON = excluded.extractedJSON,
+             modelId = excluded.modelId, privacyClass = excluded.privacyClass, analyzedAt = excluded.analyzedAt`,
+        )
+        .run({
+          attachmentId: reading.attachmentId,
+          summary: reading.summary,
+          extractedJSON: JSON.stringify({ documentType: reading.documentType, title: reading.title, text: reading.text, durationMs: reading.durationMs }),
+          modelId: reading.modelId,
+          privacyClass: reading.privacyClass,
+          analyzedAt: reading.analyzedAt,
+        });
+      const existing = this.db.prepare("SELECT source, length(trim(text)) AS n FROM attachmentText WHERE attachmentId = ?").get(reading.attachmentId) as { source: string; n: number } | undefined;
+      if (existing && existing.source !== visionTextSource && existing.n > 0) return;
+      const searchable = [reading.title, reading.summary, reading.text].filter((part) => part.trim()).join("\n");
+      this.db
+        .prepare(
+          `INSERT INTO attachmentText (attachmentId, text, source) VALUES (?, ?, ?)
+           ON CONFLICT(attachmentId) DO UPDATE SET text = excluded.text, source = excluded.source`,
+        )
+        .run(reading.attachmentId, searchable, visionTextSource);
+    })();
   }
 }
