@@ -2503,3 +2503,124 @@ button.attachment-open:hover {
     animation: none;
   }
 }
+
+/* Einordnung korrigieren */
+.category-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip-button {
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.chip-button:hover,
+.chip-button:focus-visible {
+  border-color: currentColor;
+}
+
+.chip.category-none {
+  color: var(--fg-muted);
+  background: color-mix(in srgb, var(--fg) 6%, var(--bg));
+}
+
+.category-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.category-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.category-menu > button:hover,
+.category-menu > button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+}
+
+.category-menu > button[aria-checked="true"] {
+  font-weight: 600;
+}
+
+.category-menu > button > svg {
+  color: var(--chip, currentColor);
+}
+
+.category-menu .checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 8px 2px;
+  border-top: 1px solid var(--border);
+}
+
+.category-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-muted);
+}
+
+.learned-senders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.learned-senders ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.learned-senders li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.learned-senders li + li {
+  border-top: 1px solid var(--border);
+}
+
+.learned-senders .ellipsis {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

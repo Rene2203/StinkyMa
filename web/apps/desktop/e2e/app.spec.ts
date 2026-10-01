@@ -130,6 +130,24 @@ test("Tagesüberblick ohne KI: wichtige neue Mails, Klick öffnet die Mail", asy
   await expect(page.getByTestId("thread-subject")).toHaveText(subject);
 });
 
+test("Einordnung korrigieren: für den Absender gemerkt, andere Mails folgen", async () => {
+  await page.getByRole("searchbox").fill("");
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  await rows().filter({ hasText: "Super, freut mich!" }).click();
+  await page.getByTestId("category-picker").click();
+  await expect(page.getByTestId("category-remember")).toBeChecked();
+  await page.getByTestId("category-option-work").click();
+  await expect(page.getByTestId("category-picker")).toContainText("Arbeit");
+  await expect(page.getByTestId("category-note")).toContainText("weitere Mail");
+  await shot("27-Einordnung-korrigieren");
+  // Die ältere Mail von Jonas folgt
+  await expect(rows().filter({ hasText: "Hi Anna, wir grillen am Samstag" }).locator(".chip")).toHaveText("Arbeit");
+  // Zurück: wieder „Persönlich“
+  await page.getByTestId("category-picker").click();
+  await page.getByTestId("category-option-personal").click();
+  await expect(rows().filter({ hasText: "Hi Anna, wir grillen am Samstag" }).locator(".chip")).toHaveText("Persönlich");
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

@@ -63,8 +63,43 @@ export class AIResultStore {
     return row.n;
   }
 
-  setCategory(messageId: string, category: MessageCategory, origin: ResultOrigin | "user"): void {
-    this.db.prepare("UPDATE message SET category = ?, categoryOrigin = ? WHERE id = ?").run(category, origin, messageId);
+  setCategory(messageId: string, category: MessageCategory | null, origin: ResultOrigin | "user" | "learned"): void {
+    this.db.prepare("UPDATE message SET category = ?, categoryOrigin = ? WHERE id = ?").run(category, category ? origin : null, messageId);
+  }
+
+  // --- Gelernte Einordnung je Absender (Korrekturen des Nutzers) ---
+
+  learnSender(address: string, category: MessageCategory, at: string): void {
+    this.db
+      .prepare("INSERT INTO senderCategory (address, category, learnedAt) VALUES (?, ?, ?) ON CONFLICT(address) DO UPDATE SET category = excluded.category, learnedAt = excluded.learnedAt")
+      .run(address.trim().toLowerCase(), category, at);
+  }
+
+  learnedCategory(address: string): MessageCategory | null {
+    const row = this.db.prepare("SELECT category FROM senderCategory WHERE address = ?").get(address.trim().toLowerCase()) as { category: string } | undefined;
+    return row ? (row.category as MessageCategory) : null;
+  }
+
+  learnedSenders(): { address: string; category: MessageCategory; learnedAt: string }[] {
+    return (this.db.prepare("SELECT address, category, learnedAt FROM senderCategory ORDER BY learnedAt DESC").all() as Row[]).map((r) => ({
+      address: String(r.address),
+      category: String(r.category) as MessageCategory,
+      learnedAt: String(r.learnedAt),
+    }));
+  }
+
+  forgetSender(address: string): void {
+    this.db.prepare("DELETE FROM senderCategory WHERE address = ?").run(address.trim().toLowerCase());
+  }
+
+  /** Andere Mails des Absenders übernehmen die gelernte Einordnung – außer solche, die der Nutzer selbst gesetzt hat. */
+  applyLearned(address: string, category: MessageCategory, exceptMessageId: string): number {
+    return this.db
+      .prepare(
+        `UPDATE message SET category = ?, categoryOrigin = 'learned'
+         WHERE lower(fromAddress) = ? AND id <> ? AND COALESCE(categoryOrigin, '') <> 'user' AND COALESCE(category, '') <> ?`,
+      )
+      .run(category, address.trim().toLowerCase(), exceptMessageId, category).changes;
   }
 
   attachmentNames(messageId: string): string[] {

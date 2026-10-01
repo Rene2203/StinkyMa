@@ -385,6 +385,17 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // Vom Nutzer korrigierte Einordnung, gemerkt je Absender (klein geschrieben): künftige Mails bekommen sie ohne Modell.
+    name: "v13-sender-category",
+    sql: `
+      CREATE TABLE senderCategory (
+        address TEXT PRIMARY KEY NOT NULL,
+        category TEXT NOT NULL,
+        learnedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

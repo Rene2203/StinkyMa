@@ -67,6 +67,14 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     cancelReminder: async (id) => {
       calls.push(`cancel:${id}`);
     },
+    setCategory: async (messageId, category, remember) => {
+      calls.push(`category:${messageId}:${category}:${remember}`);
+      return { changed: remember ? 2 : 0 };
+    },
+    learnedSenders: async () => [{ address: "news@tsv.example", category: "newsletter", learnedAt: "2026-10-01T10:00:00Z" }],
+    forgetSender: async (address) => {
+      calls.push(`forget:${address}`);
+    },
     resume: async () => {
       calls.push("resume");
       return status({ ready: true });
@@ -285,5 +293,24 @@ describe("BrowserStore – KI", () => {
     await store.resumeAI();
     expect(ai.calls).toContain("resume");
     expect(store.getState().ai?.ready).toBe(true);
+  });
+
+  it("Einordnung korrigieren: reicht durch, Rückmeldung mit Anzahl, gelernte Absender laden/vergessen", async () => {
+    const ai = fakeAI();
+    const store = await setup(ai);
+    const first = store.getState().messages[0];
+    if (!first) throw new Error("keine Mail");
+    await store.selectMessage(first.id);
+    await store.setMessageCategory(first.id, "newsletter", true);
+    expect(ai.calls).toContain(`category:${first.id}:newsletter:true`);
+    expect(store.getState().categoryNote).toMatchObject({ messageId: first.id, category: "newsletter", remembered: true, changed: 2 });
+    expect(store.getState().learnedSenders).toHaveLength(1);
+    await store.forgetSender("news@tsv.example");
+    expect(ai.calls).toContain("forget:news@tsv.example");
+    // Wechsel zu einer anderen Mail: Rückmeldung verschwindet
+    const second = store.getState().messages[1];
+    if (!second) throw new Error("keine zweite Mail");
+    await store.selectMessage(second.id);
+    expect(store.getState().categoryNote).toBeNull();
   });
 });

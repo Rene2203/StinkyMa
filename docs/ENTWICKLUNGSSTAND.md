@@ -435,6 +435,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   (Abrufstatus, Konto hinzufügen) bleibt jetzt auch bei vielen Ordnern sichtbar – vorher scrollte er weg. Statusmeldungen
   werden nummeriert, damit eine ältere „arbeitet …“-Meldung nie eine neuere überschreibt. Geprüft: Unit-Tests (Fortschritt,
   Aufgabe, Weiter einordnen), Sichtprüfung per Screenshot mit nachgestelltem Status.
+- **Einordnung korrigieren = KI beibringen (Wunsch des Nutzers, lokal geprüft):** Die Einordnung über der Mail ist
+  anklickbar. Gewählte Einordnung gilt sofort; standardmäßig „für diesen Absender merken“ (Migration `v13-sender-category`):
+  andere, von der KI eingeordnete Mails des Absenders werden gleich mit geändert, neue Mails bekommen sie ohne Modell
+  (Herkunft „learned“). Von Hand Gesetztes überschreibt nichts. Optionen → KI → „Gelernte Absender“ mit Vergessen.
+  Bewusst ohne Nachtrainieren des Modells: Für ein ~3B-Modell ist „Absender → Einordnung“ zuverlässiger und kostet keine
+  Rechenzeit. Die Korrekturen sind zugleich Material für die Feinabstimmung (wo irrt das Modell?).
+  Geprüft: Unit-Tests (Lernen, Mitändern, neue Mail ohne Modell, Vergessen), Store-Test, E2E mit Beispieldaten.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,

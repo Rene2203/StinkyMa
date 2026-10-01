@@ -79,6 +79,7 @@ function setup(initial: Partial<AISettings> = {}, options: { failing?: boolean; 
     store,
     results,
     thread: (id) => repository.thread(id),
+    message: (id) => repository.message(id),
     ownAddresses: async () => (await repository.accounts()).map((a) => a.email),
     settings: { load: () => saved, save: (s) => (saved = s) },
     ramGb: 8,
@@ -237,6 +238,37 @@ describe("AIService", () => {
     // Zusammenfassen danach geht – die Warteschlange ist nicht blockiert
     const { threadId } = db.prepare("SELECT threadId FROM message LIMIT 1").get() as { threadId: string };
     expect((await service.summarize(threadId)).summary).toBe("Es geht um den Grillabend.");
+  });
+
+  it("Korrektur von Hand: gemerkt je Absender, andere KI-Einordnungen des Absenders folgen, neue Mails ohne Modell", async () => {
+    const { service, install, results, db, providers, statuses } = setup();
+    install("klein");
+    const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+    await service.update({ enabled: true, modelId: "klein" });
+    await until(() => results.uncategorizedCount(since) === 0 && statuses.at(-1)?.categorizing === null);
+    // Ein Absender mit mehreren Mails
+    const inbox = "FROM message m JOIN mailbox b ON b.id = m.mailboxId WHERE b.role = 'inbox' AND m.date >= ?";
+    const { fromAddress } = db.prepare(`SELECT m.fromAddress ${inbox} GROUP BY lower(m.fromAddress) HAVING COUNT(*) > 1 LIMIT 1`).get(since) as { fromAddress: string };
+    const ids = (db.prepare(`SELECT m.id ${inbox} AND m.fromAddress = ? ORDER BY m.date`).all(since, fromAddress) as { id: string }[]).map((r) => r.id);
+    const [first, ...others] = ids;
+    expect(others.length).toBeGreaterThan(0);
+    const { changed } = await service.setCategory(first!, "newsletter", true);
+    expect(changed).toBeGreaterThanOrEqual(others.length); // die übrigen (KI: „work“) folgen
+    expect(db.prepare("SELECT category, categoryOrigin FROM message WHERE id = ?").get(first)).toEqual({ category: "newsletter", categoryOrigin: "user" });
+    expect(await service.learnedSenders()).toEqual([expect.objectContaining({ address: fromAddress.toLowerCase(), category: "newsletter" })]);
+
+    // Neue Mail des Absenders (ohne Einordnung): kommt ohne Modell zur gemerkten Einordnung
+    const requestsBefore = providers[0]!.requests.length;
+    db.prepare("UPDATE message SET category = NULL, categoryOrigin = NULL WHERE id = ?").run(others[0]);
+    service.categorizeInBackground();
+    await until(() => results.uncategorizedCount(since) === 0 && statuses.at(-1)?.categorizing === null);
+    expect(db.prepare("SELECT category, categoryOrigin FROM message WHERE id = ?").get(others[0])).toEqual({ category: "newsletter", categoryOrigin: "learned" });
+    expect(providers[0]!.requests.length).toBe(requestsBefore);
+    // Vergessen; „keine Einordnung“ ohne Merken
+    await service.forgetSender(fromAddress);
+    expect(await service.learnedSenders()).toEqual([]);
+    await service.setCategory(first!, null, false);
+    expect(db.prepare("SELECT category, categoryOrigin FROM message WHERE id = ?").get(first)).toEqual({ category: null, categoryOrigin: null });
   });
 
   it("Modell löschen gibt es frei und setzt die Auswahl zurück", async () => {

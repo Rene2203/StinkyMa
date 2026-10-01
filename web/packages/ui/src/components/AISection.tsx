@@ -1,6 +1,8 @@
 import { Download, Image as ImageIcon, Loader2, Sparkles, Trash2, X } from "lucide-react";
 import { categorizeWindowDays, type AIModelInfo } from "@stinkyma/core";
+import { useEffect } from "react";
 import { useBrowserState, useUi } from "../context.js";
+import type { MessageKey } from "../i18n.js";
 import { formatBytes } from "../format.js";
 
 /** Optionen → KI: einschalten, Modell laden/wählen/löschen, Einordnung im Hintergrund. */
@@ -35,6 +37,7 @@ export function AISection() {
             <span>{t("ai.useGpu")}</span>
           </label>
           <VisionRow />
+          <LearnedSenders />
         </>
       )}
       {ai.categorizing && (
@@ -152,5 +155,32 @@ function ModelRow({ model, selected, busyElsewhere }: { model: AIModelInfo; sele
         )}
       </div>
     </li>
+  );
+}
+
+/** Aus Korrekturen gelernte Absender – ansehen und vergessen. */
+function LearnedSenders() {
+  const { store, t } = useUi();
+  const state = useBrowserState();
+  useEffect(() => {
+    void store.loadLearnedSenders();
+  }, [store]);
+  if (state.learnedSenders.length === 0) return null;
+  return (
+    <div className="learned-senders" data-testid="learned-senders">
+      <strong className="small">{t("learned.title")}</strong>
+      <span className="hint">{t("learned.text")}</span>
+      <ul role="list">
+        {state.learnedSenders.map((s) => (
+          <li key={s.address}>
+            <span className="ellipsis">{s.address}</span>
+            <span className={`chip category-${s.category}`}>{t(`category.${s.category}` as MessageKey)}</span>
+            <button type="button" className="icon-button" title={t("learned.forget", { address: s.address })} aria-label={t("learned.forget", { address: s.address })} onClick={() => void store.forgetSender(s.address)}>
+              <X size={13} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

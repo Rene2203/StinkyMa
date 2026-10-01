@@ -1,3 +1,4 @@
+import type { MessageCategory } from "../models.js";
 import type { DigestView } from "../digest.js";
 import type { AITask } from "./types.js";
 import type { MailAction } from "./actions.js";
@@ -169,8 +170,16 @@ export interface AIApi {
   replyDrafts(messageId: string): Promise<ReplyDraftsView>;
   /** Tagesüberblick: Fälliges, wichtige ungelesene Mails, „wartet auf dich“ (ohne Modell, sofort). */
   dailyDigest(): Promise<DigestView>;
+  /**
+   * Einordnung von Hand korrigieren. `remember`: für künftige Mails dieses Absenders merken (ohne Modell) und andere,
+   * von der KI eingeordnete Mails des Absenders gleich mit ändern. Gibt zurück, wie viele weitere Mails geändert wurden.
+   */
+  setCategory(messageId: string, category: MessageCategory | null, remember: boolean): Promise<{ changed: number }>;
+  /** Gelernte Absender (aus Korrekturen) – zum Ansehen und Vergessen. */
+  learnedSenders(): Promise<{ address: string; category: MessageCategory; learnedAt: string }[]>;
+  forgetSender(address: string): Promise<void>;
   /** Nach einem Fehler: Fehler vergessen und die Einordnung neu anstoßen. */
   resume(): Promise<AIStatus>;
 }
 
-export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume"] as const satisfies readonly (keyof AIApi)[];
+export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender"] as const satisfies readonly (keyof AIApi)[];

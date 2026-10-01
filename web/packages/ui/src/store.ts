@@ -24,6 +24,7 @@ import {
   type MessageActionsView,
   type ReplyDraftsView,
   type DigestView,
+  type MessageCategory,
   type AIImage,
   type Attachment,
   type Mailbox,
@@ -110,6 +111,10 @@ export interface BrowserState {
   rules: RulesState | null;
   /** Antwortvorschläge zur geöffneten Mail (nur auf Klick). */
   replies: RepliesState | null;
+  /** Rückmeldung nach einer Korrektur der Einordnung (geöffnete Mail). */
+  categoryNote: { messageId: string; address: string; category: MessageCategory | null; remembered: boolean; changed: number } | null;
+  /** Gelernte Absender (Optionen → KI). */
+  learnedSenders: { address: string; category: MessageCategory; learnedAt: string }[];
   /** Tagesüberblick (Dialog); null = geschlossen. */
   digest: { view: DigestView | null; busy: boolean; error: string | null } | null;
 }
@@ -181,6 +186,8 @@ export const initialState: BrowserState = {
   rules: null,
   replies: null,
   digest: null,
+  categoryNote: null,
+  learnedSenders: [],
 };
 
 // --- Abgeleitete Werte ---
@@ -399,6 +406,36 @@ export class BrowserStore {
       const error = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e);
       if (this.#state.summary?.threadId === threadId) this.#set({ summary: { threadId, view: this.#state.summary.view, busy: false, error } });
     }
+  }
+
+  /** Einordnung von Hand korrigieren (W6-Nachtrag „KI beibringen“). */
+  async setMessageCategory(messageId: string, category: MessageCategory | null, remember: boolean): Promise<void> {
+    const ai = this.#ai;
+    const message = this.#find(messageId);
+    if (!ai || !message) return;
+    await this.#guard(async () => {
+      const { changed } = await ai.setCategory(messageId, category, remember);
+      this.#set({ categoryNote: { messageId, address: message.from.address, category, remembered: remember, changed } });
+      await this.reload();
+      if (remember) await this.loadLearnedSenders();
+    });
+  }
+
+  closeCategoryNote(): void {
+    this.#set({ categoryNote: null });
+  }
+
+  async loadLearnedSenders(): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    await this.#guard(async () => this.#set({ learnedSenders: await ai.learnedSenders() }));
+  }
+
+  async forgetSender(address: string): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    await this.#guard(() => ai.forgetSender(address));
+    await this.loadLearnedSenders();
   }
 
   /** Nach einem KI-Fehler: weiter einordnen. */
@@ -1015,6 +1052,7 @@ export class BrowserStore {
     if (this.#state.summary && this.#state.summary.threadId !== message.threadId) this.#set({ summary: null });
     if (this.#state.actions?.messageId !== id) this.#set({ actions: null });
     if (this.#state.replies && this.#state.replies.messageId !== id) this.#set({ replies: null });
+    if (this.#state.categoryNote && this.#state.categoryNote.messageId !== id) this.#set({ categoryNote: null });
     void this.#loadCachedSummary();
     void this.#loadActions(id);
     await this.#guard(async () => {

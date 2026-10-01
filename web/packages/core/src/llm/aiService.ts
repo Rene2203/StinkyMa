@@ -12,7 +12,7 @@ import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
 import { AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse, type AITask } from "../ai/types.js";
-import type { Message } from "../models.js";
+import type { Message, MessageCategory } from "../models.js";
 import type { AIResultStore, StoredReading, StoredSummary } from "../sqlite/aiStore.js";
 import { LlamaCppProvider } from "./llamaProvider.js";
 import { LlamaServerProvider } from "./llamaServer.js";
@@ -624,6 +624,28 @@ export class AIService implements AIApi {
    * Ordnet neue Mails im Hintergrund ein (nacheinander, eine nach der anderen). Mehrfachaufrufe während eines
    * Laufs führen zu genau einem weiteren Durchgang.
    */
+  async setCategory(messageId: string, category: MessageCategory | null, remember: boolean): Promise<{ changed: number }> {
+    const message = await this.options.message?.(messageId);
+    if (!message) throw new Error("Die Mail wurde nicht gefunden.");
+    this.options.results.setCategory(messageId, category, "user");
+    if (!remember) return { changed: 0 };
+    const address = message.from.address;
+    if (!category) {
+      this.options.results.forgetSender(address);
+      return { changed: 0 };
+    }
+    this.options.results.learnSender(address, category, (this.options.now?.() ?? new Date()).toISOString());
+    return { changed: this.options.results.applyLearned(address, category, messageId) };
+  }
+
+  async learnedSenders(): Promise<{ address: string; category: MessageCategory; learnedAt: string }[]> {
+    return this.options.results.learnedSenders();
+  }
+
+  async forgetSender(address: string): Promise<void> {
+    this.options.results.forgetSender(address);
+  }
+
   async resume(): Promise<AIStatus> {
     this.#error = null;
     this.categorizeInBackground();
@@ -658,6 +680,16 @@ export class AIService implements AIApi {
         if (!this.#settings.enabled || !this.#settings.autoCategorize || this.#disposed) break;
         const [message] = this.options.results.uncategorized(1, since());
         if (!message) break;
+        // Vom Nutzer gelernt: ohne Modell, sofort
+        const learned = this.options.results.learnedCategory(message.from.address);
+        if (learned) {
+          this.options.results.setCategory(message.id, learned, "learned");
+          this.options.onCategorized?.();
+          const remaining = this.options.results.uncategorizedCount(since());
+          const current: { remaining: number; done: number; total: number } = this.#categorizing ?? { remaining, done: 0, total: remaining };
+          this.#categorizing = { remaining, done: current.done + 1, total: Math.max(current.total, current.done + 1 + remaining) };
+          continue;
+        }
         try {
           const result = await categorizeMessage(ready.router, message, { attachmentNames: this.options.results.attachmentNames(message.id) });
           this.options.results.setCategory(message.id, result.category, result.origin);
