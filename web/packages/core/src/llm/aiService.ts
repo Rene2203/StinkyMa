@@ -2,7 +2,7 @@ import { actionsPromptVersion, extractActions, ruleActions } from "../ai/actions
 import { cleanMailText } from "../ai/prepare.js";
 import { calendarFileName, toICalendar } from "../calendar.js";
 import type { ActionStatus, ActionStore, StoredAction } from "../sqlite/actionStore.js";
-import { categorizeWindowDays, maxPageImageChars, normalizeAISettings, type ActionView, type MessageActionsView, type ReplyDraftsView, type AIApi, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
+import { categorizeWindow, categorizeWindowDays, maxPageImageChars, type CategorizeWindow, normalizeAISettings, type ActionView, type MessageActionsView, type ReplyDraftsView, type AIApi, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
 import { modelCatalog, type CatalogModel } from "../ai/catalog.js";
 import { promptVersions } from "../ai/prompts.js";
 import { AIRouter, GrantPolicy } from "../ai/router.js";
@@ -92,7 +92,8 @@ export class AIService implements AIApi {
     const activity = this.#activity ? { ...this.#activity, waiting: this.#waiting } : null;
     const categorizing = this.#categorizing ? { ...this.#categorizing } : null;
     const total = this.options.results.uncategorizedTotal();
-    const recent = this.options.results.uncategorizedCount(this.#categorizeSince());
+    const window = this.#window();
+    const recent = this.options.results.uncategorizedCount(window.since, window);
     const backlog = { recent, older: Math.max(0, total - recent) };
     const models: AIModelInfo[] = [];
     let selectedInstalled = false;
@@ -650,10 +651,9 @@ export class AIService implements AIApi {
     this.options.results.forgetSender(address);
   }
 
-  /** Ab wann eingeordnet wird: letzte `categorizeWindowDays` Tage, oder alles (Einstellung „auch ältere“). */
-  #categorizeSince(): string {
-    if (this.#settings.categorizeOlder) return "";
-    return new Date((this.options.now?.() ?? new Date()).getTime() - categorizeWindowDays * 86_400_000).toISOString();
+  /** Welche Mails eingeordnet werden: neue (letzte Tage) plus der gewählte Zeitraum. */
+  #window(): CategorizeWindow {
+    return categorizeWindow(this.#settings.categorizeRange, this.options.now?.() ?? new Date());
   }
 
   async resume(): Promise<AIStatus> {
@@ -676,7 +676,8 @@ export class AIService implements AIApi {
   }
 
   async #categorizeLoop(): Promise<void> {
-    const since = () => this.#categorizeSince();
+    const since = () => this.#window().since;
+    const range = () => this.#window();
     do {
       this.#categorizeRequested = false;
       if (!this.#settings.enabled || !this.#settings.autoCategorize || this.#disposed) break;
@@ -687,20 +688,20 @@ export class AIService implements AIApi {
         if (!(error instanceof AINotConfiguredError)) this.#error = error instanceof Error ? error.message : String(error);
         break;
       }
-      const total = this.options.results.uncategorizedCount(since());
+      const total = this.options.results.uncategorizedCount(since(), range());
       this.#categorizing = { remaining: total, done: 0, total };
       await this.#emit();
       let failures = 0;
       for (;;) {
         if (!this.#settings.enabled || !this.#settings.autoCategorize || this.#disposed) break;
-        const [message] = this.options.results.uncategorized(1, since());
+        const [message] = this.options.results.uncategorized(1, since(), range());
         if (!message) break;
         // Vom Nutzer gelernt: ohne Modell, sofort
         const learned = this.options.results.learnedCategory(message.from.address);
         if (learned) {
           this.options.results.setCategory(message.id, learned, "learned");
           this.options.onCategorized?.();
-          const remaining = this.options.results.uncategorizedCount(since());
+          const remaining = this.options.results.uncategorizedCount(since(), range());
           const current: { remaining: number; done: number; total: number } = this.#categorizing ?? { remaining, done: 0, total: remaining };
           this.#categorizing = { remaining, done: current.done + 1, total: Math.max(current.total, current.done + 1 + remaining) };
           continue;
@@ -726,7 +727,7 @@ export class AIService implements AIApi {
           }
         }
         this.options.onCategorized?.();
-        const remaining = this.options.results.uncategorizedCount(since());
+        const remaining = this.options.results.uncategorizedCount(since(), range());
         const current: { remaining: number; done: number; total: number } = this.#categorizing ?? { remaining, done: 0, total: remaining };
         // Neue Mails während des Laufs vergrößern das Ziel, statt die Anzeige rückwärts laufen zu lassen
         this.#categorizing = { remaining, done: current.done + 1, total: Math.max(current.total, current.done + 1 + remaining) };

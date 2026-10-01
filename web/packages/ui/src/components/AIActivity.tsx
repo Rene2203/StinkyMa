@@ -72,7 +72,7 @@ export function AIActivity() {
           </button>
         )}
         {ai.settings.autoCategorize && waiting === 0 && backlog.older > 0 && (
-          <button type="button" className="link-button small" data-testid="ai-older" onClick={() => void store.updateAI({ categorizeOlder: true })}>
+          <button type="button" className="link-button small" data-testid="ai-older" onClick={() => store.openOptions()}>
             {t("aiActivity.categorizeOlder")}
           </button>
         )}

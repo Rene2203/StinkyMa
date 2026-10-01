@@ -23,11 +23,65 @@ export interface AISettings {
   useGpu: boolean;
   /** Bilder und Scans verstehen (lädt Bild-Baustein und Bild-Laufzeit nach). */
   vision: boolean;
-  /** Auch Posteingangs-Mails einordnen, die älter als `categorizeWindowDays` sind. */
-  categorizeOlder: boolean;
+  /**
+   * Welche älteren Posteingangs-Mails zusätzlich eingeordnet werden. Neue Mails (letzte `categorizeWindowDays` Tage)
+   * werden immer eingeordnet – sonst bliebe neue Post bei einem Zeitraum in der Vergangenheit liegen.
+   */
+  categorizeRange: CategorizeRange;
 }
 
-export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true, vision: false, categorizeOlder: false };
+export type CategorizeRange =
+  | { kind: "recent" }
+  | { kind: "days"; days: number }
+  | { kind: "all" }
+  /** Eigener Zeitraum, beide Tage einschließlich (JJJJ-MM-TT, Ortszeit) */
+  | { kind: "custom"; from: string; to: string };
+
+/** Zeitgrenzen für die Abfrage: `since` = neue Mails; dazu optional der Zeitraum [from, to) (ISO, UTC). */
+export interface CategorizeWindow {
+  since: string;
+  from: string | null;
+  to: string | null;
+}
+
+const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(`${v}T00:00:00`).getTime());
+
+function normalizeRange(raw: unknown, legacyOlder: unknown): CategorizeRange {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  if (value.kind === "all") return { kind: "all" };
+  if (value.kind === "days" && typeof value.days === "number" && value.days >= 1 && value.days <= 3650) return { kind: "days", days: Math.round(value.days) };
+  if (value.kind === "custom" && isDay(value.from) && isDay(value.to)) {
+    return value.from <= value.to ? { kind: "custom", from: value.from, to: value.to } : { kind: "custom", from: value.to, to: value.from };
+  }
+  if (value.kind === "recent") return { kind: "recent" };
+  // frühere Einstellung „auch ältere Mails einordnen“
+  return legacyOlder === true ? { kind: "all" } : { kind: "recent" };
+}
+
+/** Lokaler Tagesbeginn als ISO (UTC). */
+function startOfDay(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1).toISOString();
+}
+
+export function categorizeWindow(range: CategorizeRange, now: Date): CategorizeWindow {
+  const since = new Date(now.getTime() - categorizeWindowDays * 86_400_000).toISOString();
+  switch (range.kind) {
+    case "recent":
+      return { since, from: null, to: null };
+    case "all":
+      return { since, from: "", to: null };
+    case "days":
+      return { since, from: new Date(now.getTime() - range.days * 86_400_000).toISOString(), to: null };
+    case "custom": {
+      const [y, m, d] = range.to.split("-").map(Number);
+      const next = new Date(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + 1).toISOString();
+      return { since, from: startOfDay(range.from), to: next };
+    }
+  }
+}
+
+export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true, vision: false, categorizeRange: { kind: "recent" } };
 
 export function normalizeAISettings(raw: unknown): AISettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -37,7 +91,7 @@ export function normalizeAISettings(raw: unknown): AISettings {
     autoCategorize: typeof value.autoCategorize === "boolean" ? value.autoCategorize : defaultAISettings.autoCategorize,
     useGpu: typeof value.useGpu === "boolean" ? value.useGpu : defaultAISettings.useGpu,
     vision: typeof value.vision === "boolean" ? value.vision : defaultAISettings.vision,
-    categorizeOlder: typeof value.categorizeOlder === "boolean" ? value.categorizeOlder : defaultAISettings.categorizeOlder,
+    categorizeRange: normalizeRange(value.categorizeRange, value.categorizeOlder),
   };
 }
 
@@ -78,7 +132,7 @@ export interface AIStatus {
    * null = Leerlauf.
    */
   activity: { task: AITask; startedAt: string; waiting: number } | null;
-  /** Noch nicht eingeordnete Posteingangs-Mails: im Zeitfenster (werden eingeordnet) und ältere (nur mit `categorizeOlder`). */
+  /** Noch nicht eingeordnete Posteingangs-Mails: im gewählten Zeitraum (werden eingeordnet) und außerhalb. */
   backlog: { recent: number; older: number };
   /** Letzter Fehler (Download, Laden des Modells) – verständlich, ohne Mail-Inhalte. */
   error: string | null;

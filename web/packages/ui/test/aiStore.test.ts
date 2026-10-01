@@ -6,7 +6,7 @@ import { BrowserStore, selectedMessage } from "../src/store.js";
 
 function status(overrides: Partial<AIStatus> = {}): AIStatus {
   return {
-    settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeOlder: false },
+    settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeRange: { kind: "recent" } },
     models: [],
     vision: { state: "ready", missingBytes: 0 },
     ramGb: 8,
@@ -27,7 +27,7 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     status: async () => status({ ready: options.ready ?? true }),
     update: async (patch) => {
       calls.push(`update:${JSON.stringify(patch)}`);
-      return status({ settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeOlder: false, ...patch } });
+      return status({ settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeRange: { kind: "recent" }, ...patch } });
     },
     download: async (id) => {
       calls.push(`download:${id}`);

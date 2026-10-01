@@ -452,6 +452,11 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   („KI bereit · alles eingeordnet“ bzw. „N Mails älter als 14 Tage sind nicht eingeordnet · Auch ältere“, „N Mails warten ·
   Jetzt einordnen“, falls trotz Arbeit nichts läuft). Neue Einstellung „Auch ältere Mails einordnen“. **Ungeprüft**, ob das
   den Abbruch beim Nutzer vollständig erklärt – nachfragen, was die Anzeige jetzt zeigt.
+- **Zeitraum für die Einordnung (Wunsch des Nutzers):** Optionen → KI → „Außer neuen Mails auch einordnen“: nichts weiter /
+  letzte 30 bzw. 90 Tage / letztes Jahr / alle / eigener Zeitraum mit Von- und Bis-Datum (Kalenderfelder). Neue Mails
+  (letzte 14 Tage) werden immer eingeordnet. Darunter: wie viele Mails noch offen sind und grobe Dauer (~5 s je Mail), und
+  wie viele außerhalb liegen. Die frühere Einstellung „auch ältere“ wird zu „alle“. Geprüft: Unit-Tests (Zeitgrenzen,
+  Enddatum einschließlich, tolerantes Lesen), Sichtprüfung per Screenshot.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,

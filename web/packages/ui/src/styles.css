@@ -2643,3 +2643,36 @@ button.ai-activity.idle {
 .ai-activity.idle .ai-activity-text > span {
   white-space: normal;
 }
+
+.categorize-range {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.range-dates {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.range-dates label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px !important;
+  font-weight: 400 !important;
+}
+
+/* Leerlauf-Anzeige: Knopf in eigener Zeile unter dem Text, damit der Text nicht in Einzelwörter zerfällt */
+.ai-activity.idle {
+  flex-wrap: wrap;
+}
+
+.ai-activity.idle .ai-activity-text {
+  flex-basis: calc(100% - 30px);
+}
+
+.ai-activity.idle > .link-button {
+  margin-left: 22px;
+  padding: 0;
+}

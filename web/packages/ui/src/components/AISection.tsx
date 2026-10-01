@@ -1,5 +1,5 @@
 import { Download, Image as ImageIcon, Loader2, Sparkles, Trash2, X } from "lucide-react";
-import { categorizeWindowDays, type AIModelInfo } from "@stinkyma/core";
+import { categorizeWindowDays, type AIModelInfo, type CategorizeRange } from "@stinkyma/core";
 import { useEffect } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import type { MessageKey } from "../i18n.js";
@@ -32,12 +32,7 @@ export function AISection() {
               <span className="hint block">{t("ai.autoCategorizeHint", { days: categorizeWindowDays })}</span>
             </span>
           </label>
-          {settings.autoCategorize && (
-            <label className="checkbox">
-              <input type="checkbox" checked={settings.categorizeOlder} data-testid="ai-categorize-older" onChange={(e) => void store.updateAI({ categorizeOlder: e.target.checked })} />
-              <span>{t("ai.categorizeOlder")}</span>
-            </label>
-          )}
+          {settings.autoCategorize && <CategorizeRangeRow />}
           <label className="checkbox">
             <input type="checkbox" checked={settings.useGpu} data-testid="ai-use-gpu" onChange={(e) => void store.updateAI({ useGpu: e.target.checked })} />
             <span>{t("ai.useGpu")}</span>
@@ -187,6 +182,72 @@ function LearnedSenders() {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+const presets: { value: string; range: CategorizeRange }[] = [
+  { value: "recent", range: { kind: "recent" } },
+  { value: "30", range: { kind: "days", days: 30 } },
+  { value: "90", range: { kind: "days", days: 90 } },
+  { value: "365", range: { kind: "days", days: 365 } },
+  { value: "all", range: { kind: "all" } },
+];
+
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** Welche älteren Mails zusätzlich eingeordnet werden – Auswahl oder eigener Zeitraum mit Start- und Enddatum. */
+function CategorizeRangeRow() {
+  const { store, t } = useUi();
+  const state = useBrowserState();
+  const ai = state.ai;
+  if (!ai) return null;
+  const range = ai.settings.categorizeRange;
+  const value = range.kind === "custom" ? "custom" : range.kind === "days" ? String(range.days) : range.kind;
+  const choose = (next: string) => {
+    if (next === "custom") {
+      const from = new Date(Date.now() - 90 * 86_400_000);
+      void store.updateAI({ categorizeRange: { kind: "custom", from: `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`, to: today() } });
+      return;
+    }
+    const preset = presets.find((p) => p.value === next);
+    if (preset) void store.updateAI({ categorizeRange: preset.range });
+  };
+  const open = ai.backlog.recent;
+  // Grobe Schätzung für schwache Hardware: ~5 Sekunden je Mail
+  const minutes = Math.max(1, Math.round((open * 5) / 60));
+  return (
+    <div className="categorize-range" data-testid="categorize-range">
+      <label className="setting-row">
+        <span>{t("ai.range.label")}</span>
+        <select value={value} data-testid="categorize-range-select" onChange={(e) => choose(e.target.value)}>
+          <option value="recent">{t("ai.range.recent")}</option>
+          <option value="30">{t("ai.range.days", { days: 30 })}</option>
+          <option value="90">{t("ai.range.days", { days: 90 })}</option>
+          <option value="365">{t("ai.range.year")}</option>
+          <option value="all">{t("ai.range.all")}</option>
+          <option value="custom">{t("ai.range.custom")}</option>
+        </select>
+      </label>
+      {range.kind === "custom" && (
+        <div className="range-dates">
+          <label>
+            <span>{t("ai.range.from")}</span>
+            <input type="date" value={range.from} max={range.to} data-testid="categorize-from" onChange={(e) => e.target.value && void store.updateAI({ categorizeRange: { ...range, from: e.target.value } })} />
+          </label>
+          <label>
+            <span>{t("ai.range.to")}</span>
+            <input type="date" value={range.to} min={range.from} max={today()} data-testid="categorize-to" onChange={(e) => e.target.value && void store.updateAI({ categorizeRange: { ...range, to: e.target.value } })} />
+          </label>
+        </div>
+      )}
+      <span className="hint block" data-testid="categorize-range-hint">
+        {open === 0 ? t("ai.range.none") : t("ai.range.open", { count: open, minutes })}
+        {ai.backlog.older > 0 ? ` ${t("ai.range.outside", { count: ai.backlog.older })}` : ""}
+      </span>
     </div>
   );
 }

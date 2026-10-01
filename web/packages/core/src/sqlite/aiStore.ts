@@ -37,19 +37,29 @@ export interface StoredReading {
 export const visionTextSource = "vision";
 
 /** KI-Ergebnisse in der Datenbank (Migration v9; Anhang-Lesen in der Tabelle attachmentAnalysis aus v1). */
+function windowSql(sinceIso: string, range?: { from: string | null; to: string | null }): { sql: string; params: string[] } {
+  if (!range || range.from === null) return { sql: "message.date >= ?", params: [sinceIso] };
+  if (range.to === null) return { sql: "(message.date >= ? OR message.date >= ?)", params: [sinceIso, range.from] };
+  return { sql: "(message.date >= ? OR (message.date >= ? AND message.date < ?))", params: [sinceIso, range.from, range.to] };
+}
+
 export class AIResultStore {
   constructor(private readonly db: Database.Database) {}
 
-  /** Mails im Posteingang ohne Kategorie, neueste zuerst (seit `sinceIso`). */
-  uncategorized(limit: number, sinceIso: string): Message[] {
+  /**
+   * Mails im Posteingang ohne Kategorie, neueste zuerst: seit `sinceIso`, und optional zusätzlich im Zeitraum
+   * [`range.from`, `range.to`) (`to` null = ohne Ende).
+   */
+  uncategorized(limit: number, sinceIso: string, range?: { from: string | null; to: string | null }): Message[] {
+    const { sql, params } = windowSql(sinceIso, range);
     return (
       this.db
         .prepare(
           `SELECT message.* FROM message JOIN mailbox ON mailbox.id = message.mailboxId
-           WHERE message.category IS NULL AND mailbox.role = 'inbox' AND message.date >= ?
+           WHERE message.category IS NULL AND mailbox.role = 'inbox' AND ${sql}
            ORDER BY message.date DESC LIMIT ?`,
         )
-        .all(sinceIso, limit) as Row[]
+        .all(...params, limit) as Row[]
     ).map(messageFromRow);
   }
 
@@ -58,13 +68,14 @@ export class AIResultStore {
     return this.uncategorizedCount("");
   }
 
-  uncategorizedCount(sinceIso: string): number {
+  uncategorizedCount(sinceIso: string, range?: { from: string | null; to: string | null }): number {
+    const { sql, params } = windowSql(sinceIso, range);
     const row = this.db
       .prepare(
         `SELECT COUNT(*) AS n FROM message JOIN mailbox ON mailbox.id = message.mailboxId
-         WHERE message.category IS NULL AND mailbox.role = 'inbox' AND message.date >= ?`,
+         WHERE message.category IS NULL AND mailbox.role = 'inbox' AND ${sql}`,
       )
-      .get(sinceIso) as { n: number };
+      .get(...params) as { n: number };
     return row.n;
   }
 

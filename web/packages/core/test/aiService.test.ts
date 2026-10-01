@@ -128,7 +128,7 @@ describe("AIService", () => {
     install("klein");
     const status = await service.update({ enabled: true, modelId: "klein", autoCategorize: false });
     expect(status.ready).toBe(true);
-    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true, vision: false, categorizeOlder: false });
+    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true, vision: false, categorizeRange: { kind: "recent" } });
     await expect(service.update({ modelId: "gibt-es-nicht" })).rejects.toThrow(/Unbekanntes Modell/);
   });
 
@@ -280,7 +280,10 @@ describe("AIService", () => {
     await service.update({ enabled: true, modelId: "klein" });
     await until(() => statuses.at(-1)?.categorizing === null && (statuses.at(-1)?.backlog.recent ?? 1) === 0);
     expect((await service.status()).backlog).toEqual({ recent: 0, older: 2 });
-    await service.update({ categorizeOlder: true });
+    // Eigener Zeitraum ohne diese Tage: bleibt bei 2 außerhalb
+    await service.update({ categorizeRange: { kind: "custom", from: "2020-01-01", to: "2020-01-31" } });
+    expect((await service.status()).backlog).toEqual({ recent: 0, older: 2 });
+    await service.update({ categorizeRange: { kind: "all" } });
     await until(() => results.uncategorizedTotal() === 0 && statuses.at(-1)?.categorizing === null);
     expect((await service.status()).backlog).toEqual({ recent: 0, older: 0 });
   });
