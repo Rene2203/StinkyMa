@@ -40,7 +40,7 @@ jobs:
         run: |
           $jar = Join-Path $env:RUNNER_TEMP "greenmail.jar"
           Invoke-WebRequest -Uri "https://repo1.maven.org/maven2/com/icegreen/greenmail-standalone/2.1.14/greenmail-standalone-2.1.14.jar" -OutFile $jar
-          Start-Process -FilePath "java" -ArgumentList "-Dgreenmail.setup.test.all","-Dgreenmail.auth.disabled","-Dgreenmail.hostname=127.0.0.1","-jar",$jar -WindowStyle Hidden
+          Start-Process -FilePath "java" -ArgumentList "-Dgreenmail.setup.test.all","-Dgreenmail.auth.disabled","-Dgreenmail.hostname=127.0.0.1","-Dgreenmail.startup.timeout=30000","-jar",$jar -WindowStyle Hidden
           for ($i = 0; $i -lt 60; $i++) {
             if ((Test-NetConnection 127.0.0.1 -Port 3143 -WarningAction SilentlyContinue).TcpTestSucceeded) { Write-Host "GreenMail bereit"; exit 0 }
             Start-Sleep -Seconds 1

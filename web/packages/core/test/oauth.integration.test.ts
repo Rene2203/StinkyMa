@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ImapFlow } from "imapflow";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { waitForGreenMail } from "./greenmail.js";
 import { createMockData, InMemorySecretStore, OAuthError, parseStoredOAuth, SecretKeys, type OAuthProviderId, type OAuthTokens } from "../src/index.js";
 import { MailService, type OAuthBroker } from "../src/mail/index.js";
 import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
@@ -36,6 +37,7 @@ class TestBroker implements OAuthBroker {
 }
 
 describe.skipIf(!port)("OAuth-Konten gegen GreenMail", () => {
+  beforeAll(() => waitForGreenMail(host, port), 70_000);
   let user: string;
   let broker: TestBroker;
   let service: MailService;

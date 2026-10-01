@@ -409,6 +409,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   **Messung** Gemma 4 E2B: 12/12 Mails mit ≥ 2 Vorschlägen, du/Sie 12/12, 7 s (Prompt v1: nur 2/12). Details und alle
   Vorschläge zum Lesen: `docs/KI-MESSUNG.md`. Geprüft: Unit-Tests (Anrede, Gruß, Filter), Store-Test, E2E mit Testmodell.
   **Ungeprüft:** in der Windows-App mit echtem Modell; Mails mit langem Verlauf.
+- **Windows-CI Lauf #71 rot, #72 (gleicher Stand) grün:** GreenMail nahm beim Start auf dem Windows-Runner kurz keine
+  Anmeldungen an; der OAuth-Integrationstest wartete gar nicht auf ihn. Jetzt: gemeinsames `waitForGreenMail` (60 s) für
+  beide Integrationstests und GreenMail in der CI mit `-Dgreenmail.startup.timeout=30000`. Lokal 24/24 grün.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,
