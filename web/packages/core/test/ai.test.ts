@@ -5,6 +5,10 @@ import {
   AIRouter,
   GrantPolicy,
   categorizeMessage,
+  evalMails,
+  evalThreads,
+  evaluateProvider,
+  formatEvalReports,
   cleanMailText,
   extractJson,
   modelCatalog,
@@ -269,5 +273,52 @@ describe("Modellkatalog", () => {
     expect(fitting(8)).toContain("gemma-4-e2b-q4");
     expect(fitting(8)).not.toContain("gemma-4-e4b-q4");
     expect(fitting(16)).toHaveLength(modelCatalog.length);
+  });
+});
+
+describe("Messlauf", () => {
+  it("zählt Treffer, Rückfälle und Fakten", async () => {
+    const provider: AIProvider = {
+      id: "fake",
+      displayName: "Fake",
+      privacyClass: "onDevice",
+      contextWindow: 4096,
+      async generate(request) {
+        const user = request.messages.at(-1)?.content ?? "";
+        const text = request.task === "categorize"
+          ? (user.includes("Rechnung") ? '{"category": "invoice", "confidence": 0.9}' : user.includes("Grillen") ? "kaputt" : '{"category": "work", "confidence": 0.6}')
+          : '{"summary": "Angebot über 7850 € plus Prüfstatik 1.200 €.", "openPoints": [], "waitingOn": "me"}';
+        return { text, providerId: "fake", privacyClass: "onDevice", durationMs: 7 };
+      },
+    };
+    const mails = evalMails.filter((m) => ["i02", "w02", "p01"].includes(m.id));
+    const threads = evalThreads.filter((t) => t.id === "t01");
+    const progress: number[] = [];
+    const report = await evaluateProvider(provider, { mails, threads, onProgress: (p) => progress.push(p.done) });
+    expect(report.categorize.outcomes.map((o) => [o.id, o.got, o.correct, o.fallback])).toEqual([
+      ["p01", "personal", true, true], // Modell zweimal unbrauchbar → Regeln
+      ["w02", "work", true, false],
+      ["i02", "invoice", true, false],
+    ]);
+    expect(report.categorize.fallbacks).toBe(1);
+    expect(report.summarize.factRecall).toBe(1); // „7.850“ == „7850“
+    expect(report.summarize.waitingOnAccuracy).toBe(1);
+    expect(progress).toEqual([1, 2, 3, 4]);
+    expect(formatEvalReports([report], { machine: "Test" })).toContain("| Fake | 100,0 %");
+  });
+
+  it("nimmt nur Modelle auf diesem Gerät", async () => {
+    await expect(evaluateProvider(new FakeProvider("cloud", ["{}"]))).rejects.toThrow(/nur für Modelle auf diesem Gerät/);
+  });
+
+  it("Testsatz ist vollständig und erfunden", () => {
+    expect(evalMails.length).toBeGreaterThanOrEqual(50);
+    expect(new Set(evalMails.map((m) => m.id)).size).toBe(evalMails.length);
+    for (const category of ["personal", "work", "newsletter", "notification", "invoice", "appointment", "spam_suspect"]) {
+      expect(evalMails.filter((m) => m.expected === category).length).toBeGreaterThanOrEqual(8);
+    }
+    for (const address of [...evalMails.map((m) => m.from.address), ...evalThreads.flatMap((t) => t.mails.map((m) => m.from.address))]) {
+      expect(address).toMatch(/\.example$/);
+    }
   });
 });

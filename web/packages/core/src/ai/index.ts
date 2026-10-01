@@ -4,3 +4,6 @@ export * from "./prepare.js";
 export * from "./prompts.js";
 export * from "./tasks.js";
 export * from "./catalog.js";
+export * from "./evalSet.js";
+export * from "./evaluate.js";
+export * from "./api.js";

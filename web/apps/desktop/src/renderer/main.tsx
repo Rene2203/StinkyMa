@@ -1,4 +1,4 @@
-import { createMockData, InMemoryMailRepository, type AccountsApi, type AppSettingsApi, type AttachmentFiles, type MailRepository } from "@stinkyma/core";
+import { createMockData, InMemoryMailRepository, type AccountsApi, type AIApi, type AIStatus, type AppSettingsApi, type AttachmentFiles, type MailRepository } from "@stinkyma/core";
 import { App, pickLocale } from "@stinkyma/ui";
 import "@stinkyma/ui/styles.css";
 import { StrictMode } from "react";
@@ -11,6 +11,8 @@ declare global {
       accounts: AccountsApi;
       files: AttachmentFiles;
       settings: AppSettingsApi;
+      ai: AIApi;
+      onAIStatus: (callback: (status: AIStatus) => void) => () => void;
       onMailChanged: (callback: () => void) => () => void;
       onOpenMessage: (callback: (messageId: string) => void) => () => void;
       platform: string;
@@ -28,7 +30,7 @@ const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <App repository={repository} locale={locale} accounts={bridge?.accounts} files={bridge?.files} settings={bridge?.settings} subscribeChanges={bridge?.onMailChanged} subscribeOpenMessage={bridge?.onOpenMessage} />
+      <App repository={repository} locale={locale} accounts={bridge?.accounts} files={bridge?.files} settings={bridge?.settings} ai={bridge?.ai} subscribeAIStatus={bridge?.onAIStatus} subscribeChanges={bridge?.onMailChanged} subscribeOpenMessage={bridge?.onOpenMessage} />
     </StrictMode>,
   );
 }

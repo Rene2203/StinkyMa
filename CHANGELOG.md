@@ -7,6 +7,10 @@
   das Gerät nur mit Freigabe je Konto und Aufgabe, nie stilles Ausweichen), Übertragungsprotokoll, Eingabe-Bereinigung,
   versionierte deutsche Prompts mit JSON-Schema, Prüfung der Antworten mit einem zweiten Versuch und Regel-Rückfall.
 - **Modellkatalog:** Gemma 4 E2B/E4B und Qwen 3.5 2B/4B (Q4, GGUF) mit Prüfsummen – Auswahl per Messlauf.
+- **Lokale KI in der Windows-App:** Optionen → KI (Modell laden mit Fortschritt, fortsetzbar, Prüfsumme; verwenden; löschen),
+  „Zusammenfassen“ mit Herkunftsangabe, automatische Einordnung neuer Mails im Hintergrund. Alles auf dem eigenen Rechner
+  (llama.cpp, CPU oder Grafikkarte über Vulkan). Migration `v9-ai-results`.
+- **Testsatz und Messlauf:** deutscher Testsatz (80 Mails, 10 Konversationen, Kontrollsatz mit 28 Mails), Messskript.
 
 ## W4 – Suche, sofortige Zustellung, Infobereich, Anhänge ansehen
 

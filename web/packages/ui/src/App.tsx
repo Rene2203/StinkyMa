@@ -1,4 +1,4 @@
-import type { AccountsApi, AppSettingsApi, AttachmentFiles, MailRepository } from "@stinkyma/core";
+import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, MailRepository } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
@@ -23,6 +23,10 @@ export interface AppProps {
   files?: AttachmentFiles;
   /** Einstellungen der App (Infobereich, Autostart, Benachrichtigungen) – nur in der Windows-App. */
   settings?: AppSettingsApi;
+  /** Lokale KI (Windows-App): Modelle, Zusammenfassungen, Einordnung. */
+  ai?: AIApi;
+  /** Meldet Statusänderungen der KI (Download-Fortschritt usw.). */
+  subscribeAIStatus?: (onStatus: (status: AIStatus) => void) => () => void;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
   subscribeChanges?: (onChange: () => void) => () => void;
   /** Von außen gewünschtes Öffnen einer Mail (z. B. Klick auf eine Benachrichtigung). */
@@ -30,8 +34,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, subscribeChanges, subscribeOpenMessage }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings }), [repository, accounts, files, settings]);
+export function App({ repository, locale, accounts, files, settings, ai, subscribeAIStatus, subscribeChanges, subscribeOpenMessage }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai }), [repository, accounts, files, settings, ai]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
@@ -39,6 +43,7 @@ export function App({ repository, locale, accounts, files, settings, subscribeCh
   }, [store]);
 
   useEffect(() => subscribeChanges?.(() => void store.reload()), [store, subscribeChanges]);
+  useEffect(() => subscribeAIStatus?.((status) => store.setAIStatus(status)), [store, subscribeAIStatus]);
   useEffect(() => subscribeOpenMessage?.((id) => void store.openMessage(id)), [store, subscribeOpenMessage]);
 
   useEffect(() => {

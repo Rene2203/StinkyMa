@@ -11,6 +11,10 @@ import {
   previewKind,
   type AppSettings,
   type AppSettingsApi,
+  type AIApi,
+  type AISettings,
+  type AIStatus,
+  type SummaryView,
   type Attachment,
   type Mailbox,
   type MailRepository,
@@ -80,6 +84,17 @@ export interface BrowserState {
   /** Einstellungen der App (nur Windows-App) und welche es auf dieser Plattform gibt. */
   appSettings: AppSettings | null;
   appSettingsAvailable: Partial<Record<keyof AppSettings, boolean>>;
+  /** KI-Status (nur Windows-App): Modelle, Download, Einordnung. */
+  ai: AIStatus | null;
+  /** Zusammenfassung der geöffneten Konversation. */
+  summary: SummaryState | null;
+}
+
+export interface SummaryState {
+  threadId: string;
+  view: SummaryView | null;
+  busy: boolean;
+  error: string | null;
 }
 
 export const initialState: BrowserState = {
@@ -104,6 +119,8 @@ export const initialState: BrowserState = {
   preview: null,
   appSettings: null,
   appSettingsAvailable: {},
+  ai: null,
+  summary: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -163,16 +180,99 @@ export class BrowserStore {
   readonly #accounts: AccountsApi | undefined;
   readonly #files: AttachmentFiles | undefined;
   readonly #settings: AppSettingsApi | undefined;
+  readonly #ai: AIApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
     this.#accounts = options.accounts;
     this.#files = options.files;
     this.#settings = options.settings;
+    this.#ai = options.ai;
+  }
+
+  // --- KI ---
+
+  /** Neuer Status vom KI-Dienst (Download-Fortschritt, Einordnung, Einstellungen). */
+  setAIStatus(status: AIStatus): void {
+    const wasReady = this.#state.ai?.ready ?? false;
+    this.#set({ ai: status });
+    if (!wasReady && status.ready) void this.#loadCachedSummary();
+  }
+
+  async #loadAI(): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    await this.#guard(async () => this.setAIStatus(await ai.status()));
+  }
+
+  async updateAI(patch: Partial<AISettings>): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    await this.#guard(async () => this.setAIStatus(await ai.update(patch)));
+  }
+
+  /** Download starten; Fortschritt und Fehler kommen über den Status (Fehler stehen in den Optionen, nicht im Banner). */
+  async downloadModel(modelId: string): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    try {
+      await ai.download(modelId);
+    } catch {
+      // steht in status.error
+    }
+    await this.#loadAI();
+  }
+
+  async cancelModelDownload(): Promise<void> {
+    await this.#ai?.cancelDownload();
+  }
+
+  async deleteModel(modelId: string): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    await this.#guard(() => ai.deleteModel(modelId));
+    await this.#loadAI();
+  }
+
+  /** Konversation der geöffneten Mail zusammenfassen – nur auf Klick. Fehler erscheinen in der Karte. */
+  async summarize(): Promise<void> {
+    const ai = this.#ai;
+    const message = selectedMessage(this.#state);
+    if (!ai || !message || this.#state.summary?.busy) return;
+    const threadId = message.threadId;
+    this.#set({ summary: { threadId, view: this.#state.summary?.threadId === threadId ? this.#state.summary.view : null, busy: true, error: null } });
+    try {
+      const view = await ai.summarize(threadId);
+      if (this.#state.summary?.threadId === threadId) this.#set({ summary: { threadId, view, busy: false, error: null } });
+    } catch (e) {
+      const error = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e);
+      if (this.#state.summary?.threadId === threadId) this.#set({ summary: { threadId, view: this.#state.summary.view, busy: false, error } });
+    }
+  }
+
+  closeSummary(): void {
+    this.#set({ summary: null });
+  }
+
+  /** Gespeicherte Zusammenfassung der geöffneten Konversation anzeigen (rechnet nichts neu). */
+  async #loadCachedSummary(): Promise<void> {
+    const ai = this.#ai;
+    const message = selectedMessage(this.#state);
+    if (!ai || !message || !this.#state.ai?.ready) return;
+    const threadId = message.threadId;
+    if (this.#state.summary?.threadId === threadId && this.#state.summary.busy) return;
+    try {
+      const view = await ai.cachedSummary(threadId);
+      const current = selectedMessage(this.#state);
+      if (current?.threadId !== threadId || this.#state.summary?.busy) return;
+      this.#set({ summary: view ? { threadId, view, busy: false, error: null } : null });
+    } catch {
+      // Zusammenfassung ist Zusatz – Fehler hier nicht melden
+    }
   }
 
   /** App-Einstellungen ändern (sofort sichtbar, Fehler ins Banner). */
@@ -264,6 +364,7 @@ export class BrowserStore {
       this.#loadSyncStatus(),
       this.#loadRemoteContentExceptions(),
       this.#loadAppSettings(),
+      this.#loadAI(),
     ]);
   }
 
@@ -283,6 +384,7 @@ export class BrowserStore {
       const thread = await this.#repository.thread(message.threadId);
       if (request === this.#threadRequest) this.#set({ thread: thread.length ? thread : [message] });
     });
+    await this.#loadCachedSummary();
   }
 
   // --- Schreiben ---
@@ -511,7 +613,7 @@ export class BrowserStore {
       }
       // Auswahl bleibt, solange die Mail noch in der Liste oder in den Suchergebnissen steht.
       const keepSelection = selected !== null && (messages.some((m) => m.id === selected) || Boolean(this.#state.searchResults?.some((m) => m.id === selected)));
-      this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {} }) });
+      this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null }) });
     });
   }
 
@@ -520,7 +622,7 @@ export class BrowserStore {
     // Ordnerwechsel beendet eine Suche in allen Ordnern; „nur in diesem Ordner“ sucht im neuen Ordner weiter.
     const keepSearch = isSearching(this.#state) && !this.#state.searchAllFolders;
     this.#set({
-      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {},
+      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null,
       ...(keepSearch ? {} : { searchText: "", searchResults: null }),
     });
     await Promise.all([this.loadMessages(), keepSearch ? this.runSearch() : Promise.resolve()]);
@@ -562,11 +664,13 @@ export class BrowserStore {
     const request = ++this.#threadRequest;
     this.#set({ selectedMessageId: id });
     if (id === null) {
-      this.#set({ thread: [], attachmentsByMessageId: {} });
+      this.#set({ thread: [], attachmentsByMessageId: {}, summary: null });
       return;
     }
     const message = this.#find(id);
     if (!message) return;
+    if (this.#state.summary && this.#state.summary.threadId !== message.threadId) this.#set({ summary: null });
+    void this.#loadCachedSummary();
     await this.#guard(async () => {
       const thread = await this.#repository.thread(message.threadId);
       const attachmentsByMessageId: Record<string, Attachment[]> = {};

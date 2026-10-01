@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1 (KI-Kern ohne Modell) fertig; als Nächstes W5.2 (lokale Laufzeit + Modell-Download), dann Messlauf Gemma 4 vs. Qwen 3.5
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 lokal gebaut und getestet; Messlauf Gemma 4 vs. Qwen 3.5 läuft (Ergebnis → Standardmodell)
 
 ## Überblick
 
@@ -290,3 +290,21 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Modellkatalog mit Download-Adressen, Größen und SHA-256 (Gemma 4 E2B/E4B, Qwen 3.5 2B/4B, je mit Bild-Baustein).
   Tests: 22 neue Unit-Tests (Router-Pflichttests, Auswertung, Regeln, Vorbereitung, Aufgaben mit Test-Anbieter).
   **Ungeprüft:** alles mit echtem Modell – kommt mit W5.2/W5.3.
+- **W5.2–W5.4 – Lokale KI in der App (lokal geprüft):**
+  - `@stinkyma/core/llm`: `ModelStore` (Download fortsetzbar per HTTP-Range, SHA-256-Prüfung, Abbruch, Löschen),
+    `LlamaCppProvider` (node-llama-cpp 3.22.1, JSON-Grammatik aus dem Schema, „Nachdenken“ aus, Anfragen nacheinander,
+    Modell nach 5 min Ruhe aus dem Speicher), `AIService` (Einstellungen, Zusammenfassen mit Speicherung, Einordnen im
+    Hintergrund – nur Posteingang, letzte 14 Tage, eine Mail nach der anderen, hält bei Modellfehler an).
+  - Migration `v9-ai-results` (Herkunft der Kategorie, Tabelle `threadSummary`).
+  - App: IPC-Kanal „ai“ (Preload-Liste per Test geprüft), Optionen → KI (Modelle mit Größe/RAM-Hinweis, Laden/Fortsetzen/
+    Abbrechen/Verwenden/Löschen), Knopf „Zusammenfassen“ mit Karte (wer ist dran, offene Punkte, „Auf diesem Gerät berechnet
+    · Modell“, veraltet-Hinweis). Installer ohne CUDA-Pakete (CPU + Vulkan).
+  - Testsatz: 80 erfundene Mails + 10 Konversationen, dazu Kontrollsatz (28 Mails, nie zum Feintuning). Messskript
+    `packages/core/scripts/eval-models.ts`.
+  - Tests: Download-Manager gegen lokalen HTTP-Server, KI-Dienst, Store, llama.cpp mit echtem Modell (lokal Qwen 3.5 2B)
+    und winzigem Testmodell (1 MB, auch in der Windows-CI), E2E in Electron (Optionen → KI, Zusammenfassung end-to-end).
+  - **Erstes Messergebnis (Prompt v1, 4 CPU-Kerne, ohne GPU):** Gemma 4 E2B – Kategorie 88,8 %, Fakten in Zusammenfassungen
+    100 %, „wer ist dran“ 70 %, ~3,8 s je Mail, ~14 s je Zusammenfassung. Schwäche: Phishing (3/10). Prompt v2 dafür
+    vorbereitet, Messung aller vier Modelle läuft.
+  - **Ungeprüft:** Download echter Modelle in der App, Vulkan/GPU unter Windows, Verhalten der installierten App
+    (gepackt, asar) mit llama.cpp, Tempo auf dem N97.

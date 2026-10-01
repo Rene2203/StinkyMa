@@ -1,4 +1,4 @@
-import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, Pencil, Reply, ReplyAll, ShieldAlert, Trash2 } from "lucide-react";
+import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, Pencil, Reply, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import { displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -8,6 +8,7 @@ import { selectedMessage, threadFor } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
 import { composeLabels } from "../composeLabels.js";
 import { SafeHtml } from "./SafeHtml.js";
+import { SummaryCard } from "./SummaryCard.js";
 
 export function MessageDetail() {
   const { store, t, locale } = useUi();
@@ -53,6 +54,17 @@ export function MessageDetail() {
             <button type="button" title={`${t("compose.forward")} (F)`} aria-label={t("compose.forward")} data-testid="action-forward" onClick={() => store.openCompose("forward", composeLabels(t, locale))}>
               <Forward size={17} />
             </button>
+            {state.ai?.ready && (
+              <button
+                type="button"
+                title={t("summary.action")}
+                data-testid="action-summarize"
+                disabled={state.summary?.busy && state.summary.threadId === message.threadId}
+                onClick={() => void store.summarize()}
+              >
+                <Sparkles size={17} /> <span>{t("summary.action")}</span>
+              </button>
+            )}
             <span className="toolbar-gap" aria-hidden="true" />
             <button type="button" title={`${flagged ? t("action.unflag") : t("action.flag")} (S)`} onClick={() => void store.toggleFlag(message.id)}>
               {flagged ? <FlagOff size={17} /> : <Flag size={17} />}
@@ -71,6 +83,7 @@ export function MessageDetail() {
           <h2 className="thread-subject" data-testid="thread-subject">{message.subject}</h2>
           {isDraft && <p className="draft-banner"><Pencil size={14} aria-hidden="true" /> {t("draft.banner")}</p>}
           {message.category && <CategoryChip category={message.category} />}
+          {state.summary?.threadId === message.threadId && <SummaryCard summary={state.summary} />}
           {thread.map((m) => (
             <ThreadMessage
               key={`${message.id}-${m.id}`}

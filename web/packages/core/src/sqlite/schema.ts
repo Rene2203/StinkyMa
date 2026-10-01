@@ -302,6 +302,27 @@ export const migrations: Migration[] = [
       END;
     `,
   },
+  {
+    name: "v9-ai-results",
+    // KI-Ergebnisse: Herkunft der Kategorie (Gerät/Server/Cloud/Regeln/Nutzer) und Zusammenfassungen je Konversation
+    // samt Modell, Prompt-Version und Stand (letzte Mail), damit veraltete Zusammenfassungen erkennbar sind.
+    sql: `
+      ALTER TABLE message ADD COLUMN categoryOrigin TEXT;
+      CREATE INDEX message_on_uncategorized ON message(date) WHERE category IS NULL;
+      CREATE TABLE threadSummary (
+        threadId TEXT PRIMARY KEY NOT NULL REFERENCES thread(id) ON DELETE CASCADE,
+        summary TEXT NOT NULL,
+        openPoints TEXT NOT NULL,
+        waitingOn TEXT NOT NULL,
+        modelId TEXT NOT NULL,
+        privacyClass TEXT NOT NULL,
+        promptVersion INTEGER NOT NULL,
+        lastMessageDate TEXT NOT NULL,
+        messageCount INTEGER NOT NULL,
+        createdAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

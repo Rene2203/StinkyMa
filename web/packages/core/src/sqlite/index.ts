@@ -3,3 +3,4 @@ export * from "./schema.js";
 export * from "./repository.js";
 export * from "./seed.js";
 export * from "./writer.js";
+export * from "./aiStore.js";

@@ -114,7 +114,7 @@ export async function summarizeThread(
 ): Promise<ThreadSummary> {
   const request: AIRequest = {
     task: "summarize",
-    messages: summarizePrompt(threadForModel(thread, options.maxChars ?? 6000), options.ownAddresses),
+    messages: summarizePrompt(threadForModel(thread, options.maxChars ?? 6000, options.ownAddresses), options.ownAddresses),
     jsonSchema: summarizeSchema,
     maxTokens: 400,
     temperature: 0.2,

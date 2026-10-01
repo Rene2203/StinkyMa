@@ -5,6 +5,7 @@ import { normalizeAppSettings, type AppSettings } from "@stinkyma/core";
 export class SettingsFile {
   #settings: AppSettings;
   #extra: Record<string, unknown>;
+  #ai: unknown;
 
   constructor(private readonly path: string) {
     let raw: Record<string, unknown> = {};
@@ -14,6 +15,7 @@ export class SettingsFile {
       raw = {}; // kaputte Datei: mit Standardwerten weiter
     }
     this.#settings = normalizeAppSettings(raw);
+    this.#ai = raw.ai ?? null;
     this.#extra = typeof raw.internal === "object" && raw.internal ? (raw.internal as Record<string, unknown>) : {};
   }
 
@@ -37,7 +39,17 @@ export class SettingsFile {
     this.#write();
   }
 
+  /** KI-Einstellungen (Modellwahl usw.) – geprüft und vereinheitlicht im KI-Dienst. */
+  get ai(): unknown {
+    return this.#ai;
+  }
+
+  setAI(value: unknown): void {
+    this.#ai = value;
+    this.#write();
+  }
+
   #write(): void {
-    writeFileSync(this.path, JSON.stringify({ ...this.#settings, internal: this.#extra }, null, 2));
+    writeFileSync(this.path, JSON.stringify({ ...this.#settings, ai: this.#ai ?? undefined, internal: this.#extra }, null, 2));
   }
 }

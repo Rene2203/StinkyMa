@@ -1669,3 +1669,146 @@ button.attachment-open:hover {
   align-items: center;
   gap: 8px;
 }
+
+/* KI: Optionen und Zusammenfassung */
+
+.options-subheading {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.model-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.model-row + .model-row {
+  border-top: 1px solid var(--border);
+}
+
+.model-row.selected {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.model-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-info .muted svg {
+  vertical-align: -2px;
+}
+
+.model-info .warning {
+  color: var(--danger);
+}
+
+.model-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.model-progress progress {
+  flex: 1;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.model-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.model-actions button:not(.icon-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+
+.model-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--fg-on-accent);
+}
+
+.model-actions button:disabled {
+  opacity: 0.5;
+}
+
+.summary-card {
+  margin: 10px 0 14px;
+  padding: 10px 14px 12px;
+  border: 1px solid color-mix(in srgb, var(--purple) 35%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--purple) 6%, var(--bg));
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--purple);
+}
+
+.summary-header strong {
+  color: var(--fg);
+  font-size: 13px;
+}
+
+.summary-header .toolbar-gap {
+  flex: 1;
+}
+
+.summary-waiting {
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+}
+
+.summary-body p {
+  margin: 8px 0 0;
+  line-height: 1.45;
+}
+
+.summary-body ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.summary-body.dimmed {
+  opacity: 0.55;
+}
+
+.summary-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.summary-origin {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

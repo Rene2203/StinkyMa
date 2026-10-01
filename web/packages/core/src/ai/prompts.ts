@@ -4,7 +4,7 @@ import type { AIMessage, JsonSchema } from "./types.js";
 // Versionierte Prompt-Vorlagen (5.5). Auf Deutsch, kurz und eindeutig – für ~3B-Modelle formuliert.
 // Ändert sich eine Vorlage, steigt die Version (Ergebnisse lassen sich so nachvollziehen und neu messen).
 
-export const promptVersions = { categorize: 1, summarize: 1 } as const;
+export const promptVersions = { categorize: 2, summarize: 2 } as const;
 
 export const categories: readonly MessageCategory[] = [
   "personal", "work", "newsletter", "notification", "invoice", "appointment", "spam_suspect",
@@ -16,7 +16,17 @@ const categoryGuide = `- personal: private Nachricht von einem Menschen (Familie
 - notification: automatische Mitteilung (Versand, Login, Passwort, Bestätigung, System)
 - invoice: Rechnung, Zahlungsaufforderung, Beleg, Abbuchung, Kontoauszug
 - appointment: Termin, Einladung, Terminanfrage, Terminbestätigung oder -absage
-- spam_suspect: verdächtig – Druck, Drohung, Gewinn, Konto gesperrt, fremde Links, passt nicht zum Absender`;
+- spam_suspect: Betrugsverdacht (Phishing) – siehe unten`;
+
+// v2: Der Messlauf (v1) zeigte, dass kleine Modelle Phishing im Look einer Benachrichtigung oder Rechnung
+// meist als „notification“/„invoice“ einordnen. Deshalb klare Vorrang-Regel mit typischen Merkmalen.
+const spamGuide = `Vorrang: Wähle spam_suspect, sobald die Mail eines dieser Merkmale hat – auch wenn sie wie eine Benachrichtigung, Rechnung oder Nachricht vom Chef aussieht:
+- drängt zu sofortigem Handeln über einen Link: anmelden, Konto bestätigen/verifizieren, Daten oder Kreditkarte eingeben, Gebühr zahlen
+- droht (Sperrung, Schließung, Pfändung, letzte Mahnung) oder setzt eine knappe Frist
+- verspricht Gewinne, Erbschaften, Erstattungen oder schnelles Geld
+- Absenderadresse passt nicht zur genannten Firma oder Person (z. B. Bank, Behörde, Chef von einer fremden oder kostenlosen Adresse)
+- bittet um Geschenkkarten, Codes oder Geheimhaltung
+Echte Benachrichtigungen informieren nur (Versand, Termin, Passwort wurde geändert) und verlangen keine Daten über einen Link.`;
 
 export const categorizeSchema: JsonSchema = {
   type: "object",
@@ -35,6 +45,7 @@ export function categorizePrompt(mail: string): AIMessage[] {
       content: `Du ordnest E-Mails genau einer Kategorie zu. Antworte nur mit JSON: {"category": "...", "confidence": 0.0 bis 1.0}.
 Kategorien:
 ${categoryGuide}
+${spamGuide}
 Bei Unsicherheit wähle die wahrscheinlichste Kategorie und eine niedrige confidence.`,
     },
     { role: "user", content: mail },
@@ -58,7 +69,11 @@ export function summarizePrompt(thread: string, ownAddresses: string[]): AIMessa
       role: "system",
       content: `Du fasst E-Mail-Konversationen auf Deutsch zusammen. Antworte nur mit JSON:
 {"summary": "2 bis 4 kurze Sätze", "openPoints": ["offene Punkte, Fragen, Fristen – höchstens 4, sonst leer"], "waitingOn": "me" | "others" | "nobody"}
-"waitingOn" = wer zuletzt etwas tun muss: "me" (der Nutzer: ${ownAddresses.join(", ") || "Empfänger"}), "others" (jemand anderes) oder "nobody".
+Mails des Nutzers (${ownAddresses.join(", ") || "Empfänger"}) sind mit „(Nutzer)“ markiert.
+"waitingOn" – wer muss als Nächstes handeln? Richte dich nach der letzten Mail:
+- "me": jemand anderes bittet den Nutzer um etwas, fragt ihn oder setzt ihm eine Frist, und der Nutzer hat danach noch nicht geantwortet
+- "others": der Nutzer hat zuletzt eine Frage gestellt oder um etwas gebeten und wartet auf Antwort
+- "nobody": alles ist geklärt, bestätigt oder nur zur Information
 Erfinde nichts. Nenne Beträge, Daten und Namen genau so, wie sie in den Mails stehen.`,
     },
     { role: "user", content: thread },

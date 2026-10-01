@@ -8,13 +8,15 @@
     ".": "./src/index.ts",
     "./sqlite": "./src/sqlite/index.ts",
     "./node": "./src/node/index.ts",
-    "./mail": "./src/mail/index.ts"
+    "./mail": "./src/mail/index.ts",
+    "./llm": "./src/llm/index.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "html-to-text": "^9.0.5",
     "imapflow": "^2.1.2",
     "mailparser": "^3.9.32",
+    "node-llama-cpp": "^3.22.1",
     "nodemailer": "^10.0.13",
     "unpdf": "^1.8.1"
   },

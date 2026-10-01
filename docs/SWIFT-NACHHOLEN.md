@@ -15,6 +15,9 @@ unten abarbeiten.
 
 | Seit | Was | Wo in TypeScript |
 |------|-----|------------------|
+| 01.10.2026 | Migration `v9-ai-results`: `message.categoryOrigin`, Index `message_on_uncategorized`, Tabelle `threadSummary` | `web/packages/core/src/sqlite/schema.ts`, `sqlite/aiStore.ts` |
+| 01.10.2026 | KI-Kern: Router mit Freigabe-Prüfung, Prompts (v2), Antwortprüfung, Testsatz + Messlauf | `web/packages/core/src/ai/` |
+| 01.10.2026 | Lokale KI: Modell-Download (fortsetzbar, SHA-256), llama.cpp-Anbieter, KI-Dienst (Zusammenfassen, Einordnen im Hintergrund) – auf dem iPad über MLX/llama.cpp-Swift nachzubauen | `web/packages/core/src/llm/` |
 | 30.09.2026 | Migration `v4-remote-content-exceptions`: Tabelle `remoteContentException(pattern TEXT PRIMARY KEY, createdAt TEXT)` | `web/packages/core/src/sqlite/schema.ts` |
 | 30.09.2026 | Ausnahmeliste für externe Inhalte (Adresse/Domain, Subdomains) + Repository-Methoden | `web/packages/core/src/remoteContent.ts`, `repository.ts` |
 | 30.09.2026 | Optionen-Dialog, „Externe Inhalte laden“ pro Mail | `web/packages/ui/src/components/OptionsDialog.tsx`, `SafeHtml.tsx` |

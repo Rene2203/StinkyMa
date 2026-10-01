@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, safeStorage, shell, Tray } from "electron";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { totalmem } from "node:os";
 import { join } from "node:path";
 import {
+  aiMethods,
   accountsApiMethods,
   appSettingsMethods,
   attachmentFilesMethods,
@@ -19,8 +21,9 @@ import {
   type Message,
 } from "@stinkyma/core";
 import { MailService } from "@stinkyma/core/mail";
+import { AIService, ModelStore } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore } from "@stinkyma/core/node";
-import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { AIResultStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -33,6 +36,7 @@ const isPrimaryInstance = app.requestSingleInstanceLock();
 
 let mainWindow: BrowserWindow | null = null;
 let service: MailService | null = null;
+let ai: AIService | null = null;
 let syncTimer: NodeJS.Timeout | null = null;
 let tray: Tray | null = null;
 let settings: SettingsFile | null = null;
@@ -70,9 +74,23 @@ function setUpServices(): void {
     decrypt: (data) => safeStorage.decryptString(data),
   });
 
-  service = new MailService(new SqliteMailRepository(db), new MailWriter(db), secrets, {
+  const repository = new SqliteMailRepository(db);
+  service = new MailService(repository, new MailWriter(db), secrets, {
     onChange: notifyRenderer,
     onNewMail: (_accountId, messages) => showNewMailNotification(messages),
+  });
+
+  // KI: Modelle im Benutzerordner, alles läuft auf diesem Rechner. Ohne gewähltes Modell passiert nichts.
+  const settingsFile = settings;
+  ai = new AIService({
+    store: new ModelStore(dataPath("models")),
+    results: new AIResultStore(db),
+    thread: (threadId) => repository.thread(threadId),
+    ownAddresses: async () => (await repository.accounts()).map((account) => account.email),
+    settings: { load: () => settingsFile?.ai ?? null, save: (next) => settingsFile?.setAI(next) },
+    ramGb: Math.round(totalmem() / 2 ** 30),
+    onStatus: (status) => mainWindow?.webContents.send("ai:status", status),
+    onCategorized: notifyRenderer,
   });
 }
 
@@ -84,6 +102,8 @@ function notifyRenderer(): void {
     notifyTimer = null;
     mainWindow?.webContents.send("mail:changed");
     void updateTrayBadge();
+    // Neue Mails einordnen (falls eingeschaltet) – läuft nacheinander im Hintergrund, Mehrfachaufrufe bündeln sich.
+    ai?.categorizeInBackground();
   }, 150);
 }
 
@@ -232,13 +252,14 @@ const attachmentFiles: AttachmentFiles = {
   },
 };
 
-/** IPC-Brücke: der Renderer darf nur die freigegebenen Methoden aufrufen – Mails lesen/ändern, Konten, Anhänge. */
+/** IPC-Brücke: der Renderer darf nur die freigegebenen Methoden aufrufen – Mails lesen/ändern, Konten, Anhänge, KI. */
 function registerIpc(): void {
   const channels: [string, ReadonlySet<string>, () => object | null][] = [
     ["mail", new Set<string>(mailRepositoryMethods), () => service],
     ["accounts", new Set<string>(accountsApiMethods), () => service],
     ["files", new Set<string>(attachmentFilesMethods), () => attachmentFiles],
     ["settings", new Set<string>(appSettingsMethods), () => (settings ? appSettingsApi : null)],
+    ["ai", new Set<string>(aiMethods), () => ai],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {
@@ -350,6 +371,7 @@ app.on("before-quit", () => {
   if (notifyTimer) clearTimeout(notifyTimer);
   // Offene IMAP-Verbindungen sofort trennen, damit die App ohne Verzögerung beendet wird.
   service?.dispose();
+  void ai?.dispose();
   destroyTray();
 });
 }

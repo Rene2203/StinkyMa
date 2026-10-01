@@ -6,6 +6,7 @@ const mailMethods = ["accounts", "mailboxes", "messages", "thread", "message", "
 const accountMethods = ["addAccount", "testConnection", "removeAccount", "syncNow", "syncStatus"];
 const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
+const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize"];
 
 const bridge = (channel: string, methods: string[]) =>
   Object.fromEntries(methods.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channel, method, args)]));
@@ -15,6 +16,7 @@ contextBridge.exposeInMainWorld("stinkyma", {
   accounts: bridge("accounts", accountMethods),
   files: bridge("files", fileMethods),
   settings: bridge("settings", settingsMethods),
+  ai: bridge("ai", aiMethods),
   /** Meldet Änderungen (neue Mails, Abgleich, Konten). Gibt eine Abmelde-Funktion zurück. */
   onMailChanged: (callback: () => void) => {
     const listener = () => callback();
@@ -28,6 +30,12 @@ contextBridge.exposeInMainWorld("stinkyma", {
     };
     ipcRenderer.on("mail:open", listener);
     return () => ipcRenderer.removeListener("mail:open", listener);
+  },
+  /** KI-Status (Download-Fortschritt, Einordnung) hat sich geändert. */
+  onAIStatus: (callback: (status: unknown) => void) => {
+    const listener = (_event: unknown, status: unknown) => callback(status);
+    ipcRenderer.on("ai:status", listener);
+    return () => ipcRenderer.removeListener("ai:status", listener);
   },
   platform: process.platform,
 });

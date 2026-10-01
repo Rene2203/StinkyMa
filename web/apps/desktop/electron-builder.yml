@@ -9,8 +9,16 @@ directories:
 files:
   - out/**
   - package.json
+  # Lokale KI (llama.cpp): nur CPU- und Vulkan-Varianten (Vulkan nutzt NVIDIA-, AMD- und Intel-Grafik).
+  # Die CUDA-Pakete (mehrere hundert MB) und fremde Plattformen kommen nicht in den Installer.
+  - "!node_modules/@node-llama-cpp/*cuda*/**"
+  - "!node_modules/@node-llama-cpp/{linux,mac}-*/**"
+  - "!node_modules/node-llama-cpp/llama/gitRelease.bundle"
 asarUnpack:
   - "**/*.node"
+  - "node_modules/node-llama-cpp/bins/**/*"
+  - "node_modules/node-llama-cpp/llama/localBuilds/**/*"
+  - "node_modules/@node-llama-cpp/*/bins/**/*"
 # better-sqlite3 nutzt Node-API mit fertigen Binärdateien pro Plattform – kein Neubau für Electron nötig.
 npmRebuild: false
 win:

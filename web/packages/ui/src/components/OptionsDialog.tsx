@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "rea
 // Der Signatur-Editor braucht den großen Editor-Baustein – erst laden, wenn die Optionen offen sind.
 const SignatureEditor = lazy(() => import("./SignatureEditor.js"));
 import { useBrowserState, useUi } from "../context.js";
+import { AISection } from "./AISection.js";
 
 /** Dialog „Optionen“. Erster Bereich: Absender, deren externe Inhalte sofort geladen werden. */
 export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onClose: () => void }) {
@@ -112,6 +113,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
             </ul>
           )}
         </section>
+
+        {state.ai && <AISection />}
 
         {state.appSettings && <AppSettingsSection />}
 

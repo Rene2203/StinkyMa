@@ -33,9 +33,11 @@ export function truncate(text: string, maxChars: number): string {
 }
 
 /** Kopf + bereinigter Text einer Mail, so wie das Modell sie sieht. */
-export function mailForModel(message: Message, maxChars: number, extra?: { attachmentNames?: string[] }): string {
+export function mailForModel(message: Message, maxChars: number, extra?: { attachmentNames?: string[]; ownAddresses?: string[] }): string {
+  const own = extra?.ownAddresses?.some((a) => a.toLowerCase() === message.from.address.toLowerCase()) ?? false;
   const lines = [
-    `Von: ${displayName(message.from)} <${message.from.address}>`,
+    // Kleine Modelle verwechseln sonst leicht, wer schreibt – eigene Mails ausdrücklich kennzeichnen.
+    `Von: ${displayName(message.from)} <${message.from.address}>${own ? " (Nutzer)" : ""}`,
     `Betreff: ${message.subject || "(kein Betreff)"}`,
     `Datum: ${message.date.slice(0, 10)}`,
   ];
@@ -48,7 +50,7 @@ export function mailForModel(message: Message, maxChars: number, extra?: { attac
  * Konversation für die Zusammenfassung: neueste Mails haben Vorrang. Passt nicht alles hinein, werden ältere
  * Mails auf ihren Anfang gekürzt bzw. weggelassen (mit Hinweis), statt die neuesten abzuschneiden.
  */
-export function threadForModel(thread: Message[], maxChars: number): string {
+export function threadForModel(thread: Message[], maxChars: number, ownAddresses: string[] = []): string {
   const ordered = [...thread].sort((a, b) => a.date.localeCompare(b.date));
   const perMail = Math.max(400, Math.floor(maxChars / Math.max(1, ordered.length)));
   const parts: string[] = [];
@@ -59,7 +61,7 @@ export function threadForModel(thread: Message[], maxChars: number): string {
       parts.push(`[${ordered.length - parts.length} ältere Nachricht(en) ausgelassen]`);
       break;
     }
-    const block = mailForModel(message, budget);
+    const block = mailForModel(message, budget, { ownAddresses });
     parts.push(block);
     used += block.length;
   }
