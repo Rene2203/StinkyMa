@@ -1,5 +1,22 @@
 # Changelog
 
+## Aufräumen und mehr Mails (nach W6)
+
+### Neu
+- **Mails laden: 30 Tage, 3 Monate, 1 Jahr oder alle** – je Konto in den Optionen. Länger: wird sofort im Hintergrund
+  nachgeladen, mit Fortschritt („Lädt Mails … 1.200 von 8.000“) unten links; nachgeladene ältere Mails lösen keine
+  Benachrichtigungen und keine Regeln aus. Kürzer: ältere Mails verschwinden nur aus StinkyMa, auf dem Server bleiben sie.
+  Migration `v14-account-sync-days`.
+- **„Ältere Mails anzeigen“** am Ende der Liste statt fester 500 Mails.
+- **Aufräumen** (Besen-Knopf unten links): Absender oder Domains mit den meisten Mails, mit Anzahl ungelesen und
+  geschützt. Alles einer Gruppe kann in den Papierkorb – **außer** Mails, die man behalten sollte: Rechnungen, Bestellungen,
+  Verträge, Tickets, Zugangsdaten/Passwörter, Sicherheitscodes, Dokumente (Steuer, Lohn, Lizenz), markierte und
+  beantwortete Mails, offene Fristen, von der KI als persönlich/Arbeit/Rechnung/Termin Eingeordnetes. Geschützte Mails
+  sind nicht vorausgewählt, lassen sich aber anhaken. Löschen nur nach Bestätigung, nur in den Papierkorb; auf Wunsch
+  Regel „künftige Mails auch in den Papierkorb“. „KI prüfen lassen“ ordnet noch nicht eingeordnete Mails der Gruppe
+  vorrangig ein (im Hintergrund, mit geschätzter Dauer).
+- Verschieben vieler Mails zwischen denselben Ordnern geht als **ein** Server-Befehl (statt einer pro Mail).
+
 ## W6 – Assistent
 
 ### Neu

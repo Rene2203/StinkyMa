@@ -9,6 +9,7 @@ import {
   digestDue,
   localDay,
   rulesApiMethods,
+  cleanupApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -29,10 +30,10 @@ import {
   type AttachmentFiles,
   type Message,
 } from "@stinkyma/core";
-import { MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
+import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
 import { AIService, ModelStore, RuntimeStore } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, DigestStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -47,6 +48,7 @@ let mainWindow: BrowserWindow | null = null;
 let service: MailService | null = null;
 let ai: AIService | null = null;
 let rules: RuleService | null = null;
+let cleanup: CleanupService | null = null;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
 let tray: Tray | null = null;
@@ -194,6 +196,9 @@ function setUpServices(): void {
     accountIds: async () => (await repository.accounts()).map((a) => a.id),
     newId: () => randomUUID(),
   });
+
+  // Aufräumen: große Absender/Domains, löschen nur auf Klick; „KI prüfen“ ordnet die Gruppe vorrangig ein
+  cleanup = new CleanupService(new CleanupStore(db), mailService, { categorize: (ids) => aiService.categorizeMessages(ids) });
 }
 
 /** Die Oberfläche lädt neu, wenn sich Daten geändert haben (Abgleich, Aktionen, Konten). Gebündelt, um Flackern zu vermeiden. */
@@ -412,6 +417,7 @@ function registerIpc(): void {
     ["settings", new Set<string>(appSettingsMethods), () => (settings ? appSettingsApi : null)],
     ["ai", new Set<string>(aiMethods), () => ai],
     ["rules", new Set<string>(rulesApiMethods), () => rules],
+    ["cleanup", new Set<string>(cleanupApiMethods), () => cleanup],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {

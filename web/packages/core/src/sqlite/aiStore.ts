@@ -63,6 +63,18 @@ export class AIResultStore {
     ).map(messageFromRow);
   }
 
+  /** Von diesen Mails die noch nicht eingeordneten (beliebiger Ordner) – für „KI prüfen“ beim Aufräumen. */
+  uncategorizedIn(ids: string[]): Message[] {
+    if (!ids.length) return [];
+    const result: Message[] = [];
+    const stmt = this.db.prepare("SELECT * FROM message WHERE id = ? AND category IS NULL");
+    for (const id of ids) {
+      const row = stmt.get(id) as Row | undefined;
+      if (row) result.push(messageFromRow(row));
+    }
+    return result;
+  }
+
   /** Alle Posteingangs-Mails ohne Kategorie (ohne Zeitgrenze). */
   uncategorizedTotal(): number {
     return this.uncategorizedCount("");

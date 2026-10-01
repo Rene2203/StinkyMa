@@ -72,6 +72,8 @@ export class AIService implements AIApi {
   #activity: { task: AITask; startedAt: string } | null = null;
   #waiting = 0;
   #categorizeRequested = false;
+  /** Vom Nutzer angefragte Mails (z. B. „KI prüfen“ beim Aufräumen) – vor dem normalen Zeitraum. */
+  #priority: string[] = [];
   #error: string | null = null;
   #lastProgressAt = 0;
   #disposed = false;
@@ -662,6 +664,19 @@ export class AIService implements AIApi {
     return this.#emit();
   }
 
+  /**
+   * Diese Mails vorrangig einordnen (auch außerhalb des Zeitraums und ohne „automatisch einordnen“, solange die KI an
+   * ist). Gibt zurück, wie viele noch fehlen.
+   */
+  categorizeMessages(ids: string[]): number {
+    if (!this.#settings.enabled) return 0;
+    const queued = new Set(this.#priority);
+    const missing = this.options.results.uncategorizedIn([...new Set(ids)]).map((m) => m.id).filter((id) => !queued.has(id));
+    this.#priority.push(...missing);
+    if (missing.length) this.categorizeInBackground();
+    return missing.length;
+  }
+
   categorizeInBackground(): void {
     if (this.#categorizing) {
       this.#categorizeRequested = true;
@@ -678,9 +693,18 @@ export class AIService implements AIApi {
   async #categorizeLoop(): Promise<void> {
     const since = () => this.#window().since;
     const range = () => this.#window();
+    const active = () => this.#settings.enabled && !this.#disposed && (this.#settings.autoCategorize || this.#priority.length > 0);
+    const remainingCount = () => this.#priority.length + (this.#settings.autoCategorize ? this.options.results.uncategorizedCount(since(), range()) : 0);
+    const next = (): Message | undefined => {
+      while (this.#priority.length) {
+        const [message] = this.options.results.uncategorizedIn(this.#priority.splice(0, 1));
+        if (message) return message;
+      }
+      return this.#settings.autoCategorize ? this.options.results.uncategorized(1, since(), range())[0] : undefined;
+    };
     do {
       this.#categorizeRequested = false;
-      if (!this.#settings.enabled || !this.#settings.autoCategorize || this.#disposed) break;
+      if (!active()) break;
       let ready: { router: AIRouter; model: CatalogModel };
       try {
         ready = await this.#router();
@@ -688,20 +712,20 @@ export class AIService implements AIApi {
         if (!(error instanceof AINotConfiguredError)) this.#error = error instanceof Error ? error.message : String(error);
         break;
       }
-      const total = this.options.results.uncategorizedCount(since(), range());
+      const total = remainingCount();
       this.#categorizing = { remaining: total, done: 0, total };
       await this.#emit();
       let failures = 0;
       for (;;) {
-        if (!this.#settings.enabled || !this.#settings.autoCategorize || this.#disposed) break;
-        const [message] = this.options.results.uncategorized(1, since(), range());
+        if (!active()) break;
+        const message = next();
         if (!message) break;
         // Vom Nutzer gelernt: ohne Modell, sofort
         const learned = this.options.results.learnedCategory(message.from.address);
         if (learned) {
           this.options.results.setCategory(message.id, learned, "learned");
           this.options.onCategorized?.();
-          const remaining = this.options.results.uncategorizedCount(since(), range());
+          const remaining = remainingCount();
           const current: { remaining: number; done: number; total: number } = this.#categorizing ?? { remaining, done: 0, total: remaining };
           this.#categorizing = { remaining, done: current.done + 1, total: Math.max(current.total, current.done + 1 + remaining) };
           continue;
@@ -727,7 +751,7 @@ export class AIService implements AIApi {
           }
         }
         this.options.onCategorized?.();
-        const remaining = this.options.results.uncategorizedCount(since(), range());
+        const remaining = remainingCount();
         const current: { remaining: number; done: number; total: number } = this.#categorizing ?? { remaining, done: 0, total: remaining };
         // Neue Mails während des Laufs vergrößern das Ziel, statt die Anzeige rückwärts laufen zu lassen
         this.#categorizing = { remaining, done: current.done + 1, total: Math.max(current.total, current.done + 1 + remaining) };

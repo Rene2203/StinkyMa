@@ -15,6 +15,8 @@ unten abarbeiten.
 
 | Seit | Was | Wo in TypeScript |
 |------|-----|------------------|
+| 01.10.2026 | Migration `v14-account-sync-days`: Spalte `account.syncDays INTEGER` (NULL = 30 Tage, 0 = alle); kürzer → ältere Mails lokal entfernen, nachgeladene alte Mails lösen keine Benachrichtigung/Regel aus; viele Verschiebungen als ein MOVE | `core/src/models.ts` (`syncSince`), `mail/mailService.ts` (`setSyncDays`, `#applyMoves`), `mail/accountSync.ts` (`arrivedSince`) |
+| 01.10.2026 | Aufräumen: Gruppen nach Absender/Domain, Schutz-Regeln (Rechnung, Bestellung, Ticket, Zugangsdaten …), Löschen in den Papierkorb, „KI prüfen“ vorrangig | `core/src/cleanup.ts`, `sqlite/cleanupStore.ts`, `mail/cleanupService.ts`, `llm/aiService.ts` (`categorizeMessages`) |
 | 01.10.2026 | Migration `v13-sender-category`: Tabelle `senderCategory(address TEXT PRIMARY KEY, category TEXT, learnedAt TEXT)`; `message.categoryOrigin` kennt zusätzlich „user“ und „learned“ | `core/src/sqlite/schema.ts`, `sqlite/aiStore.ts` |
 | 01.10.2026 | Migration `v12-mail-rules`: Tabellen `mailRule(id, text, accountId → account, definition JSON, enabled, createdAt)` und `ruleQueue(messageId → message, queuedAt)`; Regeln aus Text (ohne KI: `parseRuleText`, mit KI nur als Rückfall), Anwenden auf neu angekommene Mails | `core/src/sqlite/schema.ts`, `core/src/rules.ts`, `core/src/ai/rules.ts`, `core/src/mail/ruleService.ts` |
 | 01.10.2026 | Migration `v11-screener`: Spalte `account.screener INTEGER NOT NULL DEFAULT 0`, Tabelle `senderDecision(address TEXT PRIMARY KEY, decision TEXT, decidedAt TEXT)`; Türsteher-Filter im Posteingang | `core/src/sqlite/schema.ts`, `sqlite/repository.ts` (`screenedOut`) |

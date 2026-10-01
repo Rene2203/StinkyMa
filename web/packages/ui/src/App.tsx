@@ -1,7 +1,8 @@
-import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, MailRepository, RulesApi } from "@stinkyma/core";
+import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
+import { CleanupDialog } from "./components/CleanupDialog.js";
 import { DigestDialog } from "./components/DigestDialog.js";
 import { composeLabels } from "./composeLabels.js";
 import { MessageList } from "./components/MessageList.js";
@@ -27,6 +28,7 @@ export interface AppProps {
   /** Lokale KI (Windows-App): Modelle, Zusammenfassungen, Einordnung. */
   ai?: AIApi;
   rules?: RulesApi;
+  cleanup?: CleanupApi;
   /** Meldet Statusänderungen der KI (Download-Fortschritt usw.). */
   subscribeAIStatus?: (onStatus: (status: AIStatus) => void) => () => void;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
@@ -37,8 +39,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, ai, rules, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules }), [repository, accounts, files, settings, ai, rules]);
+export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup }), [repository, accounts, files, settings, ai, rules, cleanup]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
@@ -82,6 +84,7 @@ function Shell() {
         </Suspense>
       )}
       {state.digest && <DigestDialog />}
+      {state.cleanup && <CleanupDialog />}
       {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}
       {state.error && (
         <div className="error-banner" role="alert">

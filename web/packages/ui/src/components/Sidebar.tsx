@@ -1,4 +1,4 @@
-import { AlertTriangle, LogIn, Plus, RefreshCw, Send, Settings, Sun, X } from "lucide-react";
+import { AlertTriangle, Broom, LogIn, Plus, RefreshCw, Send, Settings, Sun, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -163,6 +163,11 @@ export function Sidebar() {
             >
               <Settings size={15} />
             </button>
+            {store.canCleanup && (
+              <button type="button" className="icon-button" title={t("cleanup.open")} aria-label={t("cleanup.open")} data-testid="open-cleanup" onClick={() => void store.openCleanup()}>
+                <Broom size={15} />
+              </button>
+            )}
             {store.canShowDigest && (
               <button type="button" className="icon-button" title={t("digest.title")} aria-label={t("digest.title")} data-testid="open-digest" onClick={() => void store.openDigest()}>
                 <Sun size={15} />

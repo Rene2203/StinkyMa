@@ -148,6 +148,40 @@ test("Einordnung korrigieren: für den Absender gemerkt, andere Mails folgen", a
   await expect(rows().filter({ hasText: "Hi Anna, wir grillen am Samstag" }).locator(".chip")).toHaveText("Persönlich");
 });
 
+test("Aufräumen: größter Absender, Geschütztes bleibt abgewählt, Löschen erst nach Bestätigung", async () => {
+  await page.getByTestId("open-cleanup").click();
+  const dialog = page.getByTestId("cleanup-dialog");
+  await expect(dialog).toBeVisible();
+  const groups = dialog.getByTestId("cleanup-group");
+  await expect(groups.first()).toBeVisible();
+  const before = Number(await groups.first().locator(".cleanup-count").textContent());
+  expect(before).toBeGreaterThanOrEqual(2);
+  await groups.first().click();
+  const mails = dialog.getByTestId("cleanup-mail");
+  await expect(mails).toHaveCount(before);
+  // Ungeschützte sind vorausgewählt, geschützte nicht
+  const protectedCount = await dialog.getByTestId("cleanup-protect").count();
+  for (let i = 0; i < before; i++) {
+    const row = mails.nth(i);
+    const isProtected = (await row.getByTestId("cleanup-protect").count()) > 0;
+    await expect(row.locator("input[type=checkbox]")).toBeChecked({ checked: !isProtected });
+  }
+  await shot("28-Aufraeumen");
+  if (protectedCount === before) await mails.first().locator("input[type=checkbox]").check();
+  const selected = await dialog.locator(".cleanup-mail input:checked").count();
+  await dialog.getByTestId("cleanup-future").check();
+  await dialog.getByTestId("cleanup-trash").click();
+  await expect(dialog.getByTestId("cleanup-confirm")).toBeVisible();
+  await dialog.getByTestId("cleanup-confirm").click();
+  await expect(dialog.getByTestId("cleanup-note")).toContainText(String(selected));
+  await expect(dialog.getByTestId("cleanup-note")).toContainText("Regel");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  // Die Mails liegen jetzt im Papierkorb
+  await page.getByRole("searchbox").fill("");
+  await page.getByTestId("sidebar-unifiedInbox").click();
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

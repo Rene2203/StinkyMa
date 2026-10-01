@@ -2697,3 +2697,237 @@ button.ai-activity.idle {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Aufräumen */
+.dialog.cleanup-dialog {
+  width: min(980px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 32px));
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.dialog.cleanup-dialog:not([open]) {
+  display: none;
+}
+.cleanup-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.cleanup-header > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cleanup-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.cleanup-header > svg {
+  color: var(--accent);
+  margin-top: 2px;
+}
+.cleanup-dialog button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cleanup-dialog button.icon-button {
+  border: none;
+  padding: 4px;
+  background: none;
+}
+.cleanup-dialog button.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--fg-on-accent);
+}
+.cleanup-dialog button:disabled {
+  opacity: 0.5;
+}
+.cleanup-dialog button.link {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  color: var(--accent);
+}
+.cleanup-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0 8px;
+}
+.cleanup-dialog .segmented {
+  display: inline-flex;
+}
+.cleanup-dialog .segmented button {
+  border-radius: 0;
+}
+.cleanup-dialog .segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.cleanup-dialog .segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+.cleanup-dialog .segmented button[aria-pressed="true"] {
+  background: var(--bg-selected);
+  border-color: var(--accent);
+}
+.cleanup-note {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--bg-card);
+}
+.cleanup-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 34%) 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+}
+.cleanup-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  padding-right: 8px;
+}
+.cleanup-dialog .cleanup-group {
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  justify-content: space-between;
+  text-align: left;
+  padding: 6px 8px;
+  background: none;
+}
+.cleanup-dialog .cleanup-group:hover {
+  background: var(--bg-hover);
+}
+.cleanup-dialog .cleanup-group[aria-selected="true"] {
+  background: var(--bg-selected);
+}
+.cleanup-group-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cleanup-group-name > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cleanup-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  padding-left: 8px;
+}
+.cleanup-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 6px;
+}
+.cleanup-detail-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.cleanup-detail .hint {
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cleanup-ai {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.cleanup-select {
+  display: flex;
+  gap: 4px;
+}
+.cleanup-mails {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.dialog.cleanup-dialog .cleanup-mail label {
+  display: flex;
+  flex-direction: row;
+  font-weight: 400;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.cleanup-mail.protected {
+  background: var(--bg-card);
+}
+.cleanup-mail-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cleanup-mail-main > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cleanup-mail-main .unread {
+  font-weight: 600;
+}
+.cleanup-protect {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--green);
+  white-space: nowrap;
+}
+.dialog.cleanup-dialog .cleanup-footer label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 400;
+}
+.cleanup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cleanup-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .cleanup-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 40% 1fr;
+  }
+  .cleanup-groups {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}

@@ -288,6 +288,23 @@ describe("AIService", () => {
     expect((await service.status()).backlog).toEqual({ recent: 0, older: 0 });
   });
 
+  it("Aufräumen „KI prüfen“: gewünschte Mails vorrangig, auch alte und ohne automatische Einordnung", async () => {
+    const { service, install, db, statuses } = setup({ enabled: true, modelId: "klein", autoCategorize: false });
+    install("klein");
+    const old = new Date(Date.now() - 400 * 86_400_000).toISOString();
+    const ids = (db.prepare("SELECT m.id FROM message m JOIN mailbox b ON b.id = m.mailboxId WHERE b.role = 'inbox' LIMIT 2").all() as { id: string }[]).map((r) => r.id);
+    expect(ids).toHaveLength(2);
+    db.prepare(`UPDATE message SET date = ? WHERE id IN (${ids.map(() => "?").join(",")})`).run(old, ...ids);
+    expect(service.categorizeMessages([...ids, ids[0]!])).toBe(2);
+    await until(() => statuses.at(-1)?.categorizing === null && ids.every((id) => (db.prepare("SELECT category FROM message WHERE id = ?").get(id) as { category: string | null }).category !== null));
+    // Nur die gewünschten – sonst bleibt alles uneingeordnet (automatisch ist aus)
+    const others = db.prepare("SELECT COUNT(*) AS n FROM message WHERE category IS NOT NULL").get() as { n: number };
+    expect(others.n).toBe(2);
+    expect(service.categorizeMessages(ids)).toBe(0); // schon eingeordnet
+    await service.update({ enabled: false });
+    expect(service.categorizeMessages(["egal"])).toBe(0);
+  });
+
   it("Modell löschen gibt es frei und setzt die Auswahl zurück", async () => {
     const { service, install, providers, saved, repository } = setup({ enabled: true, modelId: "klein", autoCategorize: false });
     install("klein");

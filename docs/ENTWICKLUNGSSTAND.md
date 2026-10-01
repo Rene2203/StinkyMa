@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft und vom Nutzer unter Windows mit echtem Gmail-Konto getestet – **W6 abgeschlossen**. Als Nächstes: Feinabstimmung der Modelle (Wunsch des Nutzers)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft und vom Nutzer unter Windows mit echtem Gmail-Konto getestet – **W6 abgeschlossen**. Danach (Wunsch des Nutzers): Zeitraum „alle Mails“ und **Aufräumen** – gebaut, lokal geprüft. Als Nächstes: Feinabstimmung der Modelle
 
 ## Überblick
 
@@ -472,3 +472,16 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Zusammenfassungen laut Nutzer „sehr gut“, die übrigen Funktionen (W5/W6) ebenfalls ohne Beanstandung. Damit erstmals
   mit einem **echten Konto** geprüft (Gmail per App-Passwort). Weiter ungeprüft: OAuth Google/Microsoft mit echten
   Konten, Uhrzeit-Benachrichtigung des Tagesüberblicks. Nächster Schritt: Feinabstimmung der Modelle.
+- **Zeitraum und Aufräumen (Wunsch des Nutzers, 01.10.2026):** Anlass: Gmail meldet ~8000 ungelesene, StinkyMa zeigte ~200
+  (nur die letzten 30 Tage waren geladen). Jetzt je Konto 30 Tage / 3 Monate / 1 Jahr / alle (Migration v14), „Ältere Mails
+  anzeigen“ in der Liste, Ladefortschritt in der Seitenleiste; nachgeladene alte Mails lösen keine Benachrichtigung/Regel
+  aus; Verschieben vieler Mails als ein MOVE. **Aufräumen**-Dialog: Gruppen nach Absender/Domain (registrierte Domain),
+  Schutz per Regeln (Betreff breit, Text nur eindeutige Formulierungen) plus KI-Einordnung; Spam-Verdacht der KI hebt den
+  Text-Schutz auf (Phishing mit „Passwort“). Löschen nur in den Papierkorb, nach Bestätigung, optional mit Regel für
+  künftige Mails; „KI prüfen lassen“ ordnet die Gruppe vorrangig ein. Geprüft: GreenMail (Zeitraum länger/kürzer/alle,
+  keine Benachrichtigung für alte Mails, ein MOVE für drei Mails mit neuen UIDs), Schutz-Regeln, Gruppierung mit SQLite
+  (Papierkorb/Spam/Gmail-Doppel ausgenommen), KI-Vorrang, Store, E2E mit der echten App (Gruppe wählen, Geschütztes
+  abgewählt, Löschen nach Bestätigung, Regel angelegt). Lokal: 387 Tests + 9 E2E grün. **Ungeprüft:** echtes großes
+  Gmail-Konto (Dauer, Speicher, Gmail-Tageslimit beim ersten vollständigen Abruf, Verhalten von „Alle Nachrichten“ beim
+  Löschen), Trefferquote der Schutz-Regeln an echten Mails, Windows-CI.
+

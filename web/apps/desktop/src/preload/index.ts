@@ -8,6 +8,7 @@ const accountMethods = ["addAccount", "addOAuthAccount", "reauthorize", "oauthPr
 const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
 const rulesMethods = ["list", "folders", "interpret", "preview", "save", "setEnabled", "remove"];
+const cleanupMethods = ["groups", "groupMails", "trash", "check"];
 const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender"];
 
 const bridge = (channel: string, methods: string[]) =>
@@ -20,6 +21,7 @@ contextBridge.exposeInMainWorld("stinkyma", {
   settings: bridge("settings", settingsMethods),
   ai: bridge("ai", aiMethods),
   rules: bridge("rules", rulesMethods),
+  cleanup: bridge("cleanup", cleanupMethods),
   /** Meldet Änderungen (neue Mails, Abgleich, Konten). Gibt eine Abmelde-Funktion zurück. */
   onMailChanged: (callback: () => void) => {
     const listener = () => callback();

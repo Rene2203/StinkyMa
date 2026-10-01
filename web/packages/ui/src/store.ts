@@ -1,5 +1,10 @@
 import {
   MessageFlag,
+  groupRuleFrom,
+  type CleanupApi,
+  type CleanupGroup,
+  type CleanupGroupBy,
+  type CleanupMail,
   isFlagged,
   isRead,
   scopeKey,
@@ -123,6 +128,27 @@ export interface BrowserState {
   learnedSenders: { address: string; category: MessageCategory; learnedAt: string }[];
   /** Tagesüberblick (Dialog); null = geschlossen. */
   digest: { view: DigestView | null; busy: boolean; error: string | null } | null;
+  /** Aufräumen (Dialog); null = geschlossen. */
+  cleanup: CleanupState | null;
+}
+
+export interface CleanupState {
+  groupBy: CleanupGroupBy;
+  accountId: string | null;
+  groups: CleanupGroup[] | null;
+  busy: boolean;
+  error: string | null;
+  /** Gewählte Gruppe mit ihren Mails */
+  group: { key: string; mails: CleanupMail[] | null; busy: boolean } | null;
+  /** Vom Nutzer umgeschaltete Häkchen (Mail-ID → ausgewählt); sonst gilt: ungeschützt = ausgewählt */
+  overrides: Record<string, boolean>;
+  /** Rückmeldung nach dem Löschen bzw. nach „KI prüfen“ */
+  note: { kind: "trashed"; count: number; key: string; rule: boolean } | { kind: "checking"; count: number } | null;
+}
+
+/** Ist diese Mail zum Löschen ausgewählt? Standard: alles außer Geschütztem. */
+export function cleanupSelected(state: CleanupState, mail: CleanupMail): boolean {
+  return state.overrides[mail.id] ?? !mail.protect;
 }
 
 export interface RepliesState {
@@ -197,6 +223,7 @@ export const initialState: BrowserState = {
   digest: null,
   categoryNote: null,
   learnedSenders: [],
+  cleanup: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -258,10 +285,11 @@ export class BrowserStore {
   readonly #settings: AppSettingsApi | undefined;
   readonly #ai: AIApi | undefined;
   readonly #rules: RulesApi | undefined;
+  readonly #cleanup: CleanupApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -270,6 +298,132 @@ export class BrowserStore {
     this.#settings = options.settings;
     this.#ai = options.ai;
     this.#rules = options.rules;
+    this.#cleanup = options.cleanup;
+  }
+
+  // --- Aufräumen ---
+
+  get canCleanup(): boolean {
+    return Boolean(this.#cleanup);
+  }
+
+  /** Gibt es Regeln (für „künftige Mails auch löschen“)? */
+  get canUseRules(): boolean {
+    return Boolean(this.#rules);
+  }
+
+  async openCleanup(): Promise<void> {
+    if (!this.#cleanup) return;
+    this.#set({ cleanup: { groupBy: "address", accountId: null, groups: null, busy: true, error: null, group: null, overrides: {}, note: null } });
+    await this.#loadCleanupGroups();
+  }
+
+  closeCleanup(): void {
+    this.#set({ cleanup: null });
+  }
+
+  async setCleanupView(patch: { groupBy?: CleanupGroupBy; accountId?: string | null }): Promise<void> {
+    const current = this.#state.cleanup;
+    if (!current) return;
+    this.#set({ cleanup: { ...current, ...patch, groups: null, busy: true, group: null, overrides: {}, note: null } });
+    await this.#loadCleanupGroups();
+  }
+
+  async #loadCleanupGroups(): Promise<void> {
+    const api = this.#cleanup;
+    const current = this.#state.cleanup;
+    if (!api || !current) return;
+    try {
+      const groups = await api.groups({ accountId: current.accountId, groupBy: current.groupBy, limit: 200, minCount: 2 });
+      const now = this.#state.cleanup;
+      if (!now || now.groupBy !== current.groupBy || now.accountId !== current.accountId) return; // überholt
+      this.#set({ cleanup: { ...now, groups, busy: false, error: null } });
+    } catch (e) {
+      const now = this.#state.cleanup;
+      if (now) this.#set({ cleanup: { ...now, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  async selectCleanupGroup(key: string): Promise<void> {
+    const current = this.#state.cleanup;
+    if (!current) return;
+    this.#set({ cleanup: { ...current, group: { key, mails: null, busy: true }, overrides: {}, note: null } });
+    await this.#loadCleanupMails();
+  }
+
+  async #loadCleanupMails(): Promise<void> {
+    const api = this.#cleanup;
+    const current = this.#state.cleanup;
+    if (!api || !current?.group) return;
+    const key = current.group.key;
+    try {
+      const mails = await api.groupMails(key, current.groupBy, current.accountId, 20_000);
+      const now = this.#state.cleanup;
+      if (!now?.group || now.group.key !== key) return;
+      this.#set({ cleanup: { ...now, group: { key, mails, busy: false } } });
+    } catch (e) {
+      const now = this.#state.cleanup;
+      if (now?.group) this.#set({ cleanup: { ...now, group: { ...now.group, busy: false }, error: messageOf(e) } });
+    }
+  }
+
+  toggleCleanupMail(id: string, selected: boolean): void {
+    const current = this.#state.cleanup;
+    if (current) this.#set({ cleanup: { ...current, overrides: { ...current.overrides, [id]: selected } } });
+  }
+
+  /** Alle (auch geschützte) an- oder abwählen; `null` = zurück zum Vorschlag. */
+  setCleanupAll(selected: boolean | null): void {
+    const current = this.#state.cleanup;
+    if (!current?.group?.mails) return;
+    const overrides = selected === null ? {} : Object.fromEntries(current.group.mails.map((m) => [m.id, selected]));
+    this.#set({ cleanup: { ...current, overrides } });
+  }
+
+  /** Ausgewählte Mails der Gruppe in den Papierkorb – nur auf Klick. Optional Regel für künftige Mails. */
+  async trashCleanupSelection(alsoFuture: boolean): Promise<void> {
+    const api = this.#cleanup;
+    const current = this.#state.cleanup;
+    if (!api || !current?.group?.mails) return;
+    const ids = current.group.mails.filter((m) => cleanupSelected(current, m)).map((m) => m.id);
+    if (!ids.length) return;
+    const key = current.group.key;
+    try {
+      await api.trash(ids);
+      let rule = false;
+      if (alsoFuture && this.#rules) {
+        await this.#rules.save(
+          {
+            text: `Mails von ${key} in den Papierkorb`,
+            accountId: current.accountId,
+            definition: { from: groupRuleFrom(key, current.groupBy), subject: [], category: null, hasAttachment: false, move: "trash", folder: null, markRead: false, flag: false },
+          },
+          false,
+        );
+        rule = true;
+      }
+      const now = this.#state.cleanup;
+      if (now) this.#set({ cleanup: { ...now, group: null, overrides: {}, note: { kind: "trashed", count: ids.length, key, rule }, busy: true } });
+      await Promise.all([this.#loadCleanupGroups(), this.loadSidebar(), this.loadMessages(), rule ? this.loadRules() : Promise.resolve()]);
+    } catch (e) {
+      const now = this.#state.cleanup;
+      if (now) this.#set({ cleanup: { ...now, error: messageOf(e) } });
+    }
+  }
+
+  /** Noch nicht eingeordnete Mails der Gruppe von der KI einordnen lassen (läuft im Hintergrund). */
+  async checkCleanupGroup(): Promise<void> {
+    const api = this.#cleanup;
+    const current = this.#state.cleanup;
+    if (!api || !current?.group) return;
+    try {
+      const { queued } = await api.check(current.group.key, current.groupBy, current.accountId);
+      const now = this.#state.cleanup;
+      if (now) this.#set({ cleanup: { ...now, note: { kind: "checking", count: queued } } });
+    } catch (e) {
+      const now = this.#state.cleanup;
+      if (now) this.#set({ cleanup: { ...now, error: messageOf(e) } });
+    }
   }
 
   // --- Regeln in normaler Sprache (W6.4) ---
@@ -753,6 +907,8 @@ export class BrowserStore {
       this.loadMessages(),
       this.#loadSyncStatus(),
       isSearching(this.#state) ? this.runSearch() : Promise.resolve(),
+      // Aufräumen offen: Schutz der gewählten Gruppe auffrischen (z. B. nach KI-Einordnung)
+      this.#state.cleanup?.group?.mails ? this.#loadCleanupMails() : Promise.resolve(),
     ]);
     const selected = this.#state.selectedMessageId;
     const message = selected ? this.#find(selected) : undefined;
