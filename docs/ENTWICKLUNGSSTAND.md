@@ -503,3 +503,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   `%APPDATA%\StinkyMail`. Interne Namen (`@stinkyma/*`, `STINKYMA_*`, Repo, Swift-Projekt) unverändert. Lokal: 396 Tests +
   11 E2E grün. **Ungeprüft:** Update-Installation über eine vorhandene StinkyMa-Installation unter Windows.
 
+- **Nutzer-Test (01.10.2026, Windows):** Rückmeldung zu Zeitraum, Aufräumen, Abbestellen, Abmelde-Fenster und Umbenennung:
+  „funktioniert super“. Welche Punkte im Einzelnen geprüft wurden (Update über alte Installation, „alle Mails“ bei Gmail,
+  Trefferquote der Schutz-Regeln), ist nicht genauer gemeldet. Nächster Schritt: W7 (Verträge & Abos, Belegordner,
+  Versprechen-Tracker) bzw. Feinabstimmung der Modelle.
