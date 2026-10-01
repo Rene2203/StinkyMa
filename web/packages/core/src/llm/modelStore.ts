@@ -115,7 +115,13 @@ async function fileSize(path: string): Promise<number | null> {
 }
 
 async function isFile(path: string): Promise<boolean> {
-  return existsSync(path) && (await stat(path)).isFile();
+  // Datei kann zwischen beiden Aufrufen verschwinden (gelöscht, aufgeräumt) – dann eben „nicht da“
+  if (!existsSync(path)) return false;
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -159,7 +159,7 @@ export class AIService implements AIApi {
           const now = Date.now();
           if (now - this.#lastProgressAt > 250) {
             this.#lastProgressAt = now;
-            void this.#emit();
+            this.#emitQuietly();
           }
         },
       });
@@ -257,7 +257,7 @@ export class AIService implements AIApi {
       const now = Date.now();
       if (now - this.#lastProgressAt > 250) {
         this.#lastProgressAt = now;
-        void this.#emit();
+        this.#emitQuietly();
       }
     };
     try {
@@ -372,14 +372,14 @@ export class AIService implements AIApi {
         const run = this.#engine.then(async () => {
           this.#waiting = Math.max(0, this.#waiting - 1);
           this.#activity = { task: request.task, startedAt: (this.options.now?.() ?? new Date()).toISOString() };
-          void this.#emit();
+          this.#emitQuietly();
           try {
             if (this.#active && this.#active !== provider) await this.#active.unload();
             this.#active = provider;
             return await this.#withTimeout(provider, request, signal);
           } finally {
             this.#activity = null;
-            void this.#emit();
+            this.#emitQuietly();
           }
         });
         this.#engine = run.catch(() => undefined);
@@ -657,7 +657,12 @@ export class AIService implements AIApi {
       this.#categorizeRequested = true;
       return;
     }
-    void this.#categorizeLoop();
+    this.#categorizeLoop().catch((error: unknown) => {
+      // Unerwarteter Fehler außerhalb einer Modell-Anfrage: anhalten, melden – nie unbehandelt
+      this.#categorizing = null;
+      this.#error = error instanceof Error ? error.message : String(error);
+      this.#emitQuietly();
+    });
   }
 
   async #categorizeLoop(): Promise<void> {
@@ -748,6 +753,11 @@ export class AIService implements AIApi {
   }
 
   #emitSeq = 0;
+
+  /** Status im Hintergrund melden – ein Fehler dabei (z. B. Datei gerade weg) darf nie unbehandelt bleiben. */
+  #emitQuietly(): void {
+    this.#emit().catch(() => undefined);
+  }
 
   /** Status an die Oberfläche – nur der neueste: ältere, die sich überholt haben, würden „arbeitet …“ stehen lassen. */
   async #emit(): Promise<AIStatus> {

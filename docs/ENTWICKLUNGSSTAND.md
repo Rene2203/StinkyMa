@@ -442,6 +442,10 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Bewusst ohne Nachtrainieren des Modells: Für ein ~3B-Modell ist „Absender → Einordnung“ zuverlässiger und kostet keine
   Rechenzeit. Die Korrekturen sind zugleich Material für die Feinabstimmung (wo irrt das Modell?).
   Geprüft: Unit-Tests (Lernen, Mitändern, neue Mail ohne Modell, Vergessen), Store-Test, E2E mit Beispieldaten.
+- **Windows-CI #85 rot (#86 gleicher Stand grün):** Die neuen Hintergrund-Statusmeldungen liefen nach dem Aufräumen eines
+  Tests noch weiter; die Modelldatei fehlte, der Fehler blieb unbehandelt. Hätte in der App beim Löschen eines Modells genauso
+  passieren können. Jetzt: Statusmeldungen im Hintergrund fangen Fehler ab, die Dateiprüfung meldet „nicht da“ statt zu
+  scheitern, und die Einordnung ist gegen unerwartete Fehler abgesichert (hält an und meldet).
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,
