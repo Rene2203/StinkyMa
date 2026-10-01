@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, safeStorage, shell, Tray } from "electron";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { totalmem } from "node:os";
 import { join } from "node:path";
 import {
@@ -37,9 +37,22 @@ import { ActionStore, AIResultStore, CleanupStore, DigestStore, MailWriter, open
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
+import { closeWebPanel, openWebPanel, setWebPanelBounds } from "./webPanel";
 
 // Tests (und später portable Installationen) können einen eigenen Datenordner vorgeben.
 if (process.env.STINKYMA_USER_DATA) app.setPath("userData", process.env.STINKYMA_USER_DATA);
+else app.setPath("userData", userDataFolder());
+app.setName("StinkyMail");
+
+/**
+ * Datenordner. Die App hieß bis Oktober 2026 „StinkyMa“: Wer schon Daten hat (Konten, verschlüsselte Passwörter, Mails,
+ * Modelle), behält den bisherigen Ordner – sonst wären nach dem Update alle Konten weg. Neu: %APPDATA%/StinkyMail.
+ */
+function userDataFolder(): string {
+  const appData = app.getPath("appData");
+  const earlier = [join(appData, "StinkyMa"), join(appData, "@stinkyma", "desktop")].find((dir) => existsSync(join(dir, "mail.sqlite")));
+  return earlier ?? join(appData, "StinkyMail");
+}
 
 // Nur eine Instanz: ein zweiter Start holt das vorhandene Fenster nach vorn.
 const isPrimaryInstance = app.requestSingleInstanceLock();
@@ -169,7 +182,7 @@ function setUpServices(): void {
     onActionsUpdated: () => notifyRenderer(),
     // Kalendereintrag: .ics im Temp-Ordner ablegen und mit dem Standardprogramm (Outlook, Kalender) öffnen
     openCalendarFile: async (ics, filename) => {
-      const dir = join(app.getPath("temp"), "StinkyMa-Kalender");
+      const dir = join(app.getPath("temp"), "StinkyMail-Kalender");
       mkdirSync(dir, { recursive: true });
       const path = join(dir, safeFilename(filename));
       writeFileSync(path, ics, "utf8");
@@ -281,11 +294,11 @@ function showNewMailNotification(messages: Message[]): void {
   const count = messages.length;
   const notification =
     mode === "minimal"
-      ? new Notification({ title: "StinkyMa", body: de ? (count === 1 ? "Neue Mail" : `${count} neue Mails`) : count === 1 ? "New email" : `${count} new emails` })
+      ? new Notification({ title: "StinkyMail", body: de ? (count === 1 ? "Neue Mail" : `${count} neue Mails`) : count === 1 ? "New email" : `${count} new emails` })
       : count === 1
         ? new Notification({ title: displayName(first.from), body: first.subject || (de ? "(kein Betreff)" : "(no subject)") })
         : new Notification({
-            title: "StinkyMa",
+            title: "StinkyMail",
             body: de ? `${count} neue Mails – zuletzt von ${displayName(first.from)}` : `${count} new emails – latest from ${displayName(first.from)}`,
           });
   notification.on("click", () => {
@@ -308,11 +321,11 @@ function showWindow(): void {
 function createTray(): void {
   if (tray) return;
   tray = new Tray(nativeImage.createFromDataURL(trayIconDataUrl));
-  tray.setToolTip("StinkyMa");
+  tray.setToolTip("StinkyMail");
   const de = german();
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: de ? "StinkyMa öffnen" : "Open StinkyMa", click: () => showWindow() },
+      { label: de ? "StinkyMail öffnen" : "Open StinkyMail", click: () => showWindow() },
       { label: de ? "Jetzt abrufen" : "Check now", click: () => void service?.syncNow() },
       { type: "separator" },
       { label: de ? "Beenden" : "Quit", click: () => quitApp() },
@@ -334,7 +347,7 @@ async function updateTrayBadge(): Promise<void> {
     const unread = (await service.overview()).counts.unifiedInbox;
     if (!tray) return;
     tray.setImage(nativeImage.createFromDataURL(unread > 0 ? trayIconUnreadDataUrl : trayIconDataUrl));
-    tray.setToolTip(unread > 0 ? `StinkyMa – ${unread} ${german() ? "ungelesen" : "unread"}` : "StinkyMa");
+    tray.setToolTip(unread > 0 ? `StinkyMail – ${unread} ${german() ? "ungelesen" : "unread"}` : "StinkyMail");
   } catch {
     // Datenbank kurz nicht erreichbar – beim nächsten Mal
   }
@@ -371,7 +384,7 @@ const appSettingsApi: AppSettingsApi = {
 
 /** Geöffnete Anhänge landen in einem eigenen Temp-Ordner, der beim Start geleert wird. */
 function attachmentTempDir(): string {
-  return join(app.getPath("temp"), "StinkyMa-Anhaenge");
+  return join(app.getPath("temp"), "StinkyMail-Anhaenge");
 }
 
 /** Anhänge öffnen (Standardprogramm) und speichern (Dialog). Ausführbare Dateien werden nie geöffnet. */
@@ -402,7 +415,7 @@ const attachmentFiles: AttachmentFiles = {
   async read(attachmentId: string) {
     if (!service) throw new Error("Datenbank ist noch nicht bereit");
     const attachment = await service.attachmentContent(attachmentId);
-    if (!previewKind(attachment.filename, attachment.mimeType)) throw new Error("Dieses Format kann StinkyMa nicht selbst anzeigen.");
+    if (!previewKind(attachment.filename, attachment.mimeType)) throw new Error("Dieses Format kann StinkyMail nicht selbst anzeigen.");
     if (attachment.content.length > previewLimitBytes) throw new Error("Der Anhang ist zu groß für die Vorschau – bitte mit dem Standardprogramm öffnen.");
     return { filename: attachment.filename, mimeType: attachment.mimeType, contentBase64: attachment.content.toString("base64") };
   },
@@ -410,6 +423,25 @@ const attachmentFiles: AttachmentFiles = {
 
 /** IPC-Brücke: der Renderer darf nur die freigegebenen Methoden aufrufen – Mails lesen/ändern, Konten, Anhänge, KI. */
 function registerIpc(): void {
+  // Fremde Seite im Fenster innerhalb der App (Abmelde-Seiten) – Rahmen zeichnet die Oberfläche
+  const fromApp = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => !event.senderFrame?.url || isAppUrl(event.senderFrame.url);
+  ipcMain.handle("webPanel:open", (event, url: unknown) => {
+    if (!fromApp(event) || typeof url !== "string" || !mainWindow) throw new Error("Ungültiger Aufruf");
+    const win = mainWindow;
+    openWebPanel(win, url, (state) => win.webContents.send("webPanel:state", state));
+  });
+  ipcMain.on("webPanel:bounds", (event, bounds: unknown) => {
+    if (!fromApp(event) || !bounds || typeof bounds !== "object") return;
+    const b = bounds as Record<string, unknown>;
+    setWebPanelBounds({ x: Number(b.x), y: Number(b.y), width: Number(b.width), height: Number(b.height) });
+  });
+  ipcMain.handle("webPanel:close", (event) => {
+    if (fromApp(event)) closeWebPanel(mainWindow);
+  });
+  ipcMain.handle("webPanel:openExternal", async (event, url: unknown) => {
+    if (fromApp(event) && typeof url === "string" && url.startsWith("https://")) await shell.openExternal(url);
+  });
+
   const channels: [string, ReadonlySet<string>, () => object | null][] = [
     ["mail", new Set<string>(mailRepositoryMethods), () => service],
     ["accounts", new Set<string>(accountsApiMethods), () => service],
@@ -442,7 +474,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 560,
     show: false,
-    title: "StinkyMa",
+    title: "StinkyMail",
     icon: nativeImage.createFromDataURL(windowIconDataUrl),
     autoHideMenuBar: true,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#1f1f1f" : "#ffffff",
@@ -467,14 +499,15 @@ function createWindow(): void {
     if (!settings.flag("trayHintShown") && Notification.isSupported()) {
       settings.setFlag("trayHintShown");
       new Notification({
-        title: "StinkyMa",
+        title: "StinkyMail",
         body: german()
-          ? "StinkyMa läuft im Infobereich weiter. Beenden über das Symbol unten rechts – oder in den Optionen abschalten."
-          : "StinkyMa keeps running in the notification area. Quit via the tray icon – or turn this off in Options.",
+          ? "StinkyMail läuft im Infobereich weiter. Beenden über das Symbol unten rechts – oder in den Optionen abschalten."
+          : "StinkyMail keeps running in the notification area. Quit via the tray icon – or turn this off in Options.",
       }).show();
     }
   });
   mainWindow.on("closed", () => {
+    closeWebPanel(null);
     mainWindow = null;
   });
 

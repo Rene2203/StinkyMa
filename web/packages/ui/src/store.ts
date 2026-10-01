@@ -134,6 +134,24 @@ export interface BrowserState {
   cleanup: CleanupState | null;
   /** Abbestellen je Mail (geöffnete Mail, gewählte Gruppe beim Aufräumen) */
   unsubscribes: Record<string, UnsubscribeState>;
+  /** Offene fremde Seite im Fenster innerhalb der App; null = zu */
+  webPanel: WebPanelState | null;
+}
+
+/** Fremde Seite in einem Fenster innerhalb der App (Windows-App: abgeschottete Webansicht im Main-Prozess). */
+export interface WebPanelHost {
+  open(url: string): Promise<unknown>;
+  setBounds(bounds: { x: number; y: number; width: number; height: number }): void;
+  close(): Promise<unknown>;
+  openExternal(url: string): Promise<unknown>;
+  subscribe(callback: (state: WebPanelState | null) => void): () => void;
+}
+
+export interface WebPanelState {
+  url: string;
+  title: string;
+  loading: boolean;
+  error: string | null;
 }
 
 export interface UnsubscribeState {
@@ -236,6 +254,7 @@ export const initialState: BrowserState = {
   learnedSenders: [],
   cleanup: null,
   unsubscribes: {},
+  webPanel: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -298,10 +317,11 @@ export class BrowserStore {
   readonly #ai: AIApi | undefined;
   readonly #rules: RulesApi | undefined;
   readonly #cleanup: CleanupApi | undefined;
+  readonly #webPanel: WebPanelHost | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -311,6 +331,42 @@ export class BrowserStore {
     this.#ai = options.ai;
     this.#rules = options.rules;
     this.#cleanup = options.cleanup;
+    this.#webPanel = options.webPanel;
+  }
+
+  // --- Fremde Seite im Fenster innerhalb der App ---
+
+  get webPanelHost(): WebPanelHost | undefined {
+    return this.#webPanel;
+  }
+
+  /** Öffnet die Seite im Fenster in der App. `false`: geht hier nicht (z. B. im Browser) – dann extern öffnen. */
+  async openWebPanel(url: string): Promise<boolean> {
+    const host = this.#webPanel;
+    if (!host) return false;
+    this.#set({ webPanel: { url, title: "", loading: true, error: null } });
+    try {
+      await host.open(url);
+    } catch (e) {
+      this.#set({ webPanel: { url, title: "", loading: false, error: messageOf(e) } });
+    }
+    return true;
+  }
+
+  /** Meldung aus dem Main-Prozess (Titel, Laden, Fehler). */
+  updateWebPanel(state: WebPanelState | null): void {
+    if (this.#state.webPanel) this.#set({ webPanel: state });
+  }
+
+  async closeWebPanel(): Promise<void> {
+    this.#set({ webPanel: null });
+    await this.#webPanel?.close();
+  }
+
+  async openWebPanelExternally(): Promise<void> {
+    const url = this.#state.webPanel?.url;
+    if (url && this.#webPanel) await this.#webPanel.openExternal(url);
+    await this.closeWebPanel();
   }
 
   // --- Abbestellen ---

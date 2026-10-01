@@ -2,8 +2,8 @@
   "name": "@stinkyma/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "StinkyMa – KI-Mail-App für Windows",
-  "author": "StinkyMa",
+  "description": "StinkyMail – KI-Mail-App für Windows",
+  "author": "StinkyMail",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

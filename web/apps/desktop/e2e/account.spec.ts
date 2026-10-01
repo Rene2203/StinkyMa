@@ -130,7 +130,7 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
   await expect(page.getByText("Externe Inhalte wurden blockiert")).toBeVisible();
   // Geöffnet = gelesen, auch auf dem Server
   await expect(page.getByTestId("sidebar-unifiedInbox").locator(".badge")).toHaveText("1", { timeout: 1_000 });
-  expect(await page.title()).toBe("StinkyMa");
+  expect(await page.title()).toBe("StinkyMail");
   await expect(frame.locator("script")).toHaveCount(0);
   await expect(frame.locator("img[src*='tracker']")).toHaveCount(0);
   await page.screenshot({ path: join(screenshotDir, "08-HTML-Mail.png") });

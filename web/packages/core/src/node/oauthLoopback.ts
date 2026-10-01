@@ -14,7 +14,7 @@ import {
 // Code entgegen. Er prüft den `state` (gegen untergeschobene Anmeldungen) und beendet sich danach sofort.
 
 const page = (title: string, text: string) =>
-  `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>StinkyMa</title>
+  `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>StinkyMail</title>
 <style>body{font-family:"Segoe UI",system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0;background:#f5f5f7;color:#1b1b1b}
 main{background:#fff;padding:32px 40px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-width:420px}h1{font-size:20px;margin:0 0 8px}</style></head>
 <body><main><h1>${title}</h1><p>${text}</p></main></body></html>`;
@@ -58,7 +58,7 @@ export async function signInWithLoopback(options: LoopbackSignInOptions): Promis
     const error = url.searchParams.get("error");
     const code = url.searchParams.get("code");
     if (url.searchParams.get("state") !== pkce.state) {
-      res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" }).end(page("Anmeldung abgelehnt", "Die Antwort passt nicht zu dieser Anmeldung. Bitte in StinkyMa erneut starten."));
+      res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" }).end(page("Anmeldung abgelehnt", "Die Antwort passt nicht zu dieser Anmeldung. Bitte in StinkyMail erneut starten."));
       return;
     }
     if (error || !code) {
@@ -66,7 +66,7 @@ export async function signInWithLoopback(options: LoopbackSignInOptions): Promis
       rejectCode(new OAuthError(error === "access_denied" ? "Anmeldung abgebrochen." : `Anmeldung fehlgeschlagen (${error ?? "kein Code"}).`));
       return;
     }
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(page("Anmeldung abgeschlossen", "Du kannst dieses Fenster schließen und zu StinkyMa zurückkehren."));
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end(page("Anmeldung abgeschlossen", "Du kannst dieses Fenster schließen und zu StinkyMail zurückkehren."));
     resolveCode(code);
   };
 

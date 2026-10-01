@@ -15,6 +15,7 @@ unten abarbeiten.
 
 | Seit | Was | Wo in TypeScript |
 |------|-----|------------------|
+| 01.10.2026 | Migration `v15-unsubscribe`: Spalte `message.listUnsubscribe TEXT` (JSON; '' = keine; NULL = noch nicht gelesen), Tabelle `unsubscribed(address TEXT PRIMARY KEY, method TEXT, requestedAt TEXT)`; Abbestellen (Ein-Klick/Mail/Seite); App-Name „StinkyMail“ | `core/src/unsubscribe.ts`, `mail/cleanupService.ts`, `mail/parse.ts` |
 | 01.10.2026 | Migration `v14-account-sync-days`: Spalte `account.syncDays INTEGER` (NULL = 30 Tage, 0 = alle); kürzer → ältere Mails lokal entfernen, nachgeladene alte Mails lösen keine Benachrichtigung/Regel aus; viele Verschiebungen als ein MOVE | `core/src/models.ts` (`syncSince`), `mail/mailService.ts` (`setSyncDays`, `#applyMoves`), `mail/accountSync.ts` (`arrivedSince`) |
 | 01.10.2026 | Aufräumen: Gruppen nach Absender/Domain, Schutz-Regeln (Rechnung, Bestellung, Ticket, Zugangsdaten …), Löschen in den Papierkorb, „KI prüfen“ vorrangig | `core/src/cleanup.ts`, `sqlite/cleanupStore.ts`, `mail/cleanupService.ts`, `llm/aiService.ts` (`categorizeMessages`) |
 | 01.10.2026 | Migration `v13-sender-category`: Tabelle `senderCategory(address TEXT PRIMARY KEY, category TEXT, learnedAt TEXT)`; `message.categoryOrigin` kennt zusätzlich „user“ und „learned“ | `core/src/sqlite/schema.ts`, `sqlite/aiStore.ts` |

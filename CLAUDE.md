@@ -25,7 +25,7 @@
 
 Seit 30.09.2026: zuerst Windows-App, dann Server mit Browser (`docs/ROADMAP-WINDOWS.md`).
 **iPad/Mac (Swift) ist zurückgestellt** (Entscheidung des Nutzers): keinen Swift-Code ändern, Apple-CI läuft nur
-von Hand. Das Ziel iPad/Mac bleibt – bis dahin erreicht das iPad StinkyMa über die Server-Version im Browser.
+von Hand. Das Ziel iPad/Mac bleibt – bis dahin erreicht das iPad StinkyMail über die Server-Version im Browser.
 - `web/packages/core`: plattformneutral (kein Electron/DOM). SQLite-Teil nur über `@stinkyma/core/sqlite`,
   Node-spezifisches über `@stinkyma/core/node` – damit die Oberfläche kein natives Modul einbündelt.
 - `web/packages/ui`: spricht nur mit `MailRepository`. UI-Texte in `packages/ui/src/i18n.ts` (de + en).

@@ -1,8 +1,9 @@
-# Windows-Installer (NSIS). Arbeitsname „StinkyMa“ – der endgültige App-Name ist noch offen.
+# Windows-Installer (NSIS). App-Name „StinkyMail“ (bis Oktober 2026: „StinkyMa“). appId bleibt gleich, damit der
+# neue Installer die alte Version ersetzt; der Datenordner bleibt ebenfalls (siehe userDataFolder in src/main/index.ts).
 appId: de.stinkyma.app
-productName: StinkyMa
-executableName: StinkyMa
-copyright: Copyright © 2026 StinkyMa
+productName: StinkyMail
+executableName: StinkyMail
+copyright: Copyright © 2026 StinkyMail
 directories:
   output: release
   buildResources: build
@@ -26,13 +27,13 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: StinkyMa-Setup-${version}.${ext}
+  artifactName: StinkyMail-Setup-${version}.${ext}
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: StinkyMa
+  shortcutName: StinkyMail
   language: "1031"
   installerLanguages: [de_DE, en_US]

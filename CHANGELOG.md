@@ -16,6 +16,11 @@
   Regel „künftige Mails auch in den Papierkorb“. „KI prüfen lassen“ ordnet noch nicht eingeordnete Mails der Gruppe
   vorrangig ein (im Hintergrund, mit geschätzter Dauer).
 - Verschieben vieler Mails zwischen denselben Ordnern geht als **ein** Server-Befehl (statt einer pro Mail).
+- **Newsletter abbestellen** mit einem Klick (in der Mail und beim Aufräumen): Ein-Klick-Abmeldung beim Anbieter, sonst
+  Abmelde-Mail, sonst Abmelde-Seite – die öffnet in einem **verschiebbaren Fenster in der App** (Hintergrund abgedunkelt,
+  Seite abgeschottet: kein Zugriff auf die App, nichts gespeichert, keine Downloads). Bei Spam-Verdacht rät die App ab.
+  Danach: „Vorhandene Mails aufräumen“. Migration `v15-unsubscribe`.
+- **Neuer Name: StinkyMail.** Daten, Konten und Einstellungen bleiben beim Update erhalten.
 
 ## W6 – Assistent
 

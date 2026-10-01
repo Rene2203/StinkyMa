@@ -3,13 +3,14 @@ import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
 import { CleanupDialog } from "./components/CleanupDialog.js";
+import { WebPanelDialog } from "./components/WebPanelDialog.js";
 import { DigestDialog } from "./components/DigestDialog.js";
 import { composeLabels } from "./composeLabels.js";
 import { MessageList } from "./components/MessageList.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { UiContext, useBrowserState, useUi } from "./context.js";
 import { translator, type Locale } from "./i18n.js";
-import { BrowserStore, selectedMessage } from "./store.js";
+import { BrowserStore, selectedMessage, type WebPanelHost } from "./store.js";
 
 // Das Mail-Fenster (mit Editor) wird erst beim ersten Öffnen geladen – schnellerer Start auf schwachen Rechnern.
 const Composer = lazy(() => import("./components/Composer.js"));
@@ -29,6 +30,7 @@ export interface AppProps {
   ai?: AIApi;
   rules?: RulesApi;
   cleanup?: CleanupApi;
+  webPanel?: WebPanelHost;
   /** Meldet Statusänderungen der KI (Download-Fortschritt usw.). */
   subscribeAIStatus?: (onStatus: (status: AIStatus) => void) => () => void;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
@@ -39,8 +41,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup }), [repository, accounts, files, settings, ai, rules, cleanup]);
+export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export function App({ repository, locale, accounts, files, settings, ai, rules, 
   useEffect(() => subscribeAIStatus?.((status) => store.setAIStatus(status)), [store, subscribeAIStatus]);
   useEffect(() => subscribeOpenMessage?.((id) => void store.openMessage(id)), [store, subscribeOpenMessage]);
   useEffect(() => subscribeOpenDigest?.(() => void store.openDigest()), [store, subscribeOpenDigest]);
+  useEffect(() => webPanel?.subscribe((s) => store.updateWebPanel(s)), [store, webPanel]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -85,6 +88,7 @@ function Shell() {
       )}
       {state.digest && <DigestDialog />}
       {state.cleanup && <CleanupDialog />}
+      {state.webPanel && <WebPanelDialog />}
       {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}
       {state.error && (
         <div className="error-banner" role="alert">

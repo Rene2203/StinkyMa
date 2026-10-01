@@ -68,4 +68,4 @@ Reihenfolge laut Nutzer: **Windows zuerst**, Server danach.
 
 ## Offene Fragen an den Nutzer
 - (für S1, später) Welche Server laufen dauerhaft, Betriebssystem, Docker?
-- App-Name (Arbeitsname „StinkyMa“)
+- ~~App-Name~~ → entschieden (01.10.2026): **StinkyMail** (sichtbarer Name der Windows-App; interne Bezeichner `stinkyma`, Repo und Swift-Projekt bleiben vorerst)

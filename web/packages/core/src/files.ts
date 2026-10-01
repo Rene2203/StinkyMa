@@ -17,7 +17,7 @@ export const previewLimitBytes = 30 * 1024 * 1024;
 
 export type PreviewKind = "pdf" | "image" | "text";
 
-/** Kann StinkyMa den Anhang selbst anzeigen? Bilder nur in sicheren Rasterformaten (kein SVG – das kann Skripte enthalten). */
+/** Kann StinkyMail den Anhang selbst anzeigen? Bilder nur in sicheren Rasterformaten (kein SVG – das kann Skripte enthalten). */
 export function previewKind(filename: string, mimeType: string): PreviewKind | null {
   const extension = filename.toLowerCase().split(".").pop() ?? "";
   if (mimeType === "application/pdf" || extension === "pdf") return "pdf";

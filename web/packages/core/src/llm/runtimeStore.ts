@@ -37,7 +37,7 @@ export const llamaRuntimeAssets: Partial<Record<string, RuntimeAsset>> = {
 
 export class RuntimeStore {
   constructor(
-    /** Ordner für Laufzeiten (z. B. %APPDATA%/StinkyMa/runtime). */
+    /** Ordner für Laufzeiten (z. B. %APPDATA%/StinkyMail/runtime). */
     private readonly directory: string,
     private readonly options: { platform?: string; fetchImpl?: typeof fetch; asset?: RuntimeAsset } = {},
   ) {}

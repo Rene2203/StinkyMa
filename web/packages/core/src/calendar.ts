@@ -42,7 +42,7 @@ function addMinutes(date: string, time: string, minutes: number): { date: string
 
 export function toICalendar(event: CalendarEvent, now: Date = new Date()): string {
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StinkyMa//DE", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:${event.uid}`, `DTSTAMP:${stamp}`];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//StinkyMail//DE", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:${event.uid}`, `DTSTAMP:${stamp}`];
   if (event.time) {
     // „Schwebende“ Ortszeit: der Kalender nimmt die Zeitzone des Rechners
     const end = addMinutes(event.date, event.time, event.durationMinutes ?? 60);

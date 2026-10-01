@@ -48,5 +48,17 @@ contextBridge.exposeInMainWorld("stinkyma", {
     ipcRenderer.on("ai:status", listener);
     return () => ipcRenderer.removeListener("ai:status", listener);
   },
+  /** Fremde Seite in einem Fenster innerhalb der App (Rahmen in der Oberfläche, Seite abgeschottet im Main-Prozess). */
+  webPanel: {
+    open: (url: string) => ipcRenderer.invoke("webPanel:open", url),
+    setBounds: (bounds: { x: number; y: number; width: number; height: number }) => ipcRenderer.send("webPanel:bounds", bounds),
+    close: () => ipcRenderer.invoke("webPanel:close"),
+    openExternal: (url: string) => ipcRenderer.invoke("webPanel:openExternal", url),
+    subscribe: (callback: (state: unknown) => void) => {
+      const listener = (_event: unknown, state: unknown) => callback(state);
+      ipcRenderer.on("webPanel:state", listener);
+      return () => ipcRenderer.removeListener("webPanel:state", listener);
+    },
+  },
   platform: process.platform,
 });

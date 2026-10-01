@@ -66,5 +66,7 @@ function demoListUnsubscribe(category: string | null, address: string): string {
   if (category !== "newsletter") return "";
   const domain = address.split("@")[1] ?? "newsletter.example";
   const url = `https://${domain}/abmelden`;
+  // Ein Beispiel nur mit Abmelde-Seite (öffnet im Fenster in der App)
+  if (domain.startsWith("tech-briefing")) return JSON.stringify({ oneClickUrl: null, url, mailto: null });
   return JSON.stringify({ oneClickUrl: url, url, mailto: { address: `abmelden@${domain}`, subject: "unsubscribe", body: "unsubscribe" } });
 }

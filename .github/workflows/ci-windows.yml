@@ -88,6 +88,6 @@ jobs:
       - name: Installer hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: StinkyMa-Windows-Installer
+          name: StinkyMail-Windows-Installer
           path: web/apps/desktop/release/*.exe
           if-no-files-found: error

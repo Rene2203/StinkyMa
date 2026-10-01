@@ -41,7 +41,7 @@ export function fileNameFromUrl(url: string): string {
 
 export class ModelStore {
   constructor(
-    /** Ordner für Modelle (z. B. %APPDATA%/StinkyMa/models). */
+    /** Ordner für Modelle (z. B. %APPDATA%/StinkyMail/models). */
     private readonly directory: string,
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}

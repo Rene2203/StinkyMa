@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft und vom Nutzer unter Windows mit echtem Gmail-Konto getestet – **W6 abgeschlossen**. Danach (Wunsch des Nutzers): Zeitraum „alle Mails“ und **Aufräumen** – gebaut, lokal geprüft. Als Nächstes: Feinabstimmung der Modelle
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft und vom Nutzer unter Windows mit echtem Gmail-Konto getestet – **W6 abgeschlossen**. Danach (Wunsch des Nutzers): Zeitraum „alle Mails“, **Aufräumen**, **Newsletter abbestellen** (Abmelde-Seite im verschiebbaren Fenster in der App) und Umbenennung in **StinkyMail** – gebaut, lokal geprüft. Als Nächstes: Feinabstimmung der Modelle
 
 ## Überblick
 
@@ -68,7 +68,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 
 - Heimserver: Rollen der drei Rechner, Betriebssystem/Docker auf dem N97 (für Phase S1)
 
-- App-Name (Arbeitsname „StinkyMa“), Bundle-ID `de.stinkyma.*` ist Platzhalter
+- App-Name: **StinkyMail** (Entscheidung des Nutzers, 01.10.2026); Bundle-ID `de.stinkyma.*` bleibt (Windows: gleiche appId, damit der Installer die alte Version ersetzt)
 - Private Nutzung oder App-Store-Release
 - Kuratierte Modellliste, Heimserver-Funktionen, Web/Windows, Beleg-Export, Türsteher-Standard
 
@@ -484,4 +484,22 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   abgewählt, Löschen nach Bestätigung, Regel angelegt). Lokal: 387 Tests + 9 E2E grün. **Ungeprüft:** echtes großes
   Gmail-Konto (Dauer, Speicher, Gmail-Tageslimit beim ersten vollständigen Abruf, Verhalten von „Alle Nachrichten“ beim
   Löschen), Trefferquote der Schutz-Regeln an echten Mails, Windows-CI.
+- **Newsletter abbestellen (01.10.2026):** Abmelde-Angabe der Mail (List-Unsubscribe; Ein-Klick nach RFC 8058) wird beim
+  Abruf gespeichert (Migration v15), bei älteren Mails werden nur diese zwei Kopfzeilen bei Bedarf vom Server geholt.
+  Leiste „Abbestellen“ in der Mail und im Aufräumen-Dialog; Weg: Ein-Klick beim Anbieter → Abmelde-Mail über das eigene
+  Konto (Empfänger wird nicht als Kontakt gemerkt) → Abmelde-Seite. Nur https, einfache Adresse, keine Kopfzeilen-Tricks;
+  bei Spam-Verdacht rät die App ab. Danach Link „Vorhandene Mails aufräumen“. **Abmelde-Seite (Wunsch des Nutzers):** in
+  einem verschiebbaren Fenster innerhalb der App mit abgedunkeltem Hintergrund – die Seite läuft abgeschottet
+  (`WebContentsView` mit Sandbox, eigene Sitzung nur im Arbeitsspeicher und beim Schließen geleert, nur https, keine
+  Popups/Downloads/Berechtigungen). Geprüft: Parser (Unsicheres wird verworfen), Dienst (Ein-Klick/Status/offline, Mail,
+  Seite, Beispielkonten ohne Netz), GreenMail (Angabe beim Abruf gelesen, vom Server nachgeholt, Abmelde-Mail kommt an),
+  E2E (Ein-Klick in der echten App; Abmelde-Fenster erscheint, wandert beim Ziehen mit, verschwindet beim Schließen).
+  **Ungeprüft:** echte Anbieter (ob sie Ein-Klick korrekt annehmen), Darstellung echter Abmelde-Seiten im Fenster (im
+  Container kein Internet), Windows-CI.
+- **Umbenennung in StinkyMail (Wunsch des Nutzers, 01.10.2026):** Fenster, Infobereich, Benachrichtigungen, Texte,
+  Installer (`StinkyMail-Setup-….exe`, Verknüpfung „StinkyMail“), X-Mailer, Kalender-PRODID. Gleich geblieben: appId
+  `de.stinkyma.app` (Installer ersetzt die alte Version, Autostart-Eintrag bleibt derselbe) und der **Datenordner** – gibt
+  es schon `%APPDATA%\StinkyMa\mail.sqlite`, nutzt StinkyMail diesen weiter (Konten, Passwörter, Mails bleiben), sonst
+  `%APPDATA%\StinkyMail`. Interne Namen (`@stinkyma/*`, `STINKYMA_*`, Repo, Swift-Projekt) unverändert. Lokal: 396 Tests +
+  11 E2E grün. **Ungeprüft:** Update-Installation über eine vorhandene StinkyMa-Installation unter Windows.
 

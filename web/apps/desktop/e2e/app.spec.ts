@@ -167,6 +167,32 @@ test("Newsletter abbestellen mit einem Klick, danach aufräumen", async () => {
   await expect(dialog).toHaveCount(0);
 });
 
+test("Abmelde-Seite öffnet in einem verschiebbaren Fenster in der App, abgeschottet", async () => {
+  await rows().filter({ hasText: "Wochenrückblick" }).click();
+  const bar = page.getByTestId("unsubscribe-bar");
+  await expect(bar).toContainText("Abmelde-Seite im Browser");
+  await bar.getByTestId("unsubscribe").click();
+  const panel = page.getByTestId("webpanel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId("webpanel-host")).toHaveText("tech-briefing.example");
+  const views = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.contentView.children.map((v) => v.getBounds()) ?? []);
+  await expect.poll(async () => (await views()).length).toBe(1);
+  await expect.poll(async () => (await views())[0]?.width ?? 0).toBeGreaterThan(100);
+  const before = (await views())[0]!;
+  await shot("30-Abmelde-Seite");
+  // Verschieben an der Titelleiste: die Seite wandert mit
+  const box = (await panel.getByTestId("webpanel-bar").boundingBox())!;
+  await page.mouse.move(box.x + 60, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 40, box.y + box.height / 2 + 30, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await views())[0]?.x ?? 0).toBeLessThan(before.x);
+  await panel.getByTestId("webpanel-close").click();
+  await expect(panel).toHaveCount(0);
+  await expect.poll(async () => (await views()).length).toBe(0);
+  await expect(page.getByTestId("unsubscribe-done")).toContainText("Abmelde-Seite geöffnet");
+});
+
 test("Aufräumen: größter Absender, Geschütztes bleibt abgewählt, Löschen erst nach Bestätigung", async () => {
   await page.getByTestId("open-cleanup").click();
   const dialog = page.getByTestId("cleanup-dialog");

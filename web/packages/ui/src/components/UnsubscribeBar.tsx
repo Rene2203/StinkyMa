@@ -14,7 +14,8 @@ export function UnsubscribeBar({ messageId, showCleanup = true }: { messageId: s
 
   const run = async () => {
     const result = await store.unsubscribe(messageId);
-    if (result?.method === "web" && result.url) window.open(result.url, "_blank", "noopener,noreferrer");
+    // Abmelde-Seite: im Fenster innerhalb der App, sonst (z. B. im Browser) in einem neuen Tab
+    if (result?.method === "web" && result.url && !(await store.openWebPanel(result.url))) window.open(result.url, "_blank", "noopener,noreferrer");
   };
 
   if (view.done) {
@@ -23,6 +24,11 @@ export function UnsubscribeBar({ messageId, showCleanup = true }: { messageId: s
       <div className="unsubscribe-bar done" role="status" data-testid="unsubscribe-done">
         <MailMinus size={15} aria-hidden="true" />
         <span>{t(`unsubscribe.done.${view.done.method}`, { date })}</span>
+        {view.done.method === "web" && view.info?.url && (
+          <button type="button" className="link" data-testid="unsubscribe-reopen" onClick={() => void (view.info?.url && store.openWebPanel(view.info.url).then((ok) => ok || window.open(view.info?.url ?? "", "_blank", "noopener,noreferrer")))}>
+            {t("unsubscribe.reopen")}
+          </button>
+        )}
         {showCleanup && store.canCleanup && (
           <button type="button" className="link" data-testid="unsubscribe-cleanup" onClick={() => void store.openCleanupFor(view.sender)}>
             <Broom size={13} aria-hidden="true" /> {t("unsubscribe.cleanup")}
