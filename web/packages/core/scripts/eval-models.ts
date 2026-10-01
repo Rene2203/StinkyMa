@@ -33,8 +33,6 @@ if (summariesOnly) args.splice(args.indexOf("--summaries"), 1);
 // --summary-v2: Zusammenfassung mit der älteren Fassung v2 (Vergleich)
 const summaryV2 = args.includes("--summary-v2");
 if (summaryV2) args.splice(args.indexOf("--summary-v2"), 1);
-const summaryV4 = args.includes("--summary-v4");
-if (summaryV4) args.splice(args.indexOf("--summary-v4"), 1);
 const all = args.includes("--all");
 for (const name of ["--holdout", "--all"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
 const mails = holdout ? evalHoldoutMails : all ? [...evalMails, ...evalHoldoutMails] : evalMails;
@@ -106,8 +104,8 @@ if (summariesOnly) {
     try {
       const { loadMs } = await provider.load();
       for (const [label, set] of [["Testsatz", evalThreads], ["Kontrollsatz", evalHoldoutThreads]] as const) {
-        const report = await evaluateProvider(provider, { loadMs, mails: [], threads: set, ...(summaryV2 ? { summaryPromptVersion: 2 as const } : summaryV4 ? { summaryPromptVersion: 4 as const } : {}), onProgress: (p) => process.stderr.write(`\r${model.id} ${label}: ${p.done}/${p.total}   `) });
-        reports.push({ ...report, displayName: `${report.displayName} ${summaryV2 ? "v2" : summaryV4 ? "v4" : "v3"} (${label})` });
+        const report = await evaluateProvider(provider, { loadMs, mails: [], threads: set, ...(summaryV2 ? { summaryPromptVersion: 2 as const } : {}), onProgress: (p) => process.stderr.write(`\r${model.id} ${label}: ${p.done}/${p.total}   `) });
+        reports.push({ ...report, displayName: `${report.displayName} ${summaryV2 ? "v2" : "v4"} (${label})` });
         process.stderr.write("\n");
         if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
       }

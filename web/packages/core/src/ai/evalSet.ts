@@ -279,7 +279,8 @@ export const evalThreads: EvalThread[] = [
 ];
 
 /**
- * Kontrollsatz für Zusammenfassungen (geschrieben am 01.10.2026 vor der Feinabstimmung v3, nie zum Verbessern benutzt):
+ * Kontrollsatz für Zusammenfassungen (geschrieben am 01.10.2026 vor der Feinabstimmung). Ehrlich: Die Fehler von v3 hier
+ * flossen in den Entwurf von v4 ein – der Satz ist damit nicht mehr ganz unberührt.
  * prüft, ob „wer ist dran“ auch bei neuen Konversationen stimmt – inklusive Fällen, in denen die letzte Mail von
  * jemand anderem stammt, aber der Nutzer trotzdem wartet (und umgekehrt).
  */

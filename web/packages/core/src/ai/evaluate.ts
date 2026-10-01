@@ -117,7 +117,7 @@ function median(values: number[]): number {
 
 export async function evaluateProvider(
   provider: AIProvider,
-  options: { mails?: EvalMail[]; threads?: EvalThread[]; loadMs?: number; signal?: AbortSignal; onProgress?: (progress: EvalProgress) => void; summaryPromptVersion?: 2 | 3 | 4 } = {},
+  options: { mails?: EvalMail[]; threads?: EvalThread[]; loadMs?: number; signal?: AbortSignal; onProgress?: (progress: EvalProgress) => void; summaryPromptVersion?: 2 | 4 } = {},
 ): Promise<EvalReport> {
   if (provider.privacyClass !== "onDevice") throw new Error("Der Messlauf ist nur für Modelle auf diesem Gerät gedacht.");
   const mails = options.mails ?? evalMails;
