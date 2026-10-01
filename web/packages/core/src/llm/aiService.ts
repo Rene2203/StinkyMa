@@ -11,7 +11,7 @@ import { draftReplies } from "../ai/replies.js";
 import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
-import { AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse } from "../ai/types.js";
+import { AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse, type AITask } from "../ai/types.js";
 import type { Message } from "../models.js";
 import type { AIResultStore, StoredReading, StoredSummary } from "../sqlite/aiStore.js";
 import { LlamaCppProvider } from "./llamaProvider.js";
@@ -68,7 +68,9 @@ export class AIService implements AIApi {
   #active: ManagedProvider | null = null;
   #engine: Promise<unknown> = Promise.resolve();
   #download: { kind: "model" | "vision"; modelId: string; receivedBytes: number; totalBytes: number; controller: AbortController } | null = null;
-  #categorizing: { remaining: number } | null = null;
+  #categorizing: { remaining: number; done: number; total: number } | null = null;
+  #activity: { task: AITask; startedAt: string } | null = null;
+  #waiting = 0;
   #categorizeRequested = false;
   #error: string | null = null;
   #lastProgressAt = 0;
@@ -86,6 +88,9 @@ export class AIService implements AIApi {
   }
 
   async status(): Promise<AIStatus> {
+    // Laufende Aufgabe zum Zeitpunkt des Aufrufs festhalten (das Folgende wartet auf Dateizugriffe)
+    const activity = this.#activity ? { ...this.#activity, waiting: this.#waiting } : null;
+    const categorizing = this.#categorizing ? { ...this.#categorizing } : null;
     const models: AIModelInfo[] = [];
     let selectedInstalled = false;
     for (const model of this.#catalog) {
@@ -115,7 +120,8 @@ export class AIService implements AIApi {
       ready: this.#settings.enabled && selectedInstalled,
       download: this.#download ? { kind: this.#download.kind, modelId: this.#download.modelId, receivedBytes: this.#download.receivedBytes, totalBytes: this.#download.totalBytes } : null,
       vision: await this.#visionStatus(),
-      categorizing: this.#categorizing ? { ...this.#categorizing } : null,
+      categorizing,
+      activity,
       error: this.#error,
     };
   }
@@ -362,10 +368,19 @@ export class AIService implements AIApi {
       contextWindow: provider.contextWindow,
       acceptsImages: provider.acceptsImages,
       generate: (request: AIRequest, signal?: AbortSignal) => {
+        this.#waiting++;
         const run = this.#engine.then(async () => {
-          if (this.#active && this.#active !== provider) await this.#active.unload();
-          this.#active = provider;
-          return this.#withTimeout(provider, request, signal);
+          this.#waiting = Math.max(0, this.#waiting - 1);
+          this.#activity = { task: request.task, startedAt: (this.options.now?.() ?? new Date()).toISOString() };
+          void this.#emit();
+          try {
+            if (this.#active && this.#active !== provider) await this.#active.unload();
+            this.#active = provider;
+            return await this.#withTimeout(provider, request, signal);
+          } finally {
+            this.#activity = null;
+            void this.#emit();
+          }
         });
         this.#engine = run.catch(() => undefined);
         return run;
@@ -609,6 +624,12 @@ export class AIService implements AIApi {
    * Ordnet neue Mails im Hintergrund ein (nacheinander, eine nach der anderen). Mehrfachaufrufe während eines
    * Laufs führen zu genau einem weiteren Durchgang.
    */
+  async resume(): Promise<AIStatus> {
+    this.#error = null;
+    this.categorizeInBackground();
+    return this.#emit();
+  }
+
   categorizeInBackground(): void {
     if (this.#categorizing) {
       this.#categorizeRequested = true;
@@ -629,7 +650,8 @@ export class AIService implements AIApi {
         if (!(error instanceof AINotConfiguredError)) this.#error = error instanceof Error ? error.message : String(error);
         break;
       }
-      this.#categorizing = { remaining: this.options.results.uncategorizedCount(since()) };
+      const total = this.options.results.uncategorizedCount(since());
+      this.#categorizing = { remaining: total, done: 0, total };
       await this.#emit();
       let failures = 0;
       for (;;) {
@@ -657,7 +679,10 @@ export class AIService implements AIApi {
           }
         }
         this.options.onCategorized?.();
-        this.#categorizing = { remaining: Math.max(0, (this.#categorizing?.remaining ?? 1) - 1) };
+        const remaining = this.options.results.uncategorizedCount(since());
+        const current: { remaining: number; done: number; total: number } = this.#categorizing ?? { remaining, done: 0, total: remaining };
+        // Neue Mails während des Laufs vergrößern das Ziel, statt die Anzeige rückwärts laufen zu lassen
+        this.#categorizing = { remaining, done: current.done + 1, total: Math.max(current.total, current.done + 1 + remaining) };
         await this.#emit();
       }
       this.#categorizing = null;
@@ -690,9 +715,13 @@ export class AIService implements AIApi {
     await current?.provider.dispose();
   }
 
+  #emitSeq = 0;
+
+  /** Status an die Oberfläche – nur der neueste: ältere, die sich überholt haben, würden „arbeitet …“ stehen lassen. */
   async #emit(): Promise<AIStatus> {
+    const seq = ++this.#emitSeq;
     const status = await this.status();
-    this.options.onStatus?.(status);
+    if (seq === this.#emitSeq) this.options.onStatus?.(status);
     return status;
   }
 

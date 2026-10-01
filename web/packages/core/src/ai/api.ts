@@ -1,4 +1,5 @@
 import type { DigestView } from "../digest.js";
+import type { AITask } from "./types.js";
 import type { MailAction } from "./actions.js";
 import type { CatalogModel, ModelCapability } from "./catalog.js";
 import type { DocumentType } from "./prompts.js";
@@ -67,7 +68,12 @@ export interface AIStatus {
    */
   vision: { state: "unavailable" | "missing" | "downloading" | "ready"; missingBytes: number };
   /** Hintergrund-Einordnung: noch offene Mails (null = läuft nicht). */
-  categorizing: { remaining: number } | null;
+  categorizing: { remaining: number; done: number; total: number } | null;
+  /**
+   * Was die KI gerade rechnet (für die Anzeige „arbeitet …“): Aufgabe, Beginn (ISO) und wie viele Aufgaben warten.
+   * null = Leerlauf.
+   */
+  activity: { task: AITask; startedAt: string; waiting: number } | null;
   /** Letzter Fehler (Download, Laden des Modells) – verständlich, ohne Mail-Inhalte. */
   error: string | null;
 }
@@ -163,6 +169,8 @@ export interface AIApi {
   replyDrafts(messageId: string): Promise<ReplyDraftsView>;
   /** Tagesüberblick: Fälliges, wichtige ungelesene Mails, „wartet auf dich“ (ohne Modell, sofort). */
   dailyDigest(): Promise<DigestView>;
+  /** Nach einem Fehler: Fehler vergessen und die Einordnung neu anstoßen. */
+  resume(): Promise<AIStatus>;
 }
 
-export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest"] as const satisfies readonly (keyof AIApi)[];
+export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume"] as const satisfies readonly (keyof AIApi)[];

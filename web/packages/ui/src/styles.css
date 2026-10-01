@@ -725,6 +725,13 @@ button.attachment-open:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* Bleibt sichtbar, auch wenn viele Ordner die Seitenleiste scrollen lassen (Abrufstatus, KI-Anzeige) */
+  position: sticky;
+  bottom: -16px;
+  margin-bottom: -16px;
+  padding-bottom: 16px;
+  background: var(--bg-sidebar);
+  box-shadow: 0 -8px 8px -8px color-mix(in srgb, var(--fg) 15%, transparent);
 }
 
 .demo-hint {
@@ -2404,4 +2411,95 @@ button.attachment-open:hover {
 
 .digest-header > div {
   flex: 1;
+}
+
+/* KI-Aktivität unten in der Seitenleiste */
+.ai-activity {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--purple, #8a5cf5) 8%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--purple, #8a5cf5) 30%, var(--border));
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.ai-activity > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--purple, #8a5cf5);
+}
+
+.ai-activity.error {
+  cursor: default;
+  align-items: center;
+  background: color-mix(in srgb, var(--orange, #e8912d) 10%, var(--bg));
+  border-color: color-mix(in srgb, var(--orange, #e8912d) 40%, var(--border));
+}
+
+.ai-activity.error > svg {
+  color: var(--orange, #e8912d);
+}
+
+.ai-activity-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-activity-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-progress {
+  display: block;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--purple, #8a5cf5) 18%, var(--bg));
+  overflow: hidden;
+}
+
+.ai-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--purple, #8a5cf5);
+  transition: width 0.4s ease;
+}
+
+.ai-progress.indeterminate > span {
+  width: 35%;
+  animation: ai-progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes ai-progress-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+.pulsing {
+  animation: ai-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-progress.indeterminate > span,
+  .pulsing {
+    animation: none;
+  }
 }

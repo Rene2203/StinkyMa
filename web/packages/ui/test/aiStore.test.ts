@@ -13,6 +13,7 @@ function status(overrides: Partial<AIStatus> = {}): AIStatus {
     ready: true,
     download: null,
     categorizing: null,
+    activity: null,
     error: null,
     ...overrides,
   };
@@ -65,6 +66,10 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     },
     cancelReminder: async (id) => {
       calls.push(`cancel:${id}`);
+    },
+    resume: async () => {
+      calls.push("resume");
+      return status({ ready: true });
     },
     dailyDigest: async () => {
       calls.push("digest");
@@ -272,5 +277,13 @@ describe("BrowserStore – KI", () => {
     expect(store.getState().digest).toBeNull();
     expect(store.getState().selectedMessageId).toBe(first.id);
     expect(new BrowserStore(new InMemoryMailRepository(createMockData())).canShowDigest).toBe(false);
+  });
+
+  it("„Weiter einordnen“ reicht durch und übernimmt den neuen Status", async () => {
+    const ai = fakeAI();
+    const store = await setup(ai);
+    await store.resumeAI();
+    expect(ai.calls).toContain("resume");
+    expect(store.getState().ai?.ready).toBe(true);
   });
 });

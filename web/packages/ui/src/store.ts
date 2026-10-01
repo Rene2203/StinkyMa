@@ -401,6 +401,13 @@ export class BrowserStore {
     }
   }
 
+  /** Nach einem KI-Fehler: weiter einordnen. */
+  async resumeAI(): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    await this.#guard(async () => this.setAIStatus(await ai.resume()));
+  }
+
   /** Gibt es den Tagesüberblick (nur Windows-App)? */
   get canShowDigest(): boolean {
     return !!this.#ai;

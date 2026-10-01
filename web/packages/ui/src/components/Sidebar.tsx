@@ -2,6 +2,7 @@ import { AlertTriangle, LogIn, Plus, RefreshCw, Send, Settings, Sun, X } from "l
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
+import { AIActivity } from "./AIActivity.js";
 import { sidebarIcon } from "../icons.js";
 import type { SidebarItem } from "../store.js";
 import type { Translate } from "../i18n.js";
@@ -138,6 +139,7 @@ export function Sidebar() {
               ))}
           </div>
         )}
+        <AIActivity />
         <div className="sync-row">
           <span className="muted small" data-testid="sync-status">
             {!store.canManageAccounts

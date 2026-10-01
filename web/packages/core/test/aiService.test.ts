@@ -34,10 +34,13 @@ class FakeProvider implements ManagedProvider {
   failWhen: ((request: AIRequest) => boolean) | null = null;
   /** Hängt (antwortet nie, bis abgebrochen) */
   hangWhen: ((request: AIRequest) => boolean) | null = null;
+  /** Rechenzeit (wie ein echtes Modell) */
+  delayMs = 0;
   constructor(readonly id: string) {
     this.displayName = id;
   }
   async generate(request: AIRequest, signal?: AbortSignal) {
+    if (this.delayMs) await new Promise((r) => setTimeout(r, this.delayMs));
     if (this.fail) throw new Error("Modell abgestürzt");
     if (this.failWhen?.(request)) throw new Error("Kontext zu klein");
     if (this.hangWhen?.(request)) {
@@ -102,7 +105,7 @@ function setup(initial: Partial<AISettings> = {}, options: { failing?: boolean; 
 }
 
 async function until(condition: () => boolean) {
-  for (let i = 0; i < 200 && !condition(); i++) await new Promise((r) => setTimeout(r, 5));
+  for (let i = 0; i < 600 && !condition(); i++) await new Promise((r) => setTimeout(r, 5));
   expect(condition()).toBe(true);
 }
 
@@ -159,7 +162,7 @@ describe("AIService", () => {
   });
 
   it("ordnet Posteingangsmails im Hintergrund ein und merkt sich die Herkunft", async () => {
-    const { service, install, results, db, categorized, statuses } = setup();
+    const { service, install, results, db, categorized, statuses } = setup({}, { configure: (p) => (p.delayMs = 15) });
     install("klein");
     const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
     const before = results.uncategorizedCount(since);
@@ -167,6 +170,12 @@ describe("AIService", () => {
     await service.update({ enabled: true, modelId: "klein" });
     await until(() => results.uncategorizedCount(since) === 0 && statuses.at(-1)?.categorizing === null);
     expect(categorized()).toBe(before);
+    // Fortschritt und laufende Aufgabe werden gemeldet (für die Anzeige in der Seitenleiste)
+    expect(statuses.some((s) => s.activity?.task === "categorize")).toBe(true);
+    const progress = statuses.map((s) => s.categorizing).filter((c) => c !== null);
+    expect(progress[0]).toMatchObject({ done: 0, total: before });
+    expect(progress.at(-1)).toMatchObject({ done: before, remaining: 0 });
+    expect(statuses.at(-1)?.activity).toBeNull();
     const origins = db.prepare("SELECT DISTINCT category, categoryOrigin FROM message m JOIN mailbox b ON b.id = m.mailboxId WHERE b.role = 'inbox' AND m.date >= ?").all(since);
     expect(origins).toEqual([{ category: "work", categoryOrigin: "onDevice" }]);
     // Gesendete Mails bleiben unberührt
@@ -185,7 +194,10 @@ describe("AIService", () => {
     // drei Mails bekamen die einfache Regel-Einordnung, dann Stopp (kein Dauerversuch)
     expect(results.uncategorizedCount(since)).toBe(before - 3);
     expect((await service.status()).error).toBe("Modell abgestürzt");
-    expect((await service.update({ autoCategorize: false })).error).toBeNull();
+    // „Weiter einordnen“: Fehler weg, neuer Anlauf
+    providers[0]!.fail = false;
+    expect((await service.resume()).error).toBeNull();
+    await until(() => results.uncategorizedCount(since) === 0 && statuses.at(-1)?.categorizing === null);
   });
 
   it("eine Mail, an der das Modell scheitert, hält die übrigen nicht auf", async () => {

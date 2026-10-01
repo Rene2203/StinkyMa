@@ -428,6 +428,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   6 Min.), danach Abbruch und Neustart des Modells; scheitert das Modell an einer Mail, bekommt sie die einfache
   Regel-Einordnung und es geht weiter – erst nach 3 Fehlern in Folge Stopp mit Meldung. Tests mit hängendem und teilweise
   scheiterndem Modell. **Ungeprüft:** ob genau das beim Nutzer passiert ist (Fehlermeldung unter Optionen → KI erfragt).
+- **KI-Anzeige in der Seitenleiste (Wunsch des Nutzers):** unten links immer sichtbar, solange die KI arbeitet: was sie
+  gerade tut (einordnen, zusammenfassen, Vorschläge schreiben …), Fortschrittsbalken bei der Einordnung („12 von 40“), eine
+  mitlaufende Uhr und wie viele Aufgaben warten; ab 1 Minute „bitte Geduld“. Hält die Einordnung wegen eines Fehlers an:
+  Hinweis mit Fehlertext und „Weiter einordnen“. Klick öffnet die KI-Optionen. Dazu: Der untere Teil der Seitenleiste
+  (Abrufstatus, Konto hinzufügen) bleibt jetzt auch bei vielen Ordnern sichtbar – vorher scrollte er weg. Statusmeldungen
+  werden nummeriert, damit eine ältere „arbeitet …“-Meldung nie eine neuere überschreibt. Geprüft: Unit-Tests (Fortschritt,
+  Aufgabe, Weiter einordnen), Sichtprüfung per Screenshot mit nachgestelltem Status.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,

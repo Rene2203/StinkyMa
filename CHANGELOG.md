@@ -18,6 +18,8 @@
 - **Antwortvorschläge** (Knopf in der Mail, nur mit lokalem Modell): 2–3 kurze Varianten (z. B. zusagen, absagen,
   nachfragen) in der Anrede der Mail (du/Sie). Klick übernimmt Anrede und Text in „Antworten“ – über Signatur und Zitat;
   gesendet wird nur vom Nutzer. Vorschläge mit Platzhaltern, falscher Anrede oder erfundenen Zahlen werden verworfen.
+- **KI-Anzeige** unten in der Seitenleiste: was die KI gerade tut, Fortschrittsbalken der Einordnung, laufende Uhr,
+  bei Stillstand „Weiter einordnen“.
 - **Tagesüberblick** (Sonnen-Knopf unten links; auf Wunsch täglich als Benachrichtigung zur gewählten Uhrzeit, nur mit
   Anzahlen): Fälliges der nächsten 7 Tage und Überfälliges, „wartet auf dich“, neue wichtige ungelesene Mails; Newsletter,
   Benachrichtigungen und Verdächtiges nur gezählt. Ohne KI-Modell, sofort – ungeöffnete neue Mails werden dafür schnell mit

@@ -7,7 +7,7 @@ const accountMethods = ["addAccount", "addOAuthAccount", "reauthorize", "oauthPr
 const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
 const rulesMethods = ["list", "folders", "interpret", "preview", "save", "setEnabled", "remove"];
-const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest"];
+const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume"];
 
 const bridge = (channel: string, methods: string[]) =>
   Object.fromEntries(methods.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channel, method, args)]));
