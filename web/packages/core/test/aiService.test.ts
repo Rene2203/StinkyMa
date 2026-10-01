@@ -30,11 +30,19 @@ class FakeProvider implements ManagedProvider {
   requests: AIRequest[] = [];
   disposed = false;
   fail = false;
+  /** Scheitert nur an bestimmten Mails */
+  failWhen: ((request: AIRequest) => boolean) | null = null;
+  /** Hängt (antwortet nie, bis abgebrochen) */
+  hangWhen: ((request: AIRequest) => boolean) | null = null;
   constructor(readonly id: string) {
     this.displayName = id;
   }
-  async generate(request: AIRequest) {
+  async generate(request: AIRequest, signal?: AbortSignal) {
     if (this.fail) throw new Error("Modell abgestürzt");
+    if (this.failWhen?.(request)) throw new Error("Kontext zu klein");
+    if (this.hangWhen?.(request)) {
+      await new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("abgebrochen"))));
+    }
     this.requests.push(request);
     const text = request.task === "categorize"
       ? '{"category": "work", "confidence": 0.7}'
@@ -53,7 +61,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function setup(initial: Partial<AISettings> = {}, options: { failing?: boolean } = {}) {
+function setup(initial: Partial<AISettings> = {}, options: { failing?: boolean; configure?: (provider: FakeProvider, index: number) => void; timeoutMs?: number } = {}) {
   const db = openDatabase(":memory:");
   seedIfEmpty(db, createMockData(new Date()));
   db.prepare("UPDATE message SET category = NULL").run();
@@ -75,11 +83,13 @@ function setup(initial: Partial<AISettings> = {}, options: { failing?: boolean }
     createProvider: (model) => {
       const provider = new FakeProvider(model.id);
       provider.fail = options.failing ?? false;
+      options.configure?.(provider, providers.length);
       providers.push(provider);
       return provider;
     },
     onStatus: (s) => statuses.push(s),
     onCategorized: () => categorized++,
+    ...(options.timeoutMs ? { generateTimeoutMs: () => options.timeoutMs ?? 0 } : {}),
   });
   const install = (id: string) => {
     const model = catalog.find((m) => m.id === id);
@@ -164,7 +174,7 @@ describe("AIService", () => {
     expect(sent.n).toBe(0);
   });
 
-  it("hält die Einordnung bei einem Modellfehler an und meldet ihn", async () => {
+  it("hält die Einordnung erst nach mehreren Fehlern in Folge an und meldet sie", async () => {
     const { service, install, results, providers, statuses } = setup({}, { failing: true });
     install("klein");
     const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
@@ -172,10 +182,49 @@ describe("AIService", () => {
     await service.update({ enabled: true, modelId: "klein" });
     await until(() => statuses.some((s) => s.error !== null) && statuses.at(-1)?.categorizing === null);
     expect(providers).toHaveLength(1);
-    expect(results.uncategorizedCount(since)).toBe(before);
+    // drei Mails bekamen die einfache Regel-Einordnung, dann Stopp (kein Dauerversuch)
+    expect(results.uncategorizedCount(since)).toBe(before - 3);
     expect((await service.status()).error).toBe("Modell abgestürzt");
-    // Neuer Anstoß ohne Änderung: bleibt stehen (kein Dauerversuch) – Einstellungen ändern setzt den Fehler zurück
     expect((await service.update({ autoCategorize: false })).error).toBeNull();
+  });
+
+  it("eine Mail, an der das Modell scheitert, hält die übrigen nicht auf", async () => {
+    let problem = "";
+    const { service, install, results, db, statuses } = setup({}, {
+      configure: (p) => {
+        p.failWhen = (r) => {
+          const text = r.messages.at(-1)?.content ?? "";
+          if (!problem) problem = text;
+          return text === problem;
+        };
+      },
+    });
+    install("klein");
+    const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+    await service.update({ enabled: true, modelId: "klein" });
+    await until(() => results.uncategorizedCount(since) === 0 && statuses.at(-1)?.categorizing === null);
+    const origins = db.prepare("SELECT categoryOrigin AS o, COUNT(*) AS n FROM message WHERE categoryOrigin IS NOT NULL GROUP BY categoryOrigin ORDER BY o").all();
+    expect(origins).toEqual([{ o: "onDevice", n: expect.any(Number) }, { o: "rules", n: 1 }]);
+    expect((await service.status()).error).toBeNull();
+  });
+
+  it("hängt das Modell, wird die Anfrage abgebrochen, das Modell neu geladen und weitergemacht", async () => {
+    const { service, install, results, providers, statuses, db } = setup({}, {
+      timeoutMs: 50,
+      // Das erste Modell hängt bei jeder Anfrage; das neu geladene arbeitet normal
+      configure: (p, index) => {
+        if (index === 0) p.hangWhen = () => true;
+      },
+    });
+    install("klein");
+    const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
+    await service.update({ enabled: true, modelId: "klein" });
+    await until(() => results.uncategorizedCount(since) === 0 && statuses.at(-1)?.categorizing === null);
+    expect(providers.length).toBe(2);
+    expect(providers[0]?.disposed).toBe(true);
+    // Zusammenfassen danach geht – die Warteschlange ist nicht blockiert
+    const { threadId } = db.prepare("SELECT threadId FROM message LIMIT 1").get() as { threadId: string };
+    expect((await service.summarize(threadId)).summary).toBe("Es geht um den Grillabend.");
   });
 
   it("Modell löschen gibt es frei und setzt die Auswahl zurück", async () => {

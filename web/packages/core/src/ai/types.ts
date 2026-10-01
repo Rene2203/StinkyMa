@@ -73,3 +73,11 @@ export class AINotConfiguredError extends Error {
     this.name = "AINotConfiguredError";
   }
 }
+
+/** Das Modell hat nicht rechtzeitig geantwortet (hängt) – es wird verworfen und bei Bedarf neu geladen. */
+export class AITimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AITimeoutError";
+  }
+}

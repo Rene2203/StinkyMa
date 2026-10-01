@@ -24,6 +24,9 @@
   den Regeln nach Fristen und Zahlungen durchsucht.
 
 ### Behoben
+- KI-Einordnung blieb nach einem Fehler oder einer hängenden Modell-Anfrage dauerhaft stehen; jetzt Zeitlimit mit Neustart
+  des Modells, und eine einzelne Problem-Mail hält die übrigen nicht mehr auf.
+- Antwort-Editor öffnete sich gelegentlich nicht (Editor beim schnellen Neuaufbau schon abgebaut).
 - Archivierte/verschobene Mails verloren den gelesenen Anhang-Text (Suche in Scans) und KI-Leseergebnisse.
 - E2E-Test „Ungelesen“ war wackelig (zwei Mails mit gleicher Uhrzeit, zufällige Reihenfolge).
 

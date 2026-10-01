@@ -10,8 +10,8 @@ import { interpretRule, interpretRuleWithRules, type RuleInterpretation } from "
 import { draftReplies } from "../ai/replies.js";
 import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
-import { categorizeMessage, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
-import { AIBlockedError, AINotConfiguredError, type AIImage, type AIProvider, type AIRequest } from "../ai/types.js";
+import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
+import { AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse } from "../ai/types.js";
 import type { Message } from "../models.js";
 import type { AIResultStore, StoredReading, StoredSummary } from "../sqlite/aiStore.js";
 import { LlamaCppProvider } from "./llamaProvider.js";
@@ -55,6 +55,8 @@ export interface AIServiceOptions {
   onCategorized?: () => void;
   /** Abfragen für den Tagesüberblick (W6.6). */
   digest?: DigestStore;
+  /** Höchstdauer einer Modell-Anfrage, danach Abbruch und Neustart des Modells (Standard: Text 3 Min., Bilder 6 Min.). */
+  generateTimeoutMs?: (request: AIRequest) => number;
   now?: () => Date;
 }
 
@@ -363,12 +365,48 @@ export class AIService implements AIApi {
         const run = this.#engine.then(async () => {
           if (this.#active && this.#active !== provider) await this.#active.unload();
           this.#active = provider;
-          return provider.generate(request, signal);
+          return this.#withTimeout(provider, request, signal);
         });
         this.#engine = run.catch(() => undefined);
         return run;
       },
     };
+  }
+
+  /**
+   * Eine Anfrage darf nie ewig hängen – sonst warten alle folgenden (Einordnung, Zusammenfassen …) mit, weil das Modell
+   * eine Anfrage nach der anderen abarbeitet. Nach der Höchstdauer: abbrechen, Modell verwerfen (wird bei Bedarf neu
+   * geladen), Fehler melden.
+   */
+  async #withTimeout(provider: ManagedProvider, request: AIRequest, signal?: AbortSignal): Promise<AIResponse> {
+    const limit = this.options.generateTimeoutMs?.(request) ?? (request.task === "readImage" ? 360_000 : 180_000);
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new AITimeoutError("Das KI-Modell hat nicht rechtzeitig geantwortet und wird neu gestartet."));
+      }, limit);
+    });
+    try {
+      return await Promise.race([provider.generate(request, controller.signal), timeout]);
+    } catch (error) {
+      if (error instanceof AITimeoutError) this.#discard(provider);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+    }
+  }
+
+  /** Hängendes Modell verwerfen, ohne auf es zu warten. */
+  #discard(provider: ManagedProvider): void {
+    if (this.#active === provider) this.#active = null;
+    if (this.#provider?.provider === provider) this.#provider = null;
+    if (this.#vision?.provider === provider) this.#vision = null;
+    void provider.dispose().catch(() => undefined);
   }
 
   async #releaseVision(): Promise<void> {
@@ -593,6 +631,7 @@ export class AIService implements AIApi {
       }
       this.#categorizing = { remaining: this.options.results.uncategorizedCount(since()) };
       await this.#emit();
+      let failures = 0;
       for (;;) {
         if (!this.#settings.enabled || !this.#settings.autoCategorize || this.#disposed) break;
         const [message] = this.options.results.uncategorized(1, since());
@@ -600,11 +639,22 @@ export class AIService implements AIApi {
         try {
           const result = await categorizeMessage(ready.router, message, { attachmentNames: this.options.results.attachmentNames(message.id) });
           this.options.results.setCategory(message.id, result.category, result.origin);
+          failures = 0;
         } catch (error) {
           if (error instanceof AIBlockedError || error instanceof AINotConfiguredError) break;
-          // Modell kaputt oder beendet: anhalten statt endlos weiterzuversuchen
-          this.#error = error instanceof Error ? error.message : String(error);
-          break;
+          // Eine Mail, an der das Modell scheitert, darf nicht alles aufhalten: einfache Regel-Einordnung, weiter.
+          // Erst wenn es mehrmals hintereinander scheitert, ist das Modell selbst kaputt – dann anhalten und melden.
+          this.options.results.setCategory(message.id, ruleCategory(message).category, "rules");
+          failures++;
+          if (failures >= 3) {
+            this.#error = error instanceof Error ? error.message : String(error);
+            break;
+          }
+          try {
+            ready = await this.#router(); // nach Zeitüberschreitung ggf. neu geladenes Modell
+          } catch {
+            break;
+          }
         }
         this.options.onCategorized?.();
         this.#categorizing = { remaining: Math.max(0, (this.#categorizing?.remaining ?? 1) - 1) };

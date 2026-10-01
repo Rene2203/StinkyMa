@@ -421,6 +421,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Nutzer testet den Installer aus der CI selbst (Türsteher, Regeln, Antwortvorschläge, Tagesüberblick).
   **Lokal nicht testbar:** echte Modelle in der E2E-App unter Linux – node-llama-cpp prüft seine Binärdateien in einem
   Kindprozess, der Playwrights Debugger-Schalter erbt und hängen bleibt. Unter Windows (CI) läuft es.
+- **Nutzertest 01.10.2026: „Die KI hört nach einiger Zeit auf, Mails einzuordnen.“** Zwei Schwachstellen gefunden:
+  (1) Ein einziger Fehler beim Einordnen hielt die ganze Einordnung an – und beim nächsten Anstoß scheiterte sie wieder an
+  derselben (neuesten) Mail. (2) Hängt eine Modell-Anfrage, warten alle folgenden für immer (das Modell arbeitet eine Anfrage
+  nach der anderen ab), und die Einordnung gilt weiter als „läuft“. Behoben: Höchstdauer je Anfrage (Text 3 Min., Bilder
+  6 Min.), danach Abbruch und Neustart des Modells; scheitert das Modell an einer Mail, bekommt sie die einfache
+  Regel-Einordnung und es geht weiter – erst nach 3 Fehlern in Folge Stopp mit Meldung. Tests mit hängendem und teilweise
+  scheiterndem Modell. **Ungeprüft:** ob genau das beim Nutzer passiert ist (Fehlermeldung unter Optionen → KI erfragt).
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,
