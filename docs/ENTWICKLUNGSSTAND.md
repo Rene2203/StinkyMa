@@ -308,3 +308,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
     vorbereitet, Messung aller vier Modelle läuft.
   - **Ungeprüft:** Download echter Modelle in der App, Vulkan/GPU unter Windows, Verhalten der installierten App
     (gepackt, asar) mit llama.cpp, Tempo auf dem N97.
+- **Windows-CI Lauf #58 grün:** llama.cpp läuft unter echtem Windows (Testmodell), KI-E2E in der Windows-App, Installer 145 MB
+  (vorher ~120 MB; CPU- und Vulkan-Laufzeit). Hinweis `npm audit`: 2 mittlere Funde nur im Testwerkzeug Vitest (nicht in der
+  App) – Behebung braucht Vitest 5 (größerer Versionssprung), später.
+- **Messlauf v1, alle vier Modelle** (Details `docs/KI-MESSUNG.md`): Gemma 4 E2B 88,8 % / Fakten 100 % / 3,5 s; Gemma 4 E4B
+  97,5 % / 92 % / 6,2 s; Qwen 3.5 2B 85 % / 81 % / 5,9 s; Qwen 3.5 4B 96,3 % / 92 % / 14,3 s. Prompt v2 + Kontrollsatz laufen.
+
