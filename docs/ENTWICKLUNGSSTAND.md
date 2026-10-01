@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent** in Arbeit: W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check) und W6.3 (Türsteher) fertig, lokal geprüft. Als Nächstes W6.4 Regeln, W6.5 Antwortentwürfe, W6.6 Tages-Digest; danach Feinabstimmung der Modelle (Wunsch des Nutzers)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent** in Arbeit: W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher) und W6.4 (Regeln in eigenen Worten) fertig, lokal geprüft. Als Nächstes W6.5 Antwortentwürfe, W6.6 Tages-Digest; danach Feinabstimmung der Modelle (Wunsch des Nutzers)
 
 ## Überblick
 
@@ -388,4 +388,19 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   „31. Oktober“ das Jahr 2027 → Punkt für die Feinabstimmung. Details in `docs/KI-MESSUNG.md`.
 - **Wackeliger E2E-Test behoben:** „Grillen?“ und die HTML-Mail hatten dieselbe Uhrzeit; je nach Reihenfolge öffnete das
   Archivieren per E die einzige ungelesene Mail, und „Ungelesen“ war leer. Jetzt feste Reihenfolge; 3 volle Läufe grün.
+- **W6.4 – Regeln in eigenen Worten (lokal geprüft):** Optionen → Regeln. Der Nutzer schreibt z. B. „Mails von
+  jonas@example.test in den Ordner Verein“; StinkyMa zeigt die erkannte Regel als Formular (Absender, Betreff, Art, Anhang →
+  Archiv/Papierkorb/Spam/eigener Ordner, gelesen, markieren), die passenden Mails im Posteingang und speichert erst auf Klick.
+  Regeln gelten für **neu ankommende** Mails (auf Wunsch auch für die angezeigten vorhandenen). Hängt eine Regel an der
+  KI-Einordnung („Newsletter …“), wartet die Mail bis zu 10 Minuten darauf. Was eine Regel wegräumt oder gelesen setzt, löst
+  keine Benachrichtigung aus. Migration `v12-mail-rules`. Sicherungen: Absender/Betreff müssen im Text stehen (nichts
+  Erfundenes), Ordner müssen existieren, ohne Bedingung oder Aktion kein Speichern.
+  **Messung** (`eval-models.ts --rules`, 24 Testsätze + 12 Kontrollsätze): Regeln allein 24/24 und 10/12. **Gemma 4 E2B allein
+  ist schlechter** (18/24, 6/12) – es erfindet gern eine „Art“ dazu („Lohnsteuer im Betreff“ → Rechnung). Deshalb: zuerst
+  Regeln, Modell nur, wenn die nichts Brauchbares ergeben → 24/24 und 11/12, Modell nur in 1 von 36 Fällen nötig (~8 s).
+  Ehrlich: Die Regeln wurden am Testsatz entwickelt; der Kontrollsatz wurde vorher geschrieben und nicht zum Verbessern genutzt.
+  Bekannte Schwäche: Verneinung („nicht markieren, nur archivieren“ → markiert trotzdem) – im Formular sichtbar und korrigierbar.
+  Geprüft: Unit-Tests (Regeln, RuleService mit SQLite, Store), E2E gegen GreenMail (Regel anlegen → neue Mail landet im
+  Ordner „Verein“ auf dem Server). Verschachtelte Ordner („INBOX/Verein“) werden auch über den letzten
+  Namensteil gefunden (Unit-Test). **Ungeprüft:** echte Konten mit vielen Ordnern; Gemma E4B/Qwen siehe `docs/KI-MESSUNG.md`.
 

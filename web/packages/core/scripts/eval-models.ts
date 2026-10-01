@@ -4,7 +4,7 @@
 import { writeFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
-import { evalHoldoutMails, evalMails, evaluateActions, evaluateProvider, formatActionsReports, formatEvalReports, modelCatalog, type ActionsEvalReport, type EvalReport } from "../src/index.js";
+import { evalHoldoutMails, evalMails, evaluateActions, evaluateProvider, evaluateRules, formatActionsReports, formatEvalReports, formatRulesReports, modelCatalog, type ActionsEvalReport, type EvalReport, type RulesEvalReport } from "../src/index.js";
 import { fileNameFromUrl, LlamaCppProvider } from "../src/llm/index.js";
 
 const args = process.argv.slice(2);
@@ -21,6 +21,9 @@ const holdout = args.includes("--holdout");
 // --actions: nur der Aktionen-Messlauf (W6.1), inklusive Vergleichswert „Regeln ohne KI“
 const actionsOnly = args.includes("--actions");
 if (actionsOnly) args.splice(args.indexOf("--actions"), 1);
+// --rules: Regeln in normaler Sprache (W6.4), Testsatz + Kontrollsatz, mit Vergleichswert „Regeln ohne KI“
+const rulesOnly = args.includes("--rules");
+if (rulesOnly) args.splice(args.indexOf("--rules"), 1);
 const all = args.includes("--all");
 for (const name of ["--holdout", "--all"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
 const mails = holdout ? evalHoldoutMails : all ? [...evalMails, ...evalHoldoutMails] : evalMails;
@@ -46,6 +49,25 @@ if (actionsOnly) {
     }
   }
   console.log(formatActionsReports(reports));
+  process.exit(0);
+}
+
+if (rulesOnly) {
+  const reports: RulesEvalReport[] = [await evaluateRules(null)];
+  for (const model of modelCatalog.filter((m) => ids.length === 0 || ids.includes(m.id))) {
+    const provider = new LlamaCppProvider({ id: model.id, displayName: model.name, modelPath: join(directory, fileNameFromUrl(model.url)), gpu: gpu ? "auto" : false, maxThreads: threads, idleUnloadMs: 0 });
+    try {
+      await provider.load();
+      for (const modelOnly of [false, true]) {
+        reports.push(await evaluateRules(provider, { modelOnly, onProgress: (d, t) => process.stderr.write(`\r${model.id}${modelOnly ? " (nur Modell)" : ""}: ${d}/${t}   `) }));
+      }
+      process.stderr.write("\n");
+      if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
+    } finally {
+      await provider.dispose();
+    }
+  }
+  console.log(formatRulesReports(reports));
   process.exit(0);
 }
 

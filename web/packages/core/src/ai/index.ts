@@ -8,3 +8,4 @@ export * from "./evalSet.js";
 export * from "./evaluate.js";
 export * from "./api.js";
 export * from "./actions.js";
+export * from "./rules.js";

@@ -10,6 +10,11 @@
 - **Türsteher für neue Absender** (pro Konto, Standard aus; beim Hinzufügen eines Kontos wählbar): Mails von Unbekannten
   landen zuerst unter „Neue Absender“. Erlauben → Posteingang (auch künftig), Blockieren → Spam-Ordner auf dem Server.
   Beim Einschalten gelten alle bisherigen Absender und Empfänger eigener Mails als bekannt. Migration `v11-screener`.
+- **Regeln in eigenen Worten** (Optionen → Regeln): z. B. „Newsletter von zeitung.example ins Archiv“. StinkyMa zeigt die
+  erkannte Regel zum Prüfen und Ändern (Absender, Betreff, Art, Anhang → verschieben/eigener Ordner, gelesen, markieren)
+  und welche Mails im Posteingang jetzt schon passen; auf Wunsch auch auf diese anwenden. Gilt danach für neu ankommende
+  Mails – lokal sofort, auf dem Server über die Warteschlange; Weggeräumtes löst keine Benachrichtigung aus. Gelesen wird
+  zuerst mit einfachen Regeln, das lokale Modell hilft nur, wenn die nichts Brauchbares ergeben. Migration `v12-mail-rules`.
 
 ### Behoben
 - Archivierte/verschobene Mails verloren den gelesenen Anhang-Text (Suche in Scans) und KI-Leseergebnisse.

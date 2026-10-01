@@ -12,6 +12,10 @@ import {
   type AppSettings,
   type AppSettingsApi,
   type AIApi,
+  type MailRule,
+  type RuleDefinition,
+  type RulePreview,
+  type RulesApi,
   type OAuthProviderId,
   type AISettings,
   type AIStatus,
@@ -99,6 +103,24 @@ export interface BrowserState {
   oauthProviders: OAuthProviderId[];
   /** Erkannte Termine, Fristen, To-dos, Zahlungen der geöffneten Mail. */
   actions: MessageActionsView | null;
+  /** Regeln in normaler Sprache (nur Windows-App); null = nicht verfügbar. */
+  rules: RulesState | null;
+}
+
+export interface RulesState {
+  list: MailRule[];
+  folders: string[];
+  /** Regel in Arbeit (neu oder geändert), mit Vorschau. */
+  draft: RuleDraft | null;
+}
+
+export interface RuleDraft {
+  id?: string;
+  text: string;
+  accountId: string | null;
+  preview: RulePreview | null;
+  busy: boolean;
+  error: string | null;
 }
 
 export interface ReadingState {
@@ -142,6 +164,7 @@ export const initialState: BrowserState = {
   reading: null,
   oauthProviders: [],
   actions: null,
+  rules: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -202,10 +225,11 @@ export class BrowserStore {
   readonly #files: AttachmentFiles | undefined;
   readonly #settings: AppSettingsApi | undefined;
   readonly #ai: AIApi | undefined;
+  readonly #rules: RulesApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -213,6 +237,92 @@ export class BrowserStore {
     this.#files = options.files;
     this.#settings = options.settings;
     this.#ai = options.ai;
+    this.#rules = options.rules;
+  }
+
+  // --- Regeln in normaler Sprache (W6.4) ---
+
+  async loadRules(): Promise<void> {
+    const api = this.#rules;
+    if (!api) return;
+    await this.#guard(async () => {
+      const [list, folders] = await Promise.all([api.list(), api.folders(null)]);
+      this.#set({ rules: { list, folders, draft: this.#state.rules?.draft ?? null } });
+    });
+  }
+
+  #setDraft(draft: RuleDraft | null): void {
+    const rules = this.#state.rules ?? { list: [], folders: [], draft: null };
+    this.#set({ rules: { ...rules, draft } });
+  }
+
+  /** Text → Regel mit Vorschau (Modell, falls bereit; sonst einfache Regeln). Speichert noch nichts. */
+  async interpretRule(text: string, accountId: string | null): Promise<void> {
+    const api = this.#rules;
+    if (!api || !text.trim()) return;
+    this.#setDraft({ text, accountId, preview: null, busy: true, error: null });
+    try {
+      const preview = await api.interpret(text, accountId);
+      this.#setDraft({ text, accountId, preview, busy: false, error: null });
+    } catch (error) {
+      this.#setDraft({ text, accountId, preview: null, busy: false, error: messageOf(error) });
+    }
+  }
+
+  /** Von Hand geändert: neu prüfen und Vorschau aktualisieren. */
+  async changeRuleDraft(definition: RuleDefinition, accountId?: string | null): Promise<void> {
+    const api = this.#rules;
+    const draft = this.#state.rules?.draft;
+    if (!api || !draft) return;
+    const account = accountId === undefined ? draft.accountId : accountId;
+    const preview = await api.preview(definition, account).catch(() => null);
+    const current = this.#state.rules?.draft;
+    if (!current || current.text !== draft.text) return; // inzwischen verworfen oder neu
+    // Herkunft bleibt sichtbar („vom Modell gelesen“) – geändert hat dann der Nutzer
+    this.#setDraft({ ...current, accountId: account, preview: preview ? { ...preview, origin: current.preview?.origin ?? null } : current.preview });
+  }
+
+  editRule(rule: MailRule): void {
+    this.#setDraft({ id: rule.id, text: rule.text, accountId: rule.accountId, preview: null, busy: true, error: null });
+    void this.changeRuleDraft(rule.definition, rule.accountId).then(() => {
+      const draft = this.#state.rules?.draft;
+      if (draft?.id === rule.id) this.#setDraft({ ...draft, busy: false });
+    });
+  }
+
+  cancelRuleDraft(): void {
+    this.#setDraft(null);
+  }
+
+  async saveRuleDraft(applyToExisting: boolean): Promise<boolean> {
+    const api = this.#rules;
+    const draft = this.#state.rules?.draft;
+    if (!api || !draft?.preview) return false;
+    this.#setDraft({ ...draft, busy: true, error: null });
+    try {
+      await api.save({ ...(draft.id ? { id: draft.id } : {}), text: draft.text, accountId: draft.accountId, definition: draft.preview.definition }, applyToExisting);
+      this.#setDraft(null);
+      await this.loadRules();
+      if (applyToExisting) await Promise.all([this.loadSidebar(), this.loadMessages()]);
+      return true;
+    } catch (error) {
+      this.#setDraft({ ...draft, busy: false, error: messageOf(error) });
+      return false;
+    }
+  }
+
+  async setRuleEnabled(id: string, enabled: boolean): Promise<void> {
+    const api = this.#rules;
+    if (!api) return;
+    await this.#guard(() => api.setEnabled(id, enabled));
+    await this.loadRules();
+  }
+
+  async removeRule(id: string): Promise<void> {
+    const api = this.#rules;
+    if (!api) return;
+    await this.#guard(() => api.remove(id));
+    await this.loadRules();
   }
 
   // --- KI ---
@@ -966,4 +1076,9 @@ export class BrowserStore {
       this.#set({ error: error instanceof Error ? error.message : String(error) });
     }
   }
+}
+
+/** Fehlertext ohne Electron-Vorspann („Error invoking remote method …“). */
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(error);
 }

@@ -366,6 +366,25 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // Regeln in normaler Sprache (W6.4). `definition` ist JSON (RuleDefinition in core/src/rules.ts).
+    // ruleQueue: neu angekommene Posteingangs-Mails, die noch durch die Regeln müssen (wartet ggf. auf die Einordnung).
+    name: "v12-mail-rules",
+    sql: `
+      CREATE TABLE mailRule (
+        id TEXT PRIMARY KEY NOT NULL,
+        text TEXT NOT NULL,
+        accountId TEXT REFERENCES account(id) ON DELETE CASCADE,
+        definition TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        createdAt TEXT NOT NULL
+      );
+      CREATE TABLE ruleQueue (
+        messageId TEXT PRIMARY KEY NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        queuedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

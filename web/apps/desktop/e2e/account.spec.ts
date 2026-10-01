@@ -563,6 +563,44 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await admin.logout();
   });
 
+  await test.step("Regel in eigenen Worten: neue Mail von Jonas landet im Ordner Verein (auch auf dem Server)", async () => {
+    const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+    await admin.connect();
+    await admin.mailboxCreate("Verein");
+    await page.getByTestId("sync-now").click();
+    await expect(page.getByRole("button", { name: "Verein" })).toBeVisible({ timeout: 20_000 });
+
+    await page.getByTestId("open-options").click();
+    const options = page.getByTestId("options-dialog");
+    await options.getByTestId("rule-text").fill("Mails von jonas@example.test in den Ordner Verein");
+    await options.getByTestId("rule-interpret").click();
+    const draft = options.getByTestId("rule-draft");
+    await expect(draft.getByTestId("rule-move")).toHaveValue("folder:Verein");
+    await expect(draft.getByTestId("rule-from")).toHaveValue("jonas@example.test");
+    await expect(draft.getByTestId("rule-preview")).toContainText("1 Mail im Posteingang"); // „Grillen?“ – bleibt, weil nicht angehakt
+    await draft.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(screenshotDir, "24-Regel-Entwurf.png") });
+    await draft.getByTestId("rule-save").click();
+    await expect(options.getByTestId("rule-row")).toHaveCount(1);
+    await expect(options.getByTestId("rule-text")).toHaveValue("");
+    await options.getByRole("button", { name: "Fertig" }).click();
+
+    await admin.append(
+      "INBOX",
+      ["From: Jonas <jonas@example.test>", `To: ${email}`, "Subject: Vereinsfest am Samstag", `Date: ${new Date().toUTCString()}`, "Message-ID: <rule-1@example.test>", "", "Bringst du Salat mit?", ""].join("\r\n"),
+      [],
+      new Date(),
+    );
+    await page.getByTestId("sync-now").click();
+    await expect
+      .poll(async () => { const status = await admin.status("Verein", { messages: true }); return status ? status.messages : -1; }, { timeout: 30_000 })
+      .toBe(1);
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    await expect(page.getByTestId("message-row").filter({ hasText: "Grillen?" })).toBeVisible();
+    await expect(page.getByTestId("message-row").filter({ hasText: "Vereinsfest am Samstag" })).toHaveCount(0);
+    await admin.logout();
+  });
+
   await test.step("Abruf per Knopf", async () => {
     await page.getByTestId("sync-now").click();
     await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });

@@ -1,7 +1,9 @@
 import type { Message, MessageCategory } from "../models.js";
-import { evalActionCases, evalHoldoutMails, evalMails, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
+import { evalActionCases, evalHoldoutMails, evalMails, evalRuleCases, evalRuleFolders, evalRuleHoldout, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
 import { extractActions, ruleActions, type MailAction } from "./actions.js";
 import { cleanMailText } from "./prepare.js";
+import { interpretRule, interpretRuleWithRules } from "./rules.js";
+import { ruleEquals } from "../rules.js";
 import { categories } from "./prompts.js";
 import { AIRouter, GrantPolicy } from "./router.js";
 import { categorizeMessage, summarizeThread } from "./tasks.js";
@@ -304,6 +306,55 @@ export async function evaluateActions(provider: AIProvider | null, options: { ca
 export function formatActionsReports(reports: ActionsEvalReport[]): string {
   const lines = ["| Verfahren | Angaben gefunden | unnötige Aktionen | Regel-Rückfall | Zeit (Median) |", "|---|---|---|---|---|"];
   for (const r of reports) lines.push(`| ${r.name} | ${percent(r.recall)} (von ${r.expectedTotal}) | ${r.falsePositives} | ${r.fallbacks} | ${seconds(r.medianMs)} |`);
+  for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
+  return lines.join("\n");
+}
+
+// --- Regeln in normaler Sprache (W6.4) ---
+
+export interface RulesEvalReport {
+  name: string;
+  correct: number;
+  total: number;
+  holdoutCorrect: number;
+  holdoutTotal: number;
+  /** Wie oft das Modell gefragt wurde. */
+  modelCalls: number;
+  /** … und davon nichts Brauchbares lieferte (die Regeln blieben). */
+  fallbacks: number;
+  medianMs: number;
+  misses: string[];
+}
+
+export async function evaluateRules(provider: AIProvider | null, options: { modelOnly?: boolean; onProgress?: (done: number, total: number) => void } = {}): Promise<RulesEvalReport> {
+  const router = provider ? new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() }) : null;
+  const sets = [{ cases: evalRuleCases, holdout: false }, { cases: evalRuleHoldout, holdout: true }];
+  const total = evalRuleCases.length + evalRuleHoldout.length;
+  const report: RulesEvalReport = { name: provider ? `${provider.displayName} (${options.modelOnly ? "nur Modell" : "Regeln zuerst"})` : "Regeln (ohne KI)", correct: 0, total: evalRuleCases.length, holdoutCorrect: 0, holdoutTotal: evalRuleHoldout.length, modelCalls: 0, fallbacks: 0, medianMs: 0, misses: [] };
+  const durations: number[] = [];
+  let done = 0;
+  for (const set of sets) {
+    for (const testCase of set.cases) {
+      const result = router ? await interpretRule(router, testCase.text, evalRuleFolders, [evalAccount], { modelOnly: options.modelOnly ?? false }) : interpretRuleWithRules(testCase.text, evalRuleFolders);
+      // Nur Fälle, in denen das Modell gefragt wurde
+      if (result.durationMs > 0) {
+        durations.push(result.durationMs);
+        if (result.origin === "rules") report.fallbacks++;
+      }
+      const ok = !result.problems.some((p) => p !== "notInText") && ruleEquals(result.definition, testCase.expected);
+      if (ok) set.holdout ? report.holdoutCorrect++ : report.correct++;
+      else report.misses.push(`${testCase.id}${set.holdout ? " (Kontrolle)" : ""}: „${testCase.text}“ → ${JSON.stringify(result.definition)}${result.problems.length ? ` ${result.problems.join(",")}` : ""}`);
+      options.onProgress?.(++done, total);
+    }
+  }
+  report.medianMs = median(durations);
+  report.modelCalls = durations.length;
+  return report;
+}
+
+export function formatRulesReports(reports: RulesEvalReport[]): string {
+  const lines = ["| Verfahren | Testsatz | Kontrollsatz | Modell gefragt | davon unbrauchbar | Zeit je Modell-Aufruf (Median) |", "|---|---|---|---|---|---|"];
+  for (const r of reports) lines.push(`| ${r.name} | ${r.correct}/${r.total} | ${r.holdoutCorrect}/${r.holdoutTotal} | ${r.modelCalls} | ${r.fallbacks} | ${seconds(r.medianMs)} |`);
   for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
   return lines.join("\n");
 }

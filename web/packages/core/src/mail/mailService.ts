@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { ImapFlow } from "imapflow";
 import {
   isDemoAccount,
-
+  MessageFlag,
   type Account,
   type AccountColor,
   type Attachment,
@@ -43,6 +43,8 @@ export interface MailServiceOptions {
   draftUploadDelayMs?: number;
   /** Neue ungelesene Mails im Posteingang (nicht beim ersten Abgleich eines Kontos) – für Benachrichtigungen. */
   onNewMail?: (accountId: string, messages: Message[]) => void;
+  /** Alle neu angekommenen Posteingangs-Mails (nicht beim ersten Abgleich) – für Regeln. */
+  onArrived?: (accountId: string, messageIds: string[]) => void | Promise<void>;
   /** Wartezeit vor dem Abgleich, nachdem der Server neue Mails gemeldet hat (bündelt mehrere Meldungen). */
   watchDebounceMs?: number;
   /** Anmeldung im Browser (OAuth) – stellt die Plattform bereit (Windows: Standardbrowser + Loopback). */
@@ -268,7 +270,6 @@ export class MailService implements MailRepository, AccountsApi {
     for (const accountId of accounts) this.#scheduleFlush(accountId);
   }
 
-  /** Sofort lokal in den Zielordner; der Server folgt über die Warteschlange. */
   // --- Türsteher (W6.3) ---
 
   async setScreener(accountId: string, enabled: boolean): Promise<void> {
@@ -286,14 +287,25 @@ export class MailService implements MailRepository, AccountsApi {
     this.options.onChange?.();
   }
 
+  /** Sofort lokal in den Zielordner; der Server folgt über die Warteschlange. */
   async move(messageIds: string[], role: MailboxRole): Promise<void> {
+    await this.#moveTo(messageIds, (accountId) => this.writer.mailboxes(accountId).find((m) => m.role === role)?.id ?? null, (ids) => this.repository.move(ids, role));
+  }
+
+  /** In einen bestimmten Ordner (z. B. eigener Ordner aus einer Regel). Demo-Konten: nicht unterstützt. */
+  async moveToMailbox(messageIds: string[], mailboxId: string): Promise<void> {
+    await this.#moveTo(messageIds, (accountId) => (this.writer.mailboxes(accountId).some((m) => m.id === mailboxId) ? mailboxId : null), async () => undefined);
+  }
+
+  async #moveTo(messageIds: string[], targetFor: (accountId: string) => string | null, demoMove: (ids: string[]) => Promise<void>): Promise<void> {
     const createdAt = this.#now().toISOString();
     for (const [accountId, ids] of this.#groupByAccount(messageIds)) {
       if (isDemoAccount({ id: accountId })) {
-        await this.repository.move(ids, role);
+        await demoMove(ids);
         continue;
       }
-      const target = this.writer.mailboxes(accountId).find((m) => m.role === role);
+      const targetId = targetFor(accountId);
+      const target = targetId ? { id: targetId } : null;
       if (!target) continue; // Kein passender Ordner auf dem Server – Mail bleibt, wo sie ist.
       this.writer.transaction(() => {
         for (const id of ids) {
@@ -484,8 +496,19 @@ export class MailService implements MailRepository, AccountsApi {
         });
       });
       this.writer.setSyncStatus(accountId, { lastSyncAt: this.#now().toISOString(), syncError: null });
+      if (!firstSync && result.arrivedInInbox.length > 0) {
+        try {
+          await this.options.onArrived?.(accountId, result.arrivedInInbox);
+        } catch {
+          // Regeln dürfen den Abgleich nie aufhalten.
+        }
+      }
       if (!firstSync && result.newInInbox.length > 0 && this.options.onNewMail) {
-        const messages = (await Promise.all(result.newInInbox.map((id) => this.repository.message(id)))).filter((m): m is Message => m !== null);
+        // Was eine Regel schon weggeräumt oder gelesen gesetzt hat, meldet keine Benachrichtigung.
+        const inbox = new Set(this.writer.mailboxes(accountId).filter((m) => m.role === "inbox").map((m) => m.id));
+        const messages = (await Promise.all(result.newInInbox.map((id) => this.repository.message(id)))).filter(
+          (m): m is Message => m !== null && inbox.has(m.mailboxId) && (m.flags & MessageFlag.seen) === 0,
+        );
         if (messages.length > 0) this.options.onNewMail(accountId, messages);
       }
       return result;

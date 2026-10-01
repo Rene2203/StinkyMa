@@ -5,6 +5,7 @@ import { totalmem } from "node:os";
 import { join } from "node:path";
 import {
   aiMethods,
+  rulesApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -25,10 +26,10 @@ import {
   type AttachmentFiles,
   type Message,
 } from "@stinkyma/core";
-import { MailService, type OAuthBroker } from "@stinkyma/core/mail";
+import { MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
 import { AIService, ModelStore, RuntimeStore } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -42,6 +43,7 @@ const isPrimaryInstance = app.requestSingleInstanceLock();
 let mainWindow: BrowserWindow | null = null;
 let service: MailService | null = null;
 let ai: AIService | null = null;
+let rules: RuleService | null = null;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
 let tray: Tray | null = null;
@@ -141,6 +143,8 @@ function setUpServices(): void {
     ...(testOAuth ? { oauthServers: { imap: testOAuth.imap, smtp: testOAuth.smtp } } : {}),
     onChange: notifyRenderer,
     onNewMail: (_accountId, messages) => showNewMailNotification(messages),
+    // Regeln (W6.4) laufen vor der Benachrichtigung – Weggeräumtes meldet sich nicht
+    onArrived: (_accountId, messageIds) => rules?.arrived(messageIds),
   });
 
   // KI: Modelle im Benutzerordner, alles läuft auf diesem Rechner. Ohne gewähltes Modell passiert nichts.
@@ -171,7 +175,20 @@ function setUpServices(): void {
     settings: { load: () => settingsFile?.ai ?? null, save: (next) => settingsFile?.setAI(next) },
     ramGb: Math.round(totalmem() / 2 ** 30),
     onStatus: (status) => mainWindow?.webContents.send("ai:status", status),
-    onCategorized: notifyRenderer,
+    onCategorized: () => {
+      notifyRenderer();
+      // Regeln, die auf die Einordnung warten („Newsletter ins Archiv“)
+      void rules?.processQueue();
+    },
+  });
+
+  // Regeln in normaler Sprache: mit dem lokalen Modell gelesen, falls bereit – sonst einfache Regeln
+  const mailService = service;
+  const aiService = ai;
+  rules = new RuleService(new RuleStore(db), mailService, {
+    interpret: (text, folders, accountIds) => aiService.interpretRule(text, folders, accountIds),
+    accountIds: async () => (await repository.accounts()).map((a) => a.id),
+    newId: () => randomUUID(),
   });
 }
 
@@ -364,6 +381,7 @@ function registerIpc(): void {
     ["files", new Set<string>(attachmentFilesMethods), () => attachmentFiles],
     ["settings", new Set<string>(appSettingsMethods), () => (settings ? appSettingsApi : null)],
     ["ai", new Set<string>(aiMethods), () => ai],
+    ["rules", new Set<string>(rulesApiMethods), () => rules],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {

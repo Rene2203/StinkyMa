@@ -1,4 +1,5 @@
 import type { MessageCategory } from "../models.js";
+import type { RuleDefinition } from "../rules.js";
 
 // Deutscher Testsatz für die KI (Spezifikation 5.5/5.7). Alle Mails, Namen, Firmen und Beträge sind erfunden;
 // Adressen enden auf .example. Dient dem Vergleich der Modelle (Messlauf) – im Repository und später in der App.
@@ -322,4 +323,59 @@ export const evalActionCases: EvalActionCase[] = [
   { mailId: "hn3", expected: [] },
   { mailId: "hn4", expected: [] },
   { mailId: "hx4", expected: [] },
+];
+
+// --- Regeln in normaler Sprache (W6.4) ---
+
+/** Eigene Ordner, die es in den Testfällen gibt. */
+export const evalRuleFolders = ["Newsletter", "Verein", "Steuer 2026", "Kinder", "Reisen"];
+
+export interface EvalRuleCase {
+  id: string;
+  text: string;
+  /** Erwartete Felder; nicht genannte Felder müssen leer/aus sein. */
+  expected: Partial<RuleDefinition>;
+}
+
+export const evalRuleCases: EvalRuleCase[] = [
+  { id: "r01", text: "Alles von newsletter@zeitung.example ins Archiv", expected: { from: ["newsletter@zeitung.example"], move: "archive" } },
+  { id: "r02", text: "Mails von shop.example automatisch als gelesen markieren", expected: { from: ["shop.example"], markRead: true } },
+  { id: "r03", text: "Newsletter in den Ordner Newsletter verschieben", expected: { category: "newsletter", folder: "Newsletter" } },
+  { id: "r04", text: "Mails vom Sportverein in Verein", expected: { from: ["Sportverein"], folder: "Verein" } },
+  { id: "r05", text: "Wenn der Betreff „Lohnsteuer“ enthält, nach Steuer 2026 verschieben", expected: { subject: ["Lohnsteuer"], folder: "Steuer 2026" } },
+  { id: "r06", text: "Rechnungen mit Anhang markieren", expected: { category: "invoice", hasAttachment: true, flag: true } },
+  { id: "r07", text: "Werbung von angebote@moebel.example löschen", expected: { from: ["angebote@moebel.example"], category: "newsletter", move: "trash" } },
+  { id: "r08", text: "Alles von der Grundschule Am Park in den Ordner Kinder", expected: { from: ["Grundschule Am Park"], folder: "Kinder" } },
+  { id: "r09", text: "Benachrichtigungen als gelesen markieren und archivieren", expected: { category: "notification", markRead: true, move: "archive" } },
+  { id: "r10", text: "Mails von Amazon archivieren", expected: { from: ["Amazon"], move: "archive" } },
+  { id: "r11", text: "Mails mit \"Buchungsbestätigung\" im Betreff in Reisen ablegen", expected: { subject: ["Buchungsbestätigung"], folder: "Reisen" } },
+  { id: "r12", text: "Alles von gewinnspiel-24.example in den Spam", expected: { from: ["gewinnspiel-24.example"], move: "spam" } },
+  { id: "r13", text: "Mails von meiner Chefin mit einem Fähnchen versehen", expected: { from: ["Chefin"], flag: true } },
+  { id: "r14", text: "Termine von praxis-sommer.example als wichtig kennzeichnen", expected: { from: ["praxis-sommer.example"], category: "appointment", flag: true } },
+  { id: "r15", text: "Mails von noreply@paket.example als gelesen markieren", expected: { from: ["noreply@paket.example"], markRead: true } },
+  { id: "r16", text: "Verschiebe Mails von der Elternvertretung nach Kinder", expected: { from: ["Elternvertretung"], folder: "Kinder" } },
+  { id: "r17", text: "Newsletter von verlag.example bitte direkt löschen", expected: { from: ["verlag.example"], category: "newsletter", move: "trash" } },
+  { id: "r18", text: "Alles, was der Tennisclub schickt, kommt in Verein", expected: { from: ["Tennisclub"], folder: "Verein" } },
+  { id: "r19", text: "Betrugsmails sofort in den Spam-Ordner", expected: { category: "spam_suspect", move: "spam" } },
+  { id: "r20", text: "Mails, deren Betreff Gutschein enthält, archivieren", expected: { subject: ["Gutschein"], move: "archive" } },
+  { id: "r21", text: "Rechnungen von stadtwerke.example in Steuer 2026", expected: { from: ["stadtwerke.example"], category: "invoice", folder: "Steuer 2026" } },
+  { id: "r22", text: "Ich will Mails von Oma Hilde nie verpassen – immer markieren", expected: { from: ["Oma Hilde"], flag: true } },
+  { id: "r23", text: "Automatische Mails vom Kundenkonto-System auf gelesen setzen", expected: { from: ["Kundenkonto-System"], category: "notification", markRead: true } },
+  { id: "r24", text: "Mails von reisebuero.example mit Anhang nach Reisen", expected: { from: ["reisebuero.example"], hasAttachment: true, folder: "Reisen" } },
+];
+
+/** Kontrollsatz für Regeln: nie zum Verbessern der Regeln oder Prompts benutzt. */
+export const evalRuleHoldout: EvalRuleCase[] = [
+  { id: "rh01", text: "Post von info@fitnessstudio.example bitte gleich archivieren", expected: { from: ["info@fitnessstudio.example"], move: "archive" } },
+  { id: "rh02", text: "Mails vom Vermieter markieren", expected: { from: ["Vermieter"], flag: true } },
+  { id: "rh03", text: "Alles mit „Reiseunterlagen“ im Betreff nach Reisen", expected: { subject: ["Reiseunterlagen"], folder: "Reisen" } },
+  { id: "rh04", text: "Newsletter als gelesen markieren", expected: { category: "newsletter", markRead: true } },
+  { id: "rh05", text: "Mails von kita-sonnenschein.example in den Ordner Kinder schieben", expected: { from: ["kita-sonnenschein.example"], folder: "Kinder" } },
+  { id: "rh06", text: "Lösche alles von rabatte@outlet.example", expected: { from: ["rabatte@outlet.example"], move: "trash" } },
+  { id: "rh07", text: "Rechnungen vom Finanzamt in Steuer 2026 ablegen", expected: { from: ["Finanzamt"], category: "invoice", folder: "Steuer 2026" } },
+  { id: "rh08", text: "Mails mit Anhang von buchhaltung.example wichtig markieren", expected: { from: ["buchhaltung.example"], hasAttachment: true, flag: true } },
+  { id: "rh09", text: "Was der Chor verschickt, gehört in Verein", expected: { from: ["Chor"], folder: "Verein" } },
+  { id: "rh10", text: "Benachrichtigungen von bank.example nicht markieren, nur archivieren", expected: { from: ["bank.example"], category: "notification", move: "archive" } },
+  { id: "rh11", text: "Spam-Verdacht direkt in den Junk-Ordner", expected: { category: "spam_suspect", move: "spam" } },
+  { id: "rh12", text: "Betreff enthält Abo – dann als gelesen markieren und ins Archiv", expected: { subject: ["Abo"], markRead: true, move: "archive" } },
 ];

@@ -8,3 +8,4 @@ export * from "./accountSync.js";
 export * from "./mailService.js";
 export * from "./smtp.js";
 export * from "./attachmentText.js";
+export * from "./ruleService.js";

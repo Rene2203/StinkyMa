@@ -6,6 +6,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "rea
 const SignatureEditor = lazy(() => import("./SignatureEditor.js"));
 import { useBrowserState, useUi } from "../context.js";
 import { AISection } from "./AISection.js";
+import { RulesSection } from "./RulesSection.js";
 
 /** Dialog „Optionen“. Erster Bereich: Absender, deren externe Inhalte sofort geladen werden. */
 export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onClose: () => void }) {
@@ -121,6 +122,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
         {state.appSettings && <OAuthSection />}
 
         <ScreenerSection />
+
+        <RulesSection />
 
         <section className="options-section" aria-labelledby="options-signature-heading">
           <h3 id="options-signature-heading">

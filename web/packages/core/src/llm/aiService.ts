@@ -6,6 +6,7 @@ import { categorizeWindowDays, maxPageImageChars, normalizeAISettings, type Acti
 import { modelCatalog, type CatalogModel } from "../ai/catalog.js";
 import { promptVersions } from "../ai/prompts.js";
 import { AIRouter, GrantPolicy } from "../ai/router.js";
+import { interpretRule, interpretRuleWithRules, type RuleInterpretation } from "../ai/rules.js";
 import { categorizeMessage, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
 import { AIBlockedError, AINotConfiguredError, type AIImage, type AIProvider, type AIRequest } from "../ai/types.js";
 import type { Message } from "../models.js";
@@ -440,6 +441,23 @@ export class AIService implements AIApi {
   /** Für Tests: wartet, bis laufende Hintergrund-Erkennungen fertig sind. */
   async settled(): Promise<void> {
     await Promise.all([...this.#scanning.values()]);
+  }
+
+  /**
+   * Regel aus normaler Sprache (W6.4): mit Modell, falls bereit – sonst (oder bei Fehlern) die einfachen Regeln.
+   * Der Text stammt vom Nutzer, nicht aus Mails.
+   */
+  async interpretRule(text: string, folders: readonly string[], accountIds: string[]): Promise<RuleInterpretation> {
+    if (!(await this.#modelReady()) || accountIds.length === 0) return interpretRuleWithRules(text, folders);
+    try {
+      const { router } = await this.#router();
+      return await interpretRule(router, text, folders, accountIds);
+    } catch (error) {
+      if (!(error instanceof AINotConfiguredError || error instanceof AIBlockedError)) {
+        this.#error = error instanceof Error ? error.message : String(error);
+      }
+      return interpretRuleWithRules(text, folders);
+    }
   }
 
   async #modelReady(): Promise<boolean> {

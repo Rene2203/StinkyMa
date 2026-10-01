@@ -118,6 +118,24 @@ Prüft, ob v2 nur auf den eigenen Testsatz passt. Kategorie richtig (Phishing er
   Zeit. Für Aktionen bleibt E2B die Wahl; die Regeln laufen ohnehin sofort und die KI verfeinert im Hintergrund.
 - Ehrlich: Die Regeln wurden an diesem Satz entwickelt; ihre 93 % sind deshalb eher optimistisch.
 
+## Regeln in eigenen Worten (W6.4, 01.10.2026)
+
+24 Testsätze (daran wurden die einfachen Regeln entwickelt) und 12 Kontrollsätze (vorher geschrieben, nie zum Verbessern
+benutzt), z. B. „Rechnungen von stadtwerke.example in Steuer 2026“. Richtig = alle Felder der Regel stimmen.
+`eval-models.ts --rules`, 4 CPU-Kerne.
+
+| Verfahren | Testsatz | Kontrollsatz | Modell gefragt | Zeit je Modell-Aufruf |
+|---|---|---|---|---|
+| Regeln (ohne KI) | 24/24 | 10/12 | – | 0 s |
+| Gemma 4 E2B, nur Modell | 18/24 | 6/12 | 36 | 5,3 s |
+| **Gemma 4 E2B, Regeln zuerst** (Standard) | **24/24** | **11/12** | 1 | 8,4 s |
+
+- Das Modell allein **erfindet eine „Art“ dazu** („Lohnsteuer im Betreff“ → Rechnung, „Chefin“ → Arbeit, „Oma Hilde“ →
+  persönlich) und setzt bei „markieren“ manchmal zusätzlich „gelesen“. Für ein ~3B-Modell ist die Aufgabe offenbar zu offen.
+- Deshalb entscheidet die App: **zuerst die Regeln, das Modell nur, wenn die nichts Brauchbares ergeben** (keine Bedingung,
+  keine Aktion, unbekannter Ordner). Im Kontrollsatz rettet es so „Spam-Verdacht direkt in den Junk-Ordner“.
+- Offen: Verneinung („nicht markieren, nur archivieren“) – beide Verfahren markieren trotzdem. Im Formular sichtbar.
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,
