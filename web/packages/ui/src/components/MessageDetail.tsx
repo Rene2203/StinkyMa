@@ -156,7 +156,7 @@ function AttachmentItem({ attachment: a }: { attachment: Attachment }) {
         <button
           type="button"
           className="attachment-open"
-          onClick={() => void store.openAttachment(a.id)}
+          onClick={() => void store.showAttachment(a)}
           disabled={busy}
           title={t("attachment.open")}
           aria-label={`${t("attachment.open")}: ${a.filename}`}

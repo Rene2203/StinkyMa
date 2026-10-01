@@ -94,7 +94,8 @@ describe("MIME", () => {
     expect(m.bodyHtml).toContain("<b>Angebot</b>");
     expect(m.snippet).toBe("Hallo Anna, anbei das Angebot.");
     expect(m.attachments).toEqual([
-      { filename: "Angebot.pdf", mimeType: "application/pdf", size: 13, contentId: null, isInline: false },
+      // Inhalt nur, damit beim Abgleich Text für die Suche gelesen werden kann (wird nicht gespeichert)
+      { filename: "Angebot.pdf", mimeType: "application/pdf", size: 13, contentId: null, isInline: false, content: expect.any(Buffer) },
     ]);
   });
 

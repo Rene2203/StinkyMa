@@ -2,6 +2,7 @@ import { convert } from "html-to-text";
 import { simpleParser, type AddressObject, type ParsedMail } from "mailparser";
 import type { EmailAddress } from "../models.js";
 import { makeSnippet } from "../mockData.js";
+import { isExtractable } from "./attachmentText.js";
 
 export interface ParsedAttachment {
   filename: string;
@@ -9,6 +10,8 @@ export interface ParsedAttachment {
   size: number;
   contentId: string | null;
   isInline: boolean;
+  /** Inhalt nur bei Anhängen, aus denen Text für die Suche gelesen wird (PDF, Text) – nicht gespeichert. */
+  content?: Buffer;
 }
 
 export interface ParsedMessage {
@@ -84,13 +87,18 @@ export async function parseMessage(source: Buffer | string): Promise<ParsedMessa
     bodyText,
     bodyHtml,
     snippet: snippetFromText(bodyText ?? ""),
-    attachments: mail.attachments.map((a) => ({
-      filename: a.filename ?? "Anhang",
-      mimeType: a.contentType,
-      size: a.size,
-      contentId: a.cid ?? null,
-      isInline: a.related || a.contentDisposition === "inline",
-    })),
+    attachments: mail.attachments.map((a) => {
+      const filename = a.filename ?? "Anhang";
+      const isInline = a.related || a.contentDisposition === "inline";
+      return {
+        filename,
+        mimeType: a.contentType,
+        size: a.size,
+        contentId: a.cid ?? null,
+        isInline,
+        ...(!isInline && isExtractable(filename, a.contentType, a.size) ? { content: a.content } : {}),
+      };
+    }),
   };
 }
 

@@ -185,6 +185,16 @@ export class MailWriter {
     });
   }
 
+  /** Text eines Anhangs für die Suche (vorhandener Text wird ersetzt). */
+  setAttachmentText(attachmentId: string, text: string, source: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO attachmentText (attachmentId, text, source) VALUES (?, ?, ?)
+         ON CONFLICT(attachmentId) DO UPDATE SET text = excluded.text, source = excluded.source`,
+      )
+      .run(attachmentId, text, source);
+  }
+
   updateFlags(messageId: string, flags: number): void {
     this.db.prepare("UPDATE message SET flags = ? WHERE id = ?").run(flags, messageId);
   }

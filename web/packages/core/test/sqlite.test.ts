@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createMockData, MockIds } from "../src/index.js";
-import { migrate, migrations, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
+import { MailWriter, migrate, migrations, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
 
 describe("SQLite-Schema", () => {
   it("legt alle Tabellen aus Abschnitt 8 an", () => {
@@ -79,3 +79,26 @@ describe("SQLite-Schema", () => {
     expect(rows.every((r) => r.a.endsWith(".example"))).toBe(true);
   });
 });
+
+describe("Suche in Anhängen", () => {
+  it("findet eine Mail über den Text ihres Anhangs; von: gilt für die Mail; Löschen räumt den Index", async () => {
+    const db = openDatabase(":memory:");
+    seedIfEmpty(db, createMockData(new Date("2026-09-29T10:00:00Z")));
+    const repo = new SqliteMailRepository(db);
+    const writer = new MailWriter(db);
+    const invoice = (await repo.messages({ kind: "unifiedInbox" }, 100)).find((m) => m.subject === "Nebenkostenabrechnung 2025")!;
+    const [attachment] = await repo.attachments(invoice.id);
+    writer.setAttachmentText(attachment!.id, "Zählernummer 98765 Kaltwasser", "pdf");
+
+    expect((await repo.search("zahlernummer", { limit: 10 })).map((m) => m.id)).toEqual([invoice.id]);
+    expect((await repo.search("98765 kaltwasser", { limit: 10 })).map((m) => m.id)).toEqual([invoice.id]);
+    expect(await repo.search(`98765 von:${invoice.from.address.split("@")[0]}`, { limit: 10 })).toHaveLength(1);
+    expect(await repo.search("98765 von:niemand", { limit: 10 })).toEqual([]);
+    // erneutes Setzen ersetzt den Text
+    writer.setAttachmentText(attachment!.id, "Neuer Inhalt", "pdf");
+    expect(await repo.search("98765", { limit: 10 })).toEqual([]);
+    writer.deleteMessages([invoice.id]);
+    expect(await repo.search("neuer inhalt", { limit: 10 })).toEqual([]);
+  });
+});
+

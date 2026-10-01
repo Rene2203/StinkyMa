@@ -6,9 +6,25 @@ export interface AttachmentFiles {
   open(attachmentId: string): Promise<void>;
   /** Fragt nach einem Speicherort und speichert. `false`, wenn der Nutzer abbricht. */
   save(attachmentId: string): Promise<boolean>;
+  /** Inhalt für die Vorschau in der App (nur Formate aus `previewKind`, begrenzte Größe). */
+  read(attachmentId: string): Promise<{ filename: string; mimeType: string; contentBase64: string }>;
 }
 
-export const attachmentFilesMethods = ["open", "save"] as const satisfies readonly (keyof AttachmentFiles)[];
+export const attachmentFilesMethods = ["open", "save", "read"] as const satisfies readonly (keyof AttachmentFiles)[];
+
+/** Größter Anhang, der in der App angezeigt wird (größere: mit dem Standardprogramm öffnen). */
+export const previewLimitBytes = 30 * 1024 * 1024;
+
+export type PreviewKind = "pdf" | "image" | "text";
+
+/** Kann StinkyMa den Anhang selbst anzeigen? Bilder nur in sicheren Rasterformaten (kein SVG – das kann Skripte enthalten). */
+export function previewKind(filename: string, mimeType: string): PreviewKind | null {
+  const extension = filename.toLowerCase().split(".").pop() ?? "";
+  if (mimeType === "application/pdf" || extension === "pdf") return "pdf";
+  if (["png", "jpg", "jpeg", "gif", "webp", "bmp"].includes(extension) || /^image\/(png|jpe?g|gif|webp|bmp)$/.test(mimeType)) return "image";
+  if (["txt", "csv", "log", "md"].includes(extension) || mimeType === "text/plain" || mimeType === "text/csv") return "text";
+  return null;
+}
 
 /** Endungen, die Programme starten oder Skripte ausführen können – nie per Doppelklick öffnen. */
 const riskyExtensions = new Set([

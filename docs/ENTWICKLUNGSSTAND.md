@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W4 – Suche, IDLE, Infobereich, Anhang-Ansicht (in Arbeit). Gmail vorerst mit App-Passwort (Entscheidung Nutzer).
+**Aktuelle Phase:** W4 fertig (lokal geprüft) – Windows-CI und Test durch den Nutzer stehen aus; als Nächstes W5 (KI-Basis mit 3B-Modell)
 
 ## Überblick
 
@@ -269,3 +269,10 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   kaputter Datei, E2E (Modus gespeichert, Schließen versteckt, Beenden/Neustart weiterhin sauber).
   **Ungeprüft:** Tray-Symbol und Autostart unter echtem Windows (im Linux-Test ohne Infobereich), Verhalten bei
   Windows-Abmeldung.
+- **W4 Baustein 4 – Anhang-Vorschau und -Suche:** `extractAttachmentText` (unpdf, Grenzen), Textauslese im Abgleich,
+  `attachmentFTS` (v8) und Suche per UNION (Absender-Filter gilt über die Mail), `AttachmentFiles.read` +
+  `previewKind`, Vorschau-Dialog (lazy). Tests: Textauslese inkl. kaputtem PDF, SQLite-Suche im Anhang (ersetzen,
+  löschen), GreenMail (PDF beim Abgleich gelesen und gefunden), E2E (kaputtes PDF → Hinweis + extern öffnen;
+  echtes PDF → Seite gerendert, Suche findet Anhang-Text). **W4 damit komplett.** Lokal alle Tests + 3 E2E grün.
+  **Bekannt:** bereits abgerufene Mails haben noch keinen Anhang-Text (kein erneuter Download); gescannte PDFs ohne
+  Textebene bleiben unauffindbar (Texterkennung/OCR später). **Ungeprüft:** Tempo der PDF-Auslese auf dem N97.

@@ -7,6 +7,8 @@ import {
   type AccountSettings,
   type AccountsApi,
   type AttachmentFiles,
+  type PreviewKind,
+  previewKind,
   type AppSettings,
   type AppSettingsApi,
   type Attachment,
@@ -73,6 +75,8 @@ export interface BrowserState {
   outbox: OutboxItem[];
   /** Anhang, der gerade vom Server geholt wird (Öffnen/Speichern). */
   attachmentBusy: string | null;
+  /** Offene Vorschau eines Anhangs in der App. */
+  preview: { attachmentId: string; filename: string; kind: PreviewKind } | null;
   /** Einstellungen der App (nur Windows-App) und welche es auf dieser Plattform gibt. */
   appSettings: AppSettings | null;
   appSettingsAvailable: Partial<Record<keyof AppSettings, boolean>>;
@@ -97,6 +101,7 @@ export const initialState: BrowserState = {
   compose: null,
   outbox: [],
   attachmentBusy: null,
+  preview: null,
   appSettings: null,
   appSettingsAvailable: {},
 };
@@ -193,6 +198,23 @@ export class BrowserStore {
   /** Können Anhänge geöffnet/gespeichert werden (Windows-App)? */
   get canOpenAttachments(): boolean {
     return this.#files !== undefined;
+  }
+
+  /** Vorschau in der App (PDF, Bild, Text); andere Formate öffnen im Standardprogramm. */
+  async showAttachment(attachment: { id: string; filename: string; mimeType: string }): Promise<void> {
+    const kind = previewKind(attachment.filename, attachment.mimeType);
+    if (kind && this.#files) this.#set({ preview: { attachmentId: attachment.id, filename: attachment.filename, kind } });
+    else await this.openAttachment(attachment.id);
+  }
+
+  closePreview(): void {
+    this.#set({ preview: null });
+  }
+
+  /** Inhalt für die Vorschau (Fehler an den Vorschau-Dialog, nicht ins Banner). */
+  readAttachment(id: string): Promise<{ filename: string; mimeType: string; contentBase64: string }> {
+    if (!this.#files) return Promise.reject(new Error("Vorschau ist hier nicht verfügbar."));
+    return this.#files.read(id);
   }
 
   openAttachment(id: string): Promise<void> {

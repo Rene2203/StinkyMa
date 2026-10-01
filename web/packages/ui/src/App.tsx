@@ -11,6 +11,8 @@ import { BrowserStore, selectedMessage } from "./store.js";
 
 // Das Mail-Fenster (mit Editor) wird erst beim ersten Öffnen geladen – schnellerer Start auf schwachen Rechnern.
 const Composer = lazy(() => import("./components/Composer.js"));
+// Vorschau für Anhänge (mit PDF-Baustein) ebenfalls erst bei Bedarf laden.
+const AttachmentViewer = lazy(() => import("./components/AttachmentViewer.js"));
 
 export interface AppProps {
   repository: MailRepository;
@@ -63,6 +65,11 @@ function Shell() {
       {state.compose && (
         <Suspense fallback={null}>
           <Composer draft={state.compose} />
+        </Suspense>
+      )}
+      {state.preview && (
+        <Suspense fallback={null}>
+          <AttachmentViewer key={state.preview.attachmentId} {...state.preview} />
         </Suspense>
       )}
       {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}

@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createMockData, InMemorySecretStore, isDemoAccount, isRead, SecretKeys } from "../src/index.js";
 import { extractAttachment, MailService, parseMessage, type AccountSettings } from "../src/mail/index.js";
 import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
-import { sampleReply } from "./fixtures.js";
+import { minimalPdf, sampleReply } from "./fixtures.js";
 
 // Läuft gegen einen lokalen GreenMail-Testserver (nie gegen echte Konten):
 //   java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -jar greenmail-standalone.jar
@@ -484,6 +484,27 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     await service.addAccount(settings(), "geheim", { removeDemoAccounts: true });
     await service.syncNow();
     expect(notified).toEqual([]);
+  });
+
+  it("Anhang-Text: PDF wird beim Abgleich gelesen und ist durchsuchbar", async () => {
+    const boundary = "pdf42";
+    await admin.append(
+      "INBOX",
+      [
+        "From: Versicherung <post@versicherung.example>", `To: ${user}`, "Subject: Ihre Unterlagen", `Date: ${now.toUTCString()}`,
+        "Message-ID: <pdf1@versicherung.example>", "MIME-Version: 1.0", `Content-Type: multipart/mixed; boundary="${boundary}"`, "",
+        `--${boundary}`, "Content-Type: text/plain; charset=utf-8", "", "Anbei Ihre Police.",
+        `--${boundary}`, 'Content-Type: application/pdf; name="Police.pdf"', 'Content-Disposition: attachment; filename="Police.pdf"',
+        "Content-Transfer-Encoding: base64", "", minimalPdf("Versicherungsschein Nummer VS-424242").toString("base64"),
+        `--${boundary}--`, "",
+      ].join("\r\n"),
+      [],
+      now,
+    );
+    await addAndSync();
+    const hits = await service.search("versicherungsschein", { limit: 10 });
+    expect(hits.map((m) => m.subject)).toEqual(["Ihre Unterlagen"]);
+    expect((await service.search("424242", { limit: 10 })).map((m) => m.subject)).toEqual(["Ihre Unterlagen"]);
   });
 });
 

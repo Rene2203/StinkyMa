@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expectScrollable, removeQuietly } from "./helpers";
+import { minimalPdf } from "../../../packages/core/test/fixtures";
 
 // Konto einrichten gegen einen lokalen GreenMail-Testserver (nie gegen echte Konten).
 // Start: java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -jar greenmail-standalone.jar
@@ -222,7 +223,13 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect.poll(() => existsSync(savePath)).toBe(true);
     expect(readFileSync(savePath, "utf8")).toBe("%PDF-1.4 Vertrag");
 
+    // Klick öffnet die Vorschau in der App; dieses Test-PDF ist absichtlich kaputt → Hinweis, extern öffnen geht weiter
     await items.nth(0).getByRole("button", { name: /Öffnen/ }).click();
+    const viewer = page.getByTestId("attachment-viewer");
+    await expect(viewer.getByRole("alert")).toContainText("lässt sich hier nicht anzeigen");
+    await viewer.getByRole("button", { name: "Mit Standardprogramm öffnen" }).click();
+    await viewer.getByTestId("viewer-close").click();
+    await expect(viewer).toHaveCount(0);
     await expect.poll(() => app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? [])).toHaveLength(1);
     const [opened] = await app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? []);
     expect(opened).toMatch(/Vertrag\.pdf$/);
@@ -474,6 +481,40 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([false]);
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.show());
     await expect(page.getByTestId("sidebar-unifiedInbox")).toBeVisible();
+  });
+
+  await test.step("Echtes PDF: Vorschau in der App zeigt die Seite, Suche findet den Text im Anhang", async () => {
+    const boundary = "pdfe2e";
+    const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+    await admin.connect();
+    await admin.append(
+      "INBOX",
+      [
+        "From: Versicherung <post@versicherung.example>", `To: ${email}`, "Subject: Ihre Police", `Date: ${new Date().toUTCString()}`,
+        "Message-ID: <police-e2e@versicherung.example>", "MIME-Version: 1.0", `Content-Type: multipart/mixed; boundary="${boundary}"`, "",
+        `--${boundary}`, "Content-Type: text/plain; charset=utf-8", "", "Anbei Ihre Police.",
+        `--${boundary}`, 'Content-Type: application/pdf; name="Police.pdf"', 'Content-Disposition: attachment; filename="Police.pdf"',
+        "Content-Transfer-Encoding: base64", "", minimalPdf("Versicherungsschein VS-777888").toString("base64"),
+        `--${boundary}--`, "",
+      ].join("\r\n"),
+      [],
+      new Date(),
+    );
+    await admin.logout();
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    const row = page.getByTestId("message-row").filter({ hasText: "Ihre Police" });
+    await expect(row).toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId("search-input").fill("versicherungsschein");
+    await expect(page.getByTestId("message-row")).toHaveCount(1);
+    await row.click();
+    await page.getByRole("button", { name: "Öffnen: Police.pdf" }).click();
+    const viewer = page.getByTestId("attachment-viewer");
+    await expect(viewer.getByTestId("viewer-page")).toHaveCount(1, { timeout: 10_000 });
+    await page.screenshot({ path: join(screenshotDir, "17-PDF-Vorschau.png") });
+    await page.keyboard.press("Escape");
+    await expect(viewer).toHaveCount(0);
+    await page.getByTestId("search-input").press("Escape");
   });
 
   await test.step("Abruf per Knopf", async () => {

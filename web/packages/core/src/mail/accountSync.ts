@@ -3,6 +3,7 @@ import { MessageFlag, type Account, type Mailbox, type MailboxRole } from "../mo
 import type { MailWriter } from "../sqlite/writer.js";
 import { flagsFromImap } from "./flags.js";
 import { parseMessage } from "./parse.js";
+import { extractAttachmentText } from "./attachmentText.js";
 import { assignUniqueRoles, isVirtualFolder, mailboxRole } from "./roles.js";
 import { baseSubject, threadIdFor } from "./threading.js";
 
@@ -146,6 +147,12 @@ async function syncMailbox(
           flags: flagsFromImap(msg.flags),
           attachments: parsed.attachments,
         });
+        // Text aus PDF-/Text-Anhängen für die Suche – Fehler dabei halten den Abgleich nie auf.
+        for (const [index, attachment] of parsed.attachments.entries()) {
+          if (!attachment.content) continue;
+          const extracted = await extractAttachmentText({ filename: attachment.filename, mimeType: attachment.mimeType, content: attachment.content });
+          if (extracted) writer.setAttachmentText(`${id}/a${index}`, extracted.text, extracted.source);
+        }
         added += 1;
         if ((flagsFromImap(msg.flags) & MessageFlag.seen) === 0) newUnread.push(id);
         // Dem Main-Prozess Luft lassen: Oberfläche und Aktionen bleiben während des Abgleichs bedienbar.

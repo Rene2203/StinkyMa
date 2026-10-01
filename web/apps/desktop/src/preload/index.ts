@@ -4,7 +4,7 @@ import { contextBridge, ipcRenderer } from "electron";
 const mailMethods = ["accounts", "mailboxes", "messages", "thread", "message", "attachments", "unreadCount", "overview", "setFlag", "move",
   "remoteContentExceptions", "addRemoteContentException", "removeRemoteContentException", "send", "reopenOutgoing", "saveDraft", "deleteDraft", "openDraft", "suggestAddresses", "setSignature", "search"];
 const accountMethods = ["addAccount", "testConnection", "removeAccount", "syncNow", "syncStatus"];
-const fileMethods = ["open", "save"];
+const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
 
 const bridge = (channel: string, methods: string[]) =>

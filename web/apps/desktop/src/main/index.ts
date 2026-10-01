@@ -8,6 +8,8 @@ import {
   attachmentFilesMethods,
   createMockData,
   isRiskyAttachment,
+  previewKind,
+  previewLimitBytes,
   displayName,
   mailRepositoryMethods,
   safeFilename,
@@ -220,6 +222,13 @@ const attachmentFiles: AttachmentFiles = {
     if (result.canceled || !result.filePath) return false;
     writeFileSync(result.filePath, attachment.content);
     return true;
+  },
+  async read(attachmentId: string) {
+    if (!service) throw new Error("Datenbank ist noch nicht bereit");
+    const attachment = await service.attachmentContent(attachmentId);
+    if (!previewKind(attachment.filename, attachment.mimeType)) throw new Error("Dieses Format kann StinkyMa nicht selbst anzeigen.");
+    if (attachment.content.length > previewLimitBytes) throw new Error("Der Anhang ist zu groß für die Vorschau – bitte mit dem Standardprogramm öffnen.");
+    return { filename: attachment.filename, mimeType: attachment.mimeType, contentBase64: attachment.content.toString("base64") };
   },
 };
 

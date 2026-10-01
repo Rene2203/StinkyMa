@@ -280,6 +280,28 @@ export const migrations: Migration[] = [
       ALTER TABLE account ADD COLUMN signatureHtml TEXT;
     `,
   },
+  {
+    name: "v8-attachment-search",
+    // Suchindex über den Text von Anhängen (PDF, Text) – gleiche Regeln wie für Mails (ohne Akzente, Wortanfang).
+    sql: `
+      CREATE VIRTUAL TABLE attachmentFTS USING fts5(
+        text,
+        content='attachmentText', content_rowid='rowid',
+        tokenize='unicode61 remove_diacritics 2', prefix='2 3'
+      );
+      INSERT INTO attachmentFTS(rowid, text) SELECT rowid, text FROM attachmentText;
+      CREATE TRIGGER attachment_fts_ai AFTER INSERT ON attachmentText BEGIN
+        INSERT INTO attachmentFTS(rowid, text) VALUES (new.rowid, new.text);
+      END;
+      CREATE TRIGGER attachment_fts_ad AFTER DELETE ON attachmentText BEGIN
+        INSERT INTO attachmentFTS(attachmentFTS, rowid, text) VALUES ('delete', old.rowid, old.text);
+      END;
+      CREATE TRIGGER attachment_fts_au AFTER UPDATE ON attachmentText BEGIN
+        INSERT INTO attachmentFTS(attachmentFTS, rowid, text) VALUES ('delete', old.rowid, old.text);
+        INSERT INTO attachmentFTS(rowid, text) VALUES (new.rowid, new.text);
+      END;
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

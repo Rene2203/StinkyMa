@@ -42,3 +42,13 @@ export function ftsExpression(query: SearchQuery): string {
   ];
   return parts.join(" AND ");
 }
+
+/** FTS5-Ausdruck nur aus den freien Begriffen (für Anhang-Texte, die keinen Absender haben). */
+export function ftsTermsExpression(query: SearchQuery): string {
+  return ftsExpression({ terms: query.terms, from: [] });
+}
+
+/** FTS5-Ausdruck nur für den Absender. */
+export function ftsFromExpression(query: SearchQuery): string {
+  return ftsExpression({ terms: [], from: query.from });
+}

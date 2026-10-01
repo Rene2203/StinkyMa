@@ -50,7 +50,7 @@ Die Phasen folgen der Spezifikation (Abschnitt 9), angepasst an Windows. ★ = V
 | **W1 – Fundament** | Electron-App, Drei-Spalten-Oberfläche mit Mock-Daten, SQLite-Schema + Migrationen, sicherer Speicher (DPAPI), Tests, Windows-CI mit Installer | ✅ umgesetzt |
 | **W2 – Ein Konto lesen** | IMAP (imapflow), Konto-Einrichtung mit iCloud (app-spezifisches Passwort), Ordner & Mails laden, MIME parsen, HTML sicher anzeigen (ohne Skripte, externe Bilder blockiert) | ✅ umgesetzt (mit echtem Konto noch ungetestet) |
 | **W3 – Mehrere Konten & Senden** | Auto-Discovery, OAuth Gmail/Outlook (Loopback-Redirect + PKCE), SMTP, Composer, Entwürfe, Offline-Warteschlange | 🚧 Composer, SMTP, Postausgang, Formatierung, Entwürfe, Anhänge, Adressvorschläge, Signatur, Weiterleiten umgesetzt; offen: OAuth Gmail/Outlook |
-| **W4 – Suche & Sync** | FTS5-Suche in der Oberfläche, IDLE, Sync im Hintergrund (Infobereich/Tray), Autostart, Anhang-Reader (PDF.js), Textextraktion | offen |
+| **W4 – Suche & Sync** | FTS5-Suche in der Oberfläche, IDLE, Sync im Hintergrund (Infobereich/Tray), Autostart, Anhang-Reader (PDF.js), Textextraktion | ✅ umgesetzt (mit echten Konten ungeprüft) |
 | **W5 – KI-Basis** | `AIProvider`/`AIRouter` mit Datenschutz-Prüfung in TypeScript, lokales **3B-Modell als Standard** (llama.cpp, läuft auch nur auf der CPU), optional Ollama/größere Modelle; Test-Set, gemessen mit 3B; Zusammenfassung, Kategorisierung | offen |
 | **S1 – Server & Browser** | `apps/server`: HTTP-API + gleiche Oberfläche im Browser, Login, Docker Compose, Zugriff nur im Heimnetz/VPN | offen |
 | danach | Spezifikation Phasen 6–15 (eigene Modelle, Assistent, Alleinstellungsmerkmale …) für Windows & Server | offen |

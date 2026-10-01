@@ -19,6 +19,12 @@
   im Infobereich, Standard aus), Benachrichtigungen „Absender und Betreff“ / „Nur ‚Neue Mail‘“ / „Aus“.
   Gespeichert in `settings.json` im Benutzerordner (tolerant gegen kaputte Dateien).
 - Platzhalter-Symbol (Briefumschlag auf Blau) für Fenster, Installer und Infobereich – App-Name/Logo stehen noch aus.
+- **Anhang-Vorschau in der App:** PDF (PDF.js über `unpdf`, ohne Skripte, bis 50 Seiten), Bilder (PNG/JPEG/GIF/WebP/BMP –
+  kein SVG) und Text; bis 30 MB. Knöpfe: im Standardprogramm öffnen, speichern. Andere Formate öffnen wie bisher extern.
+  Der PDF-Baustein wird erst beim ersten Öffnen geladen.
+- **Anhänge durchsuchbar:** Text aus PDF- und Textanhängen wird beim Abgleich gelesen (kein zusätzlicher Download;
+  Grenzen 15 MB / 30 Seiten / 10 s) und in einem eigenen Suchindex abgelegt (Migration `v8-attachment-search`).
+  Die Suche findet Mails auch über den Text ihrer Anhänge. Gilt für ab jetzt abgerufene Mails.
 
 ## W3 – Gmail-Vorbereitung
 

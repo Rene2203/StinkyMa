@@ -13,7 +13,7 @@ import type {
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 import { requireRemoteContentException } from "../remoteContent.js";
-import { ftsExpression, isEmptySearch, parseSearchQuery } from "../search.js";
+import { ftsExpression, ftsFromExpression, ftsTermsExpression, isEmptySearch, parseSearchQuery } from "../search.js";
 import { normalizeSignature, draftFromMessage, formatAddressList, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "../compose.js";
 import type { OutboxItem } from "../repository.js";
 
@@ -283,17 +283,37 @@ export class SqliteMailRepository implements MailRepository {
   async search(query: string, options: { scope?: MessageScope | null; limit: number }): Promise<Message[]> {
     const parsed = parseSearchQuery(query);
     if (isEmptySearch(parsed)) return [];
+    let nextParam = 0;
     const scope = options.scope ? scopeCondition(options.scope) : { sql: "mailbox.role NOT IN ('trash', 'spam')", params: [] };
+    // Treffer im Mailtext ODER im Text eines Anhangs (dort gelten die freien Begriffe, der Absender kommt von der Mail).
+    const attachmentHits =
+      parsed.terms.length === 0
+        ? ""
+        : `UNION
+           SELECT attachment.messageId FROM attachmentFTS
+             JOIN attachmentText ON attachmentText.rowid = attachmentFTS.rowid
+             JOIN attachment ON attachment.id = attachmentText.attachmentId
+            WHERE attachmentFTS MATCH @terms
+              ${parsed.from.length ? "AND attachment.messageId IN (SELECT message.id FROM messageFTS JOIN message ON message.rowid = messageFTS.rowid WHERE messageFTS MATCH @from)" : ""}`;
     const rows = this.db
       .prepare(
-        `SELECT message.* FROM messageFTS
-           JOIN message ON message.rowid = messageFTS.rowid
+        `WITH hits AS (
+           SELECT message.id AS id FROM messageFTS JOIN message ON message.rowid = messageFTS.rowid WHERE messageFTS MATCH @all
+           ${attachmentHits}
+         )
+         SELECT message.* FROM message
            JOIN mailbox ON mailbox.id = message.mailboxId
-          WHERE messageFTS MATCH ? AND ${scope.sql} AND NOT ${archiveDuplicate}
+          WHERE message.id IN (SELECT id FROM hits) AND ${scope.sql.replace(/\?/g, () => "@p" + nextParam++)} AND NOT ${archiveDuplicate}
           ORDER BY message.date DESC
-          LIMIT ?`,
+          LIMIT @limit`,
       )
-      .all(ftsExpression(parsed), ...scope.params, options.limit) as Row[];
+      .all({
+        all: ftsExpression(parsed),
+        terms: ftsTermsExpression(parsed),
+        from: ftsFromExpression(parsed),
+        limit: options.limit,
+        ...Object.fromEntries(scope.params.map((value, i) => [`p${i}`, value])),
+      }) as Row[];
     return rows.map(messageFromRow);
   }
 
