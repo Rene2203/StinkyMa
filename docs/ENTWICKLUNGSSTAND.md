@@ -507,3 +507,12 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   „funktioniert super“. Welche Punkte im Einzelnen geprüft wurden (Update über alte Installation, „alle Mails“ bei Gmail,
   Trefferquote der Schutz-Regeln), ist nicht genauer gemeldet. Nächster Schritt: W7 (Verträge & Abos, Belegordner,
   Versprechen-Tracker) bzw. Feinabstimmung der Modelle.
+- **Feinabstimmung Gemma E2B/E4B begonnen (Wunsch des Nutzers, 01.10.2026) – in Arbeit:**
+  - Zusammenfassung **Prompt v3**: „wer ist dran“ als zwei Ja/Nein-Fragen; wer die letzte Mail schrieb, bestimmt der Code.
+    Neuer Kontrollsatz mit 10 Konversationen (`evalHoldoutThreads`, vor v3 geschrieben). v2 bleibt für Vergleichsmessungen
+    wählbar (`eval-models.ts --summaries [--summary-v2]`). **Messung läuft noch – Ergebnis offen.**
+  - Aktionen: Jahr bei Daten ohne Jahreszahl setzt der Code (Modelle rieten 2027 für „31. Oktober“); Regeln verstehen
+    Wochentage, „morgen“, „übermorgen“ (nicht bei Öffnungszeiten/„immer dienstags“); Modell bekommt die nächsten 7 Tage als
+    Liste. Regeln ohne KI: 95,0 % von 60 Angaben, 0 unnötige. 14 neue Fälle mit relativen Angaben, davon 6 als
+    Kontrollfälle – einer deckte einen Fehler auf („Schalter 3. Bitte“ galt als Datum), behoben; die Kontrollfälle sind
+    damit nicht mehr ganz unberührt. Modell-Messung der Aktionen steht noch aus.

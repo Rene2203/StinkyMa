@@ -278,6 +278,132 @@ export const evalThreads: EvalThread[] = [
   },
 ];
 
+/**
+ * Kontrollsatz für Zusammenfassungen (geschrieben am 01.10.2026 vor der Feinabstimmung v3, nie zum Verbessern benutzt):
+ * prüft, ob „wer ist dran“ auch bei neuen Konversationen stimmt – inklusive Fällen, in denen die letzte Mail von
+ * jemand anderem stammt, aber der Nutzer trotzdem wartet (und umgekehrt).
+ */
+export const evalHoldoutThreads: EvalThread[] = [
+  {
+    id: "h01",
+    ownAddress: anna,
+    mails: [
+      { from: { name: "Vermieter Peters", address: "k.peters@hausbesitz.example" }, date: "2026-09-29T08:00:00Z", subject: "Heizungswartung", body: "Hallo Frau Beispiel,\nam Dienstag, 7.10., kommt der Heizungsmonteur zwischen 8 und 12 Uhr. Können Sie ihm Zugang zur Wohnung ermöglichen? Bitte kurz bestätigen.\nK. Peters" },
+    ],
+    facts: ["7.10.", "Heizungsmonteur"],
+    waitingOn: "me",
+  },
+  {
+    id: "h02",
+    ownAddress: anna,
+    mails: [
+      { from: annaFrom, date: "2026-09-26T10:00:00Z", subject: "Unterlagen Steuererklärung", body: "Hallo Herr Vogt,\nanbei wie besprochen die Belege für 2025 (Handwerkerrechnungen und Spendenquittungen).\nViele Grüße\nAnna Beispiel" },
+      { from: { name: "Steuerbüro Vogt", address: "kanzlei@vogt-steuer.example" }, date: "2026-09-26T14:00:00Z", subject: "Re: Unterlagen Steuererklärung", body: "Danke, Frau Beispiel, alles ist vollständig angekommen. Wir melden uns, sobald der Bescheid da ist.\nSteuerbüro Vogt" },
+    ],
+    facts: ["2025", "Spendenquittungen"],
+    waitingOn: "nobody",
+  },
+  {
+    id: "h03",
+    ownAddress: anna,
+    mails: [
+      { from: { name: "Malerbetrieb Roth", address: "info@maler-roth.example" }, date: "2026-09-22T09:00:00Z", subject: "Termin Flur streichen", body: "Guten Tag,\nwann dürfen wir den Flur streichen? Wir bräuchten etwa zwei Tage.\nMalerbetrieb Roth" },
+      { from: annaFrom, date: "2026-09-22T18:00:00Z", subject: "Re: Termin Flur streichen", body: "Guten Tag,\nam liebsten in der Woche ab dem 13.10. Passt Ihnen Montag und Dienstag?\nAnna Beispiel" },
+    ],
+    facts: ["13.10.", "Flur"],
+    waitingOn: "others",
+  },
+  {
+    id: "h04",
+    ownAddress: anna,
+    mails: [
+      { from: annaFrom, date: "2026-09-27T08:00:00Z", subject: "Rückfrage Reisekosten", body: "Hallo Herr Neumann,\nwerden die Hotelkosten für die Messe in Köln (3 Nächte, 456 €) übernommen?\nAnna" },
+      { from: { name: "Peter Neumann", address: "p.neumann@firma.example" }, date: "2026-09-27T11:00:00Z", subject: "Re: Rückfrage Reisekosten", body: "Hallo Anna,\ndas muss ich mit der Buchhaltung klären. Ich melde mich bis Freitag bei dir.\nPeter" },
+    ],
+    facts: ["456", "Köln"],
+    waitingOn: "others",
+  },
+  {
+    id: "h05",
+    ownAddress: anna,
+    mails: [
+      { from: { name: "Grundschule Am Park", address: "sekretariat@gs-ampark.example" }, date: "2026-09-30T07:00:00Z", subject: "Elternbrief Ausflug", body: "Liebe Eltern,\nam 16.10. fährt die Klasse 3b in den Zoo. Bitte geben Sie den unterschriebenen Elternbrief und 12 € bis Montag bei der Klassenlehrerin ab.\nIhr Schulteam" },
+    ],
+    facts: ["16.10.", "12"],
+    waitingOn: "me",
+  },
+  {
+    id: "h06",
+    ownAddress: anna,
+    mails: [
+      { from: { name: "Paketblitz", address: "noreply@paketblitz.example" }, date: "2026-09-30T13:00:00Z", subject: "Ihr Paket wurde zugestellt", body: "Ihre Sendung PB 7781 2290 wurde heute um 12:47 Uhr an Ihren Nachbarn (Müller, EG links) übergeben." },
+    ],
+    facts: ["Müller"],
+    waitingOn: "nobody",
+  },
+  {
+    id: "h07",
+    ownAddress: anna,
+    mails: [
+      { from: annaFrom, date: "2026-09-21T09:00:00Z", subject: "Fahrradhelm", body: "Hi Mia,\nkannst du mir deinen alten Fahrradhelm für den Ausflug leihen?\nAnna" },
+      { from: { name: "Mia Hofmann", address: "mia.hofmann@mailbox.example" }, date: "2026-09-21T12:00:00Z", subject: "Re: Fahrradhelm", body: "Klar! Ich habe zwei – welche Größe brauchst du, M oder L?\nMia" },
+    ],
+    facts: ["Fahrradhelm"],
+    waitingOn: "me",
+  },
+  {
+    id: "h08",
+    ownAddress: anna,
+    mails: [
+      { from: annaFrom, date: "2026-09-23T08:00:00Z", subject: "Termin Werkstatt", body: "Guten Tag,\nich hätte gern einen Termin für den Reifenwechsel, am besten nachmittags.\nAnna Beispiel" },
+      { from: { name: "Autohaus Klein", address: "service@autohaus-klein.example" }, date: "2026-09-23T10:00:00Z", subject: "Re: Termin Werkstatt", body: "Sehr geehrte Frau Beispiel,\nIhr Termin für den Reifenwechsel am 14.10. um 15 Uhr ist bestätigt. Dauer ca. 45 Minuten.\nAutohaus Klein" },
+    ],
+    facts: ["14.10.", "15 Uhr", "Reifenwechsel"],
+    waitingOn: "nobody",
+  },
+  {
+    id: "h09",
+    ownAddress: anna,
+    mails: [
+      { from: { name: "Lukas Brandt", address: "l.brandt@firma.example" }, date: "2026-09-29T09:00:00Z", subject: "Budget Messestand", body: "Hallo zusammen,\nder Messestand kostet laut Angebot 8.900 €. Das liegt 900 € über Plan.\nLukas" },
+      { from: { name: "Sabine Krüger", address: "s.krueger@firma.example" }, date: "2026-09-29T10:00:00Z", subject: "Re: Budget Messestand", body: "Danke Lukas. Anna, kannst du die Mehrkosten freigeben? Ohne Freigabe können wir nicht bestellen.\nSabine" },
+    ],
+    facts: ["8.900", "900"],
+    waitingOn: "me",
+  },
+  {
+    id: "h10",
+    ownAddress: anna,
+    mails: [
+      { from: annaFrom, date: "2026-09-25T08:00:00Z", subject: "Zahlungserinnerung Rechnung 2026-118", body: "Sehr geehrter Herr Schulze,\ndie Rechnung 2026-118 über 1.380 € ist seit dem 10.09. fällig. Bitte überweisen Sie den Betrag bis zum 15.10.\nMit freundlichen Grüßen\nAnna Beispiel" },
+    ],
+    facts: ["1.380", "15.10."],
+    waitingOn: "others",
+  },
+];
+
+/**
+ * Relative Angaben (Feinabstimmung, 01.10.2026; vor den Wochentags-Regeln geschrieben): Wochentage, „morgen“,
+ * „übermorgen“ – und Fallen wie Öffnungszeiten. Nur für den Aktionen-Messlauf. Die Mails sind vom Mittwoch, 30.09.2026.
+ */
+export const evalRelativeMails: EvalMail[] = [
+  c("r01", "work", "Sabine Krüger", "s.krueger@firma.example", "Abstimmung Projektplan", "Hallo Anna,\nkönnen wir uns am Dienstag um 9:30 Uhr im Büro zum Projektplan abstimmen?\nSabine"),
+  c("r02", "work", "Peter Neumann", "p.neumann@firma.example", "Unterlagen Messe", "Hallo Anna,\nbitte schick mir die Unterlagen für die Messe bis Freitag.\nPeter"),
+  c("r03", "notification", "Stadtwerke Musterstadt", "service@stadtwerke-musterstadt.example", "Zählerwechsel", "Sehr geehrte Frau Beispiel,\nmorgen um 14 Uhr kommt unser Techniker für den Zählerwechsel. Bitte sorgen Sie für Zugang zum Keller.\nIhre Stadtwerke"),
+  c("r04", "notification", "Kundenservice Allerlei", "service@allerlei-shop.example", "Ihre Anfrage", "Sehr geehrte Frau Beispiel,\nvielen Dank für Ihre Nachricht. Unsere Hotline ist Montag bis Freitag von 8 bis 18 Uhr erreichbar.\nIhr Allerlei-Team"),
+  c("r05", "personal", "Tom Wagner", "tom.wagner@mailbox.example", "Fahrrad", "Hi Anna,\nich bringe dir das Fahrrad am kommenden Montag gegen 17 Uhr vorbei.\nTom"),
+  c("r06", "appointment", "Immobilien Weber", "kontakt@immo-weber.example", "Besichtigung Wohnung", "Sehr geehrte Frau Beispiel,\nübermorgen um 10 Uhr ist die Besichtigung der Wohnung in der Gartenstraße 12.\nImmobilien Weber"),
+  c("r07", "newsletter", "Yoga-Studio Om", "news@yoga-om.example", "Kursplan Herbst", "Liebe Yogis,\nunser Anfängerkurs findet ab sofort immer dienstags um 18 Uhr statt. Wir freuen uns auf euch!"),
+  c("r08", "work", "Frank Lehmann", "f.lehmann@firma.example", "Angebot Hansen", "Hallo Anna,\ndas Angebot für Hansen muss spätestens am Donnerstag raus.\nFrank"),
+  // Kontrollfälle (nach den Regeln geschrieben, nie zum Verbessern benutzt)
+  c("rh1", "personal", "Lena Wagner", "lena.wagner@mailbox.example", "Kaffee?", "Hi Anna,\nhast du Freitagnachmittag um 15 Uhr Zeit für einen Kaffee?\nLena"),
+  c("rh2", "work", "IT-Service", "it@firma.example", "Wartungsfenster", "Hallo zusammen,\nam Sonntag zwischen 6 und 9 Uhr sind die Server wegen Wartung nicht erreichbar.\nIT-Service"),
+  c("rh3", "notification", "Bürgeramt Musterstadt", "termine@buergeramt-musterstadt.example", "Terminbestätigung", "Ihr Termin im Bürgeramt ist morgen um 8:45 Uhr, Schalter 3. Bitte bringen Sie Ihren Ausweis mit."),
+  c("rh4", "work", "Sabine Krüger", "s.krueger@firma.example", "Reisekosten", "Hallo Anna,\ndenk bitte dran, die Reisekostenabrechnung bis Montag einzureichen.\nSabine"),
+  c("rh5", "newsletter", "Bäckerei Korn", "news@baeckerei-korn.example", "Unsere Öffnungszeiten", "Liebe Kundschaft,\nab sofort haben wir samstags von 7 bis 13 Uhr und sonntags von 8 bis 11 Uhr geöffnet."),
+  c("rh6", "personal", "Tom Wagner", "tom.wagner@mailbox.example", "Umzug", "Hi Anna,\nder Umzugswagen kommt übermorgen früh um 7:30 Uhr. Schaffst du es?\nTom"),
+];
+
 /** Erwartete Aktionen (W6.1) – jede Erwartung muss von einer erkannten Aktion erfüllt werden (Datum/Uhrzeit/Betrag). */
 export interface EvalActionCase {
   mailId: string;
@@ -323,6 +449,21 @@ export const evalActionCases: EvalActionCase[] = [
   { mailId: "hn3", expected: [] },
   { mailId: "hn4", expected: [] },
   { mailId: "hx4", expected: [] },
+  // Relative Angaben (Mails vom Mittwoch, 30.09.2026)
+  { mailId: "r01", expected: [{ date: "2026-10-06", time: "09:30" }] },
+  { mailId: "r02", expected: [{ date: "2026-10-02" }] },
+  { mailId: "r03", expected: [{ date: "2026-10-01", time: "14:00" }] },
+  { mailId: "r04", expected: [] },
+  { mailId: "r05", expected: [{ date: "2026-10-05", time: "17:00" }] },
+  { mailId: "r06", expected: [{ date: "2026-10-02", time: "10:00" }] },
+  { mailId: "r07", expected: [] },
+  { mailId: "r08", expected: [{ date: "2026-10-01" }] },
+  { mailId: "rh1", expected: [{ date: "2026-10-02", time: "15:00" }] },
+  { mailId: "rh2", expected: [] },
+  { mailId: "rh3", expected: [{ date: "2026-10-01", time: "08:45" }] },
+  { mailId: "rh4", expected: [{ date: "2026-10-05" }] },
+  { mailId: "rh5", expected: [] },
+  { mailId: "rh6", expected: [{ date: "2026-10-02", time: "07:30" }] },
 ];
 
 // --- Regeln in normaler Sprache (W6.4) ---

@@ -4,7 +4,7 @@ import type { AIMessage, JsonSchema } from "./types.js";
 // Versionierte Prompt-Vorlagen (5.5). Auf Deutsch, kurz und eindeutig – für ~3B-Modelle formuliert.
 // Ändert sich eine Vorlage, steigt die Version (Ergebnisse lassen sich so nachvollziehen und neu messen).
 
-export const promptVersions = { categorize: 2, summarize: 2, readImage: 1 } as const;
+export const promptVersions = { categorize: 2, summarize: 3, readImage: 1 } as const;
 
 export const categories: readonly MessageCategory[] = [
   "personal", "work", "newsletter", "notification", "invoice", "appointment", "spam_suspect",
@@ -52,7 +52,40 @@ Bei Unsicherheit wähle die wahrscheinlichste Kategorie und eine niedrige confid
   ];
 }
 
+// v3 (Feinabstimmung): „wer ist dran“ nicht mehr als eine Wahl aus drei, sondern zwei einfache Ja/Nein-Fragen.
+// Wer die letzte Mail geschrieben hat, bestimmt der Code und sagt es dem Modell ausdrücklich.
 export const summarizeSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    summary: { type: "string", maxLength: 600 },
+    openPoints: { type: "array", items: { type: "string", maxLength: 160 }, maxItems: 4 },
+    nutzerMussHandeln: { type: "boolean" },
+    nutzerWartet: { type: "boolean" },
+  },
+  required: ["summary", "openPoints", "nutzerMussHandeln", "nutzerWartet"],
+  additionalProperties: false,
+};
+
+export function summarizePrompt(thread: string, ownAddresses: string[]): AIMessage[] {
+  return [
+    {
+      role: "system",
+      content: `Du fasst E-Mail-Konversationen auf Deutsch zusammen. Antworte nur mit JSON:
+{"summary": "2 bis 4 kurze Sätze", "openPoints": ["was noch offen ist"], "nutzerMussHandeln": true | false, "nutzerWartet": true | false}
+Mails des Nutzers (${ownAddresses.join(", ") || "Empfänger"}) sind mit „(Nutzer)“ markiert.
+- "summary": Übernimm alle Beträge, Mengen, Daten, Uhrzeiten und Namen genau so, wie sie in den Mails stehen – auch bei Punkten, die schon erledigt sind.
+- "openPoints": offene Fragen, Bitten und Fristen – höchstens 4, sonst leer.
+- "nutzerMussHandeln": true, wenn jemand den Nutzer etwas fragt, ihn um etwas bittet oder ihm eine Frist setzt und der Nutzer darauf noch nicht geantwortet hat. Sonst false.
+- "nutzerWartet": true, wenn der Nutzer auf andere wartet: Er hat zuletzt etwas gefragt oder um etwas gebeten, oder jemand hat angekündigt, sich noch zu melden. Sonst false.
+- Dank, Bestätigungen und reine Informationen: beide false.
+Erfinde nichts.`,
+    },
+    { role: "user", content: thread },
+  ];
+}
+
+/** Fassung v2 – nur noch für Vergleichsmessungen (eval-models.ts --summary-v2). */
+export const summarizeSchemaV2: JsonSchema = {
   type: "object",
   properties: {
     summary: { type: "string", maxLength: 600 },
@@ -63,7 +96,7 @@ export const summarizeSchema: JsonSchema = {
   additionalProperties: false,
 };
 
-export function summarizePrompt(thread: string, ownAddresses: string[]): AIMessage[] {
+export function summarizePromptV2(thread: string, ownAddresses: string[]): AIMessage[] {
   return [
     {
       role: "system",

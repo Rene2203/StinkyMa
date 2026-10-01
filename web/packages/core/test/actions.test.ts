@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { calendarFileName, createMockData, parseActions, quoteFound, ruleActions, toICalendar, type AIRequest, type CatalogModel } from "../src/index.js";
+import { calendarFileName, createMockData, fixYear, parseActions, quoteFound, ruleActions, toICalendar, type AIRequest, type CatalogModel } from "../src/index.js";
 import { AIService, ModelStore, type ManagedProvider } from "../src/llm/index.js";
 import { ActionStore, AIResultStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
 
@@ -65,6 +65,36 @@ describe("Aktionen – Regeln ohne KI", () => {
   it("schweigt bei Werbung und reinen Infos", () => {
     expect(ruleActions("Herbstangebote", "Nur diese Woche 20 % auf alles – ab 9,99 €! Gültig bis 31.10.", mailDate)).toEqual([]);
     expect(ruleActions("Build", "Der Build #212 war erfolgreich.", mailDate)).toEqual([]);
+  });
+});
+
+describe("Aktionen – Feinabstimmung", () => {
+  it("Jahr: steht keins in der Mail, gilt das nächste passende – auch wenn das Modell ein anderes setzt", () => {
+    expect(fixYear("2027-10-31", "Der Vertrag endet am 31. Oktober.", mailDate)).toBe("2026-10-31");
+    expect(fixYear("2027-10-15", "Bitte bis 15.10. einreichen.", mailDate)).toBe("2026-10-15");
+    expect(fixYear("2027-01-10", "Abgabe bis 10.01.", mailDate)).toBe("2027-01-10");
+    // Jahr steht da: bleibt
+    expect(fixYear("2027-10-31", "Der Vertrag endet am 31. Oktober 2027.", mailDate)).toBe("2027-10-31");
+    expect(fixYear("2027-10-15", "Bitte bis 15.10.2027 einreichen.", mailDate)).toBe("2027-10-15");
+    // Datum gar nicht wörtlich in der Mail („morgen“): Modell entscheidet
+    expect(fixYear("2026-10-01", "Bis morgen bitte.", mailDate)).toBe("2026-10-01");
+    const parsed = parseActions('{"items":[{"type":"deadline","title":"Kündigen","date":"2027-10-31","time":"","amount":"","quote":"endet am 31. Oktober"}]}', "Ihr Vertrag endet am 31. Oktober.", mailDate);
+    expect(parsed?.[0]?.date).toBe("2026-10-31");
+  });
+
+  it("Wochentage, morgen, übermorgen (Mail vom Mittwoch); Öffnungszeiten und Wiederkehrendes zählen nicht", () => {
+    const one = (body: string) => ruleActions("Betreff", body, mailDate).map((a) => [a.type, a.date, a.time]);
+    expect(one("Können wir uns am Dienstag um 9:30 Uhr treffen?")).toEqual([["appointment", "2026-10-06", "09:30"]]);
+    expect(one("Bitte schick mir das bis Freitag.")).toEqual([["deadline", "2026-10-02", null]]);
+    expect(one("Morgen kommt niemand. morgen um 14 Uhr kommt der Techniker.")).toEqual([["appointment", "2026-10-01", "14:00"]]);
+    expect(one("Übermorgen ist frei. Die Besichtigung ist übermorgen um 10 Uhr.")).toEqual([["appointment", "2026-10-02", "10:00"]]);
+    expect(one("Am Mittwoch um 10 Uhr?")).toEqual([["appointment", "2026-10-07", "10:00"]]); // gleicher Wochentag: nächste Woche
+    expect(one("Unsere Hotline ist Montag bis Freitag von 8 bis 18 Uhr erreichbar.")).toEqual([]);
+    expect(one("Der Kurs ist immer dienstags um 18 Uhr.")).toEqual([]);
+    expect(one("Guten Morgen! heute morgen war es kalt.")).toEqual([]);
+    expect(one("Ihr Termin ist morgen um 8:45 Uhr, Schalter 3. Bitte Ausweis mitbringen.")).toEqual([["appointment", "2026-10-01", "08:45"]]);
+    // festes Datum im Satz geht vor
+    expect(one("Am Dienstag, 13.10., um 9 Uhr ist der Termin.")).toEqual([["appointment", "2026-10-13", "09:00"]]);
   });
 });
 

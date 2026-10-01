@@ -1,6 +1,6 @@
 import type { Message, MessageCategory } from "../models.js";
 import { mailForModel, threadForModel } from "./prepare.js";
-import { categories, categorizePrompt, categorizeSchema, documentTypes, readImagePrompt, readImageSchema, summarizePrompt, summarizeSchema, type DocumentType } from "./prompts.js";
+import { categories, categorizePrompt, categorizeSchema, documentTypes, readImagePrompt, readImageSchema, summarizePrompt, summarizePromptV2, summarizeSchema, summarizeSchemaV2, type DocumentType } from "./prompts.js";
 import type { AIRouter } from "./router.js";
 import type { AIImage, AIRequest, AIResponse, PrivacyClass } from "./types.js";
 
@@ -45,13 +45,23 @@ export function parseCategory(text: string): { category: MessageCategory; confid
   return { category, confidence };
 }
 
-export function parseSummary(text: string): Pick<ThreadSummary, "summary" | "openPoints" | "waitingOn"> | null {
-  const value = extractJson(text) as { summary?: unknown; openPoints?: unknown; waitingOn?: unknown } | null;
+/**
+ * Liest die Zusammenfassung. „Wer ist dran“: aus den zwei Ja/Nein-Antworten (v3) – nach der letzten Mail des Nutzers
+ * kann ihn niemand mehr gefragt haben, also ist er dann nie „dran“. Ältere Antworten mit `waitingOn` (v2) gehen auch.
+ */
+export function parseSummary(text: string, context: { lastFromUser?: boolean } = {}): Pick<ThreadSummary, "summary" | "openPoints" | "waitingOn"> | null {
+  const value = extractJson(text) as { summary?: unknown; openPoints?: unknown; waitingOn?: unknown; nutzerMussHandeln?: unknown; nutzerWartet?: unknown } | null;
   if (!value || typeof value.summary !== "string" || !value.summary.trim()) return null;
   const openPoints = Array.isArray(value.openPoints)
     ? value.openPoints.filter((p): p is string => typeof p === "string" && p.trim() !== "").map((p) => p.trim()).slice(0, 4)
     : [];
-  const waitingOn = value.waitingOn === "me" || value.waitingOn === "others" ? value.waitingOn : "nobody";
+  let waitingOn: ThreadSummary["waitingOn"];
+  if (typeof value.nutzerMussHandeln === "boolean" || typeof value.nutzerWartet === "boolean") {
+    const mustAct = value.nutzerMussHandeln === true && !context.lastFromUser;
+    waitingOn = mustAct ? "me" : value.nutzerWartet === true ? "others" : "nobody";
+  } else {
+    waitingOn = value.waitingOn === "me" || value.waitingOn === "others" ? value.waitingOn : "nobody";
+  }
   return { summary: value.summary.trim(), openPoints, waitingOn };
 }
 
@@ -110,17 +120,23 @@ export async function categorizeMessage(
 export async function summarizeThread(
   router: AIRouter,
   thread: Message[],
-  options: { ownAddresses: string[]; maxChars?: number; signal?: AbortSignal },
+  options: { ownAddresses: string[]; maxChars?: number; signal?: AbortSignal; /** nur für Vergleichsmessungen */ promptVersion?: 2 | 3 },
 ): Promise<ThreadSummary> {
+  const own = new Set(options.ownAddresses.map((a) => a.toLowerCase()));
+  const last = [...thread].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+  const lastFromUser = !!last && own.has(last.from.address.toLowerCase());
+  const lastLine = last ? `\n\n---\nDie letzte Mail ist ${lastFromUser ? "vom Nutzer selbst" : `von ${last.from.name || last.from.address} an den Nutzer`}.` : "";
+  const threadText = threadForModel(thread, options.maxChars ?? 6000, options.ownAddresses);
+  const v2 = options.promptVersion === 2;
   const request: AIRequest = {
     task: "summarize",
-    messages: summarizePrompt(threadForModel(thread, options.maxChars ?? 6000, options.ownAddresses), options.ownAddresses),
-    jsonSchema: summarizeSchema,
+    messages: v2 ? summarizePromptV2(threadText, options.ownAddresses) : summarizePrompt(threadText + lastLine, options.ownAddresses),
+    jsonSchema: v2 ? summarizeSchemaV2 : summarizeSchema,
     maxTokens: 400,
     temperature: 0.2,
   };
   const accountIds = [...new Set(thread.map((m) => m.accountId))];
-  const result = await runParsed(router, request, accountIds, parseSummary, options.signal);
+  const result = await runParsed(router, request, accountIds, (text) => parseSummary(text, { lastFromUser }), options.signal);
   if (!result) throw new Error("Das Modell hat keine brauchbare Zusammenfassung geliefert. Bitte noch einmal versuchen.");
   return { ...result.value, origin: result.response.privacyClass as ThreadSummary["origin"], providerId: result.response.providerId, durationMs: result.durationMs };
 }

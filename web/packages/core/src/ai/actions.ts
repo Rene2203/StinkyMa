@@ -53,6 +53,14 @@ export const actionsSchema: JsonSchema = {
 
 const weekdays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 
+/** Kleine Modelle rechnen Wochentage schlecht um – die nächsten 7 Tage stehen deshalb ausdrücklich im Prompt. */
+function nextDays(mailDate: Date): string {
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + i + 1));
+    return `${weekdays[day.getUTCDay()]} = ${day.toISOString().slice(0, 10)}`;
+  }).join(", ");
+}
+
 export function actionsPrompt(mail: string, mailDate: Date): AIMessage[] {
   const iso = mailDate.toISOString().slice(0, 10);
   return [
@@ -64,7 +72,8 @@ export function actionsPrompt(mail: string, mailDate: Date): AIMessage[] {
 - deadline: Frist – etwas muss bis zu einem Datum erledigt sein (einreichen, antworten, anmelden).
 - payment: Betrag, der bezahlt oder abgebucht wird (mit Datum, falls genannt).
 - todo: Bitte an den Empfänger ohne festes Datum.
-Die Mail ist vom ${weekdays[mailDate.getUTCDay()]}, ${iso}. Rechne „morgen“, „Dienstag“, „Ende des Monats“ in ein Datum um; fehlt das Jahr, nimm das nächste passende.
+Die Mail ist vom ${weekdays[mailDate.getUTCDay()]}, ${iso}. Die nächsten Tage: ${nextDays(mailDate)}.
+Rechne „morgen“, „Dienstag“, „Ende des Monats“ mit dieser Liste in ein Datum um; fehlt das Jahr, nimm das nächste passende.
 Nur was wirklich in der Mail steht – nichts erfinden. Werbung, Newsletter und reine Infos ohne Handlung: {"items": []}.`,
     },
     { role: "user", content: mail },
@@ -106,7 +115,8 @@ export function parseActions(text: string, mail: string, mailDate: Date): MailAc
     const title = typeof item.title === "string" ? item.title.trim() : "";
     const quote = typeof item.quote === "string" ? item.quote.trim() : "";
     if (!type || !title || !quoteFound(quote, mail)) continue;
-    const date = typeof item.date === "string" ? validDate(item.date.trim(), mailDate) : null;
+    const modelDate = typeof item.date === "string" ? validDate(item.date.trim(), mailDate) : null;
+    const date = modelDate ? fixYear(modelDate, mail, mailDate) : null;
     const time = typeof item.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time.trim()) ? item.time.trim() : null;
     const amountRaw = typeof item.amount === "string" ? item.amount.trim() : "";
     // Betrag nur, wenn die Zahl so in der Mail steht
@@ -116,6 +126,18 @@ export function parseActions(text: string, mail: string, mailDate: Date): MailAc
     result.push({ type, title: title.slice(0, 80), date, time, amount, quote: quote.slice(0, 160) });
   }
   return dedupe(result);
+}
+
+/**
+ * Steht das Datum in der Mail ohne Jahr („31. Oktober“, „15.10.“), setzt der Code das Jahr: das nächste passende ab dem
+ * Maildatum. Die Modelle raten hier oft das falsche Jahr.
+ */
+export function fixYear(date: string, mail: string, mailDate: Date): string {
+  const [, m = 0, d = 0] = date.split("-").map(Number);
+  const names = Object.entries(months).filter(([, n]) => n === m).map(([name]) => name).join("|");
+  const withoutYear = new RegExp(`(?<!\\d)0?${d}\\.\\s?(?:0?${m}\\.(?!\\s?\\d)|(?:${names})\\b\\.?(?!\\s+\\d{2,4}))`, "i");
+  if (!withoutYear.test(mail)) return date;
+  return isoDate(d, m, null, mailDate) ?? date;
 }
 
 function dedupe(actions: MailAction[]): MailAction[] {
@@ -181,30 +203,24 @@ export function ruleActions(subject: string, body: string, mailDate: Date): Mail
     const date = isoDate(day, month, yearText ? Number(yearText) : null, mailDate);
     if (!date) continue;
     const quote = sentenceOf(text, match.index ?? 0);
-    const lower = quote.toLowerCase();
-    // Zeitspanne („zwischen 9 und 10 Uhr“, „von 14 bis 18 Uhr“): Beginn zählt
-    const timeMatch =
-      /\b([01]?\d|2[0-3])(?::([0-5]\d))?\s?(?:bis|und|-|–)\s?(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s?uhr\b/i.exec(quote) ??
-      /\b([01]?\d|2[0-3])(?::([0-5]\d))?\s?uhr\b/i.exec(quote) ??
-      /\b([01]?\d|2[0-3]):([0-5]\d)\b/.exec(quote);
-    const time = timeMatch ? `${timeMatch[1]?.padStart(2, "0")}:${timeMatch[2] ?? "00"}` : null;
-    const amountMatch = /\b\d{1,3}(?:\.\d{3})*,\d{2}\s?(?:€|eur\b)/i.exec(quote);
-    let type: ActionType | null = null;
-    let title = "";
-    if (amountMatch && /(abgebucht|abbuchung|überweis|zahlbar|fällig|bezahlen|nachzahlung|betrag)/.test(lower)) {
-      type = "payment";
-      title = subjectTitle || "Zahlung";
-    } else if (/(termin|einladung|findet .* statt|elternabend|besichtigung|treffen|abholung|ablesung)/.test(lower) || (time && !/(versendet|zugestellt|erhalten)/.test(lower))) {
-      type = "appointment";
-      title = subjectTitle || "Termin";
-    } else if (/(\bbis\b|spätestens|frist|einreichen|zurücksenden|eintragen|anmelden)/.test(lower)) {
-      type = "deadline";
-      title = subjectTitle || "Frist";
-    }
-    if (!type) continue;
-    // Werbung („gültig bis“, „nur solange“, „20 %“) ist keine Frist und kein Termin
-    if (type !== "payment" && /(gültig|solange|angebot|rabatt|\d+ ?%|aktion|gutschein|sale)/i.test(quote)) continue;
-    result.push({ type, title, date, time: type === "payment" ? null : time, amount: amountMatch ? amountMatch[0].replace(/\s?eur\b/i, " €") : null, quote });
+    const action = classifyAction(quote, date, subjectTitle);
+    if (action) result.push(action);
+  }
+  // Relative Angaben: „morgen um 14 Uhr“, „am Dienstag um 9:30“, „bis Freitag“ – nicht bei Öffnungszeiten („Montag bis Freitag“)
+  const weekdayIndex: Record<string, number> = { sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6 };
+  // \b greift nicht vor Umlauten („übermorgen“) – deshalb Buchstaben-Grenzen mit Unicode
+  const relativeRe = /(?<!heute |guten |Guten )(?<!\p{L})(übermorgen|morgen|[Mm]ontag|[Dd]ienstag|[Mm]ittwoch|[Dd]onnerstag|[Ff]reitag|[Ss]amstag|[Ss]onntag)(?!\p{L})/gu;
+  for (const match of text.matchAll(relativeRe)) {
+    const word = (match[1] ?? "").toLowerCase();
+    const quote = sentenceOf(text, match.index ?? 0);
+    if (/(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\s*(bis|-|–)\s*(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)/i.test(quote)) continue;
+    if (/(erreichbar|geöffnet|öffnungszeit|sprechzeit|hotline|jeden|immer)/i.test(quote)) continue;
+    // Steht im Satz schon ein festes Datum, gilt das (oben)
+    if (/\b\d{1,2}\.\s?(\d{1,2}\.|(januar|februar|märz|april|mai|juni|juli|august|september|oktober|november|dezember|jan|feb|mär|apr|jun|jul|aug|sept?|okt|nov|dez)\b)/i.test(quote)) continue;
+    const offset = word === "morgen" ? 1 : word === "übermorgen" ? 2 : ((weekdayIndex[word] ?? 0) - mailDate.getUTCDay() + 7) % 7 || 7;
+    const date = new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + offset)).toISOString().slice(0, 10);
+    const action = classifyAction(quote, date, subjectTitle);
+    if (action && action.type !== "payment") result.push(action);
   }
   // Beträge ohne Datum („Rechnung über 39,99 €“, „bitte 65,00 € überweisen“)
   for (const match of text.matchAll(/\b\d{1,3}(?:\.\d{3})*,\d{2}\s?(?:€|eur\b)/gi)) {
@@ -216,6 +232,35 @@ export function ruleActions(subject: string, body: string, mailDate: Date): Mail
     result.push({ type: "payment", title: subjectTitle || "Zahlung", date: null, time: null, amount, quote });
   }
   return dedupe(result).slice(0, 5);
+}
+
+/** Art einer Fundstelle mit Datum (ohne KI). Werbung zählt nicht. */
+function classifyAction(quote: string, date: string, subjectTitle: string): MailAction | null {
+  const lower = quote.toLowerCase();
+  // Zeitspanne („zwischen 9 und 10 Uhr“, „von 14 bis 18 Uhr“): Beginn zählt
+  const timeMatch =
+    /\b([01]?\d|2[0-3])(?::([0-5]\d))?\s?(?:bis|und|-|–)\s?(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s?uhr\b/i.exec(quote) ??
+    /\b([01]?\d|2[0-3])(?::([0-5]\d))?\s?uhr\b/i.exec(quote) ??
+    /\b([01]?\d|2[0-3]):([0-5]\d)\b/.exec(quote);
+  const time = timeMatch ? `${timeMatch[1]?.padStart(2, "0")}:${timeMatch[2] ?? "00"}` : null;
+  const amountMatch = /\b\d{1,3}(?:\.\d{3})*,\d{2}\s?(?:€|eur\b)/i.exec(quote);
+  let type: ActionType | null = null;
+  let title = "";
+  if (amountMatch && /(abgebucht|abbuchung|überweis|zahlbar|fällig|bezahlen|nachzahlung|betrag)/.test(lower)) {
+    type = "payment";
+    title = subjectTitle || "Zahlung";
+  } else if (/(termin|einladung|findet .* statt|elternabend|besichtigung|treffen|abholung|ablesung)/.test(lower) || (time && !/(versendet|zugestellt|erhalten)/.test(lower))) {
+    type = "appointment";
+    title = subjectTitle || "Termin";
+  } else if (/(\bbis\b|spätestens|frist|einreichen|zurücksenden|eintragen|anmelden)/.test(lower)) {
+    type = "deadline";
+    title = subjectTitle || "Frist";
+  }
+  if (!type) return null;
+  // Werbung („gültig bis“, „nur solange“, „20 %“) ist keine Frist und kein Termin
+  // „Angebot“ allein ist oft ein Geschäftsangebot („das Angebot für Hansen muss raus“) – nur Werbeformulierungen zählen
+  if (type !== "payment" && /(gültig|solange|angebote\b|angebot gilt|im angebot|rabatt|\d+ ?%|aktion|gutschein|sale)/i.test(quote)) return null;
+  return { type, title, date, time: type === "payment" ? null : time, amount: amountMatch ? amountMatch[0].replace(/\s?eur\b/i, " €") : null, quote };
 }
 
 export interface ActionsResult {

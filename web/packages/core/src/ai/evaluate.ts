@@ -1,5 +1,5 @@
 import type { Message, MessageCategory } from "../models.js";
-import { evalActionCases, evalHoldoutMails, evalMails, evalReplyCases, evalRuleCases, evalRuleFolders, evalRuleHoldout, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
+import { evalActionCases, evalHoldoutMails, evalMails, evalRelativeMails, evalReplyCases, evalRuleCases, evalRuleFolders, evalRuleHoldout, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
 import { extractActions, ruleActions, type MailAction } from "./actions.js";
 import { cleanMailText } from "./prepare.js";
 import { interpretRule, interpretRuleWithRules } from "./rules.js";
@@ -115,7 +115,7 @@ function median(values: number[]): number {
 
 export async function evaluateProvider(
   provider: AIProvider,
-  options: { mails?: EvalMail[]; threads?: EvalThread[]; loadMs?: number; signal?: AbortSignal; onProgress?: (progress: EvalProgress) => void } = {},
+  options: { mails?: EvalMail[]; threads?: EvalThread[]; loadMs?: number; signal?: AbortSignal; onProgress?: (progress: EvalProgress) => void; summaryPromptVersion?: 2 | 3 } = {},
 ): Promise<EvalReport> {
   if (provider.privacyClass !== "onDevice") throw new Error("Der Messlauf ist nur für Modelle auf diesem Gerät gedacht.");
   const mails = options.mails ?? evalMails;
@@ -138,7 +138,7 @@ export async function evaluateProvider(
     options.signal?.throwIfAborted();
     const startedThread = Date.now();
     try {
-      const result = await summarizeThread(router, threadMessages(thread), { ownAddresses: [thread.ownAddress], signal: options.signal });
+      const result = await summarizeThread(router, threadMessages(thread), { ownAddresses: [thread.ownAddress], signal: options.signal, ...(options.summaryPromptVersion ? { promptVersion: options.summaryPromptVersion } : {}) });
       const text = normalizeFact(`${result.summary}\n${result.openPoints.join("\n")}`);
       const missingFacts = thread.facts.filter((fact) => !text.includes(normalizeFact(fact)));
       summaryOutcomes.push({
@@ -259,7 +259,7 @@ function actionMatches(action: MailAction, expected: EvalActionCase["expected"][
 /** Aktionen-Messlauf; ohne Anbieter nur mit Regeln (Vergleichswert). */
 export async function evaluateActions(provider: AIProvider | null, options: { cases?: EvalActionCase[]; onProgress?: (done: number, total: number) => void } = {}): Promise<ActionsEvalReport> {
   const cases = options.cases ?? evalActionCases;
-  const all = [...evalMails, ...evalHoldoutMails];
+  const all = [...evalMails, ...evalHoldoutMails, ...evalRelativeMails];
   const router = provider ? new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() }) : null;
   let expectedTotal = 0;
   let found = 0;

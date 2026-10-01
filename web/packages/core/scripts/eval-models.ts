@@ -4,7 +4,7 @@
 import { writeFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
-import { evalHoldoutMails, evalMails, evaluateActions, evaluateProvider, evaluateReplies, evaluateRules, formatActionsReports, formatEvalReports, formatRepliesReports, formatRulesReports, modelCatalog, type ActionsEvalReport, type EvalReport, type RepliesEvalReport, type RulesEvalReport } from "../src/index.js";
+import { evalHoldoutMails, evalHoldoutThreads, evalMails, evalThreads, evaluateActions, evaluateProvider, evaluateReplies, evaluateRules, formatActionsReports, formatEvalReports, formatRepliesReports, formatRulesReports, modelCatalog, type ActionsEvalReport, type EvalReport, type RepliesEvalReport, type RulesEvalReport } from "../src/index.js";
 import { fileNameFromUrl, LlamaCppProvider } from "../src/llm/index.js";
 
 const args = process.argv.slice(2);
@@ -27,6 +27,12 @@ if (rulesOnly) args.splice(args.indexOf("--rules"), 1);
 // --replies: Antwortvorschläge (W6.5) – Zahlen plus alle Vorschläge zum Lesen
 const repliesOnly = args.includes("--replies");
 if (repliesOnly) args.splice(args.indexOf("--replies"), 1);
+// --summaries: nur Zusammenfassungen, Testsatz und Kontrollsatz (Konversationen) getrennt
+const summariesOnly = args.includes("--summaries");
+if (summariesOnly) args.splice(args.indexOf("--summaries"), 1);
+// --summary-v2: Zusammenfassung mit der älteren Fassung v2 (Vergleich)
+const summaryV2 = args.includes("--summary-v2");
+if (summaryV2) args.splice(args.indexOf("--summary-v2"), 1);
 const all = args.includes("--all");
 for (const name of ["--holdout", "--all"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
 const mails = holdout ? evalHoldoutMails : all ? [...evalMails, ...evalHoldoutMails] : evalMails;
@@ -88,6 +94,26 @@ if (rulesOnly) {
     }
   }
   console.log(formatRulesReports(reports));
+  process.exit(0);
+}
+
+if (summariesOnly) {
+  const reports: EvalReport[] = [];
+  for (const model of modelCatalog.filter((m) => ids.length === 0 || ids.includes(m.id))) {
+    const provider = new LlamaCppProvider({ id: model.id, displayName: model.name, modelPath: join(directory, fileNameFromUrl(model.url)), gpu: gpu ? "auto" : false, maxThreads: threads, idleUnloadMs: 0 });
+    try {
+      const { loadMs } = await provider.load();
+      for (const [label, set] of [["Testsatz", evalThreads], ["Kontrollsatz", evalHoldoutThreads]] as const) {
+        const report = await evaluateProvider(provider, { loadMs, mails: [], threads: set, ...(summaryV2 ? { summaryPromptVersion: 2 as const } : {}), onProgress: (p) => process.stderr.write(`\r${model.id} ${label}: ${p.done}/${p.total}   `) });
+        reports.push({ ...report, providerId: `${report.providerId} ${summaryV2 ? "v2" : "v3"} (${label})` });
+        process.stderr.write("\n");
+        if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
+      }
+    } finally {
+      await provider.dispose();
+    }
+  }
+  console.log(formatEvalReports(reports, { machine: "" }));
   process.exit(0);
 }
 

@@ -173,6 +173,14 @@ describe("Antworten auswerten", () => {
     });
     expect(parseSummary('{"summary": "x", "waitingOn": "wer?"}')).toEqual({ summary: "x", openPoints: [], waitingOn: "nobody" });
     expect(parseSummary('{"summary": "  "}')).toBeNull();
+    // v3: zwei Ja/Nein-Fragen; nach der letzten Mail des Nutzers kann er nicht „dran“ sein
+    const v3 = (must: boolean, waits: boolean) => `{"summary": "x", "openPoints": [], "nutzerMussHandeln": ${must}, "nutzerWartet": ${waits}}`;
+    expect(parseSummary(v3(true, false))?.waitingOn).toBe("me");
+    expect(parseSummary(v3(true, true))?.waitingOn).toBe("me");
+    expect(parseSummary(v3(false, true))?.waitingOn).toBe("others");
+    expect(parseSummary(v3(false, false))?.waitingOn).toBe("nobody");
+    expect(parseSummary(v3(true, true), { lastFromUser: true })?.waitingOn).toBe("others");
+    expect(parseSummary(v3(true, false), { lastFromUser: true })?.waitingOn).toBe("nobody");
   });
 
   it("ordnet mit Regeln ein, wenn das Modell versagt", () => {
