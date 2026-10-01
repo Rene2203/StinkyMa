@@ -38,6 +38,8 @@ export interface AIModelInfo {
   minRamGb: number;
   capabilities: ModelCapability[];
   note: string;
+  /** Vom Messlauf empfohlen. */
+  recommended: boolean;
   /** Passt in den Arbeitsspeicher dieses Rechners. */
   fits: boolean;
   state: "missing" | "partial" | "downloading" | "installed";

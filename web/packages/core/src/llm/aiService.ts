@@ -72,6 +72,7 @@ export class AIService implements AIApi {
         minRamGb: model.minRamGb,
         capabilities: model.capabilities,
         note: model.note,
+        recommended: model.recommended ?? false,
         fits: this.options.ramGb >= model.minRamGb,
         state,
         receivedBytes: downloading ? downloading.receivedBytes : stored.state === "partial" ? stored.receivedBytes : stored.state === "installed" ? model.sizeBytes : 0,

@@ -268,6 +268,10 @@ describe("Modellkatalog", () => {
     }
   });
 
+  it("empfiehlt genau ein Modell – Gemma 4 E2B (Messlauf)", () => {
+    expect(modelCatalog.filter((m) => m.recommended).map((m) => m.id)).toEqual(["gemma-4-e2b-q4"]);
+  });
+
   it("schlägt nur Modelle vor, die in den Speicher passen", () => {
     const fitting = (ram: number) => modelsForRam(ram).filter((m) => m.fits).map((m) => m.model.id);
     expect(fitting(8)).toContain("gemma-4-e2b-q4");

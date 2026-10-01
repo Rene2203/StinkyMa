@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 lokal gebaut und getestet; Messlauf Gemma 4 vs. Qwen 3.5 läuft (Ergebnis → Standardmodell)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. Offen: Zusammenfassungs-Prompt v3, Test durch den Nutzer, W5.5 (Bilder)
 
 ## Überblick
 
@@ -313,4 +313,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   App) – Behebung braucht Vitest 5 (größerer Versionssprung), später.
 - **Messlauf v1, alle vier Modelle** (Details `docs/KI-MESSUNG.md`): Gemma 4 E2B 88,8 % / Fakten 100 % / 3,5 s; Gemma 4 E4B
   97,5 % / 92 % / 6,2 s; Qwen 3.5 2B 85 % / 81 % / 5,9 s; Qwen 3.5 4B 96,3 % / 92 % / 14,3 s. Prompt v2 + Kontrollsatz laufen.
+- **Messlauf v2 + Kontrollsatz fertig → Entscheidung: Gemma 4 E2B ist Standard** (in der App als „Empfohlen“ markiert).
+  Prompt v2: Kategorie 98,8 % (Testsatz) / 92,9 % (Kontrollsatz, nie zum Feintuning), Phishing 9/10 bzw. 3/4, ~3,7 s je Mail.
+  Gemma 4 E4B fehlerfrei, aber ~doppelt so langsam (Option für starke Rechner). Qwen 3.5 2B langsamer und ungenauer.
+  **Offen:** „wer ist dran“ 60 % bei Gemma, Fakten 92 % (Ziel 95 %) → Prompt v3 für Zusammenfassungen. Messung auf N97/GPU fehlt.
 

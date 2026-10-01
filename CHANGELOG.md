@@ -10,6 +10,7 @@
 - **Lokale KI in der Windows-App:** Optionen → KI (Modell laden mit Fortschritt, fortsetzbar, Prüfsumme; verwenden; löschen),
   „Zusammenfassen“ mit Herkunftsangabe, automatische Einordnung neuer Mails im Hintergrund. Alles auf dem eigenen Rechner
   (llama.cpp, CPU oder Grafikkarte über Vulkan). Migration `v9-ai-results`.
+- **Standardmodell Gemma 4 E2B** (Messlauf, `docs/KI-MESSUNG.md`), Prompt v2 mit besserer Phishing-Erkennung.
 - **Testsatz und Messlauf:** deutscher Testsatz (80 Mails, 10 Konversationen, Kontrollsatz mit 28 Mails), Messskript.
 
 ## W4 – Suche, sofortige Zustellung, Infobereich, Anhänge ansehen

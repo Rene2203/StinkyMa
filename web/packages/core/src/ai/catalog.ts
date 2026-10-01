@@ -21,6 +21,8 @@ export interface CatalogModel {
   /** Optionaler Bild-Baustein (mmproj) für Bild-Eingaben – erst bei Bedarf laden. */
   vision?: { url: string; sizeBytes: number; sha256: string };
   note: string;
+  /** Empfehlung aus dem Messlauf (docs/KI-MESSUNG.md) – genau ein Modell. */
+  recommended?: boolean;
 }
 
 const hf = (repo: string, file: string) => `https://huggingface.co/${repo}/resolve/main/${file}`;
@@ -43,7 +45,8 @@ export const modelCatalog: readonly CatalogModel[] = [
       sizeBytes: 985_654_080,
       sha256: "140be8d7849741f88c50757d529b84373ee8e27052cc2236855b537f4a8215fa",
     },
-    note: "Von Google. Versteht auch Bilder und Sprache – sparsam.",
+    note: "Von Google. Schnell und sparsam, versteht auch Bilder und Sprache. Im Test: 99 % richtig eingeordnet.",
+    recommended: true,
   },
   {
     id: "gemma-4-e4b-q4",
@@ -62,7 +65,7 @@ export const modelCatalog: readonly CatalogModel[] = [
       sizeBytes: 990_372_672,
       sha256: "ddf46c21d7078e95338cfc22306b19b276a29a5ad089023449dd54d4b6170a51",
     },
-    note: "Von Google. Bessere Qualität, braucht mehr Speicher.",
+    note: "Von Google. Im Test fehlerfrei, aber etwa doppelt so langsam – für stärkere Rechner.",
   },
   {
     id: "qwen-3.5-2b-q4",
@@ -81,7 +84,7 @@ export const modelCatalog: readonly CatalogModel[] = [
       sizeBytes: 668_227_264,
       sha256: "7035e9cb8d7c6a9681d07eef9a364783e86ea4cd73faab2eabb4f43a101830c7",
     },
-    note: "Von Alibaba. Kleinste Wahl, für sehr schwache Geräte.",
+    note: "Von Alibaba. Kleinste Datei, im Test aber langsamer und ungenauer als Gemma 4 E2B.",
   },
   {
     id: "qwen-3.5-4b-q4",
@@ -100,7 +103,7 @@ export const modelCatalog: readonly CatalogModel[] = [
       sizeBytes: 672_423_616,
       sha256: "cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864",
     },
-    note: "Von Alibaba. Gilt als stark im Deutschen.",
+    note: "Von Alibaba. Gut, aber auf schwachen Rechnern deutlich am langsamsten.",
   },
 ];
 

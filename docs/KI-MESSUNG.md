@@ -51,3 +51,67 @@ Gesamtdauer je Modell (90 Aufgaben): Gemma 4 E2B 7,4 min · Gemma 4 E4B 14,5 min
 das schnellste Modell und behält Fakten am zuverlässigsten (100 %), erkennt aber Phishing schlecht (3/10). Die 4B-Klasse
 erkennt Phishing deutlich besser (8/10), braucht aber 2–4× so lange. Qwen 3.5 2B ist auf diesem Rechner trotz kleinerer
 Datei langsamer als Gemma 4 E2B und lässt öfter Fakten weg. „Wer ist dran“ ist bei allen schwach (60–70 %).
+
+## Lauf 2 – Prompt v2 (01.10.2026)
+
+Änderungen gegenüber v1: klare Vorrang-Regel für Phishing (Merkmale: Link + Daten/Zahlung, Drohung/Frist, Gewinne,
+Absender passt nicht, Geschenkkarten), Regeln für „wer ist dran“, eigene Mails in Konversationen als „(Nutzer)“ markiert.
+
+
+| Modell | Kategorie richtig | davon Regel-Rückfall | Fakten in Zusammenfassung | gültige Zusammenfassungen | „Wer ist dran“ richtig | Kategorie (Median) | Zusammenfassung (Median) | Laden |
+|---|---|---|---|---|---|---|---|---|
+| Gemma 4 E2B | 98,8 % | 0 | 92,3 % | 100,0 % | 60,0 % | 3,7 s | 13,1 s | 7,4 s |
+| Gemma 4 E4B | 100,0 % | 0 | 96,2 % | 100,0 % | 60,0 % | 6,7 s | 27,5 s | 15,7 s |
+| Qwen 3.5 2B | 87,5 % | 0 | 61,5 % | 100,0 % | 60,0 % | 9,7 s | 16,5 s | 7,5 s |
+| Qwen 3.5 4B | 97,5 % | 0 | 88,5 % | 100,0 % | 90,0 % | 21,9 s | 33,9 s | 5,6 s |
+
+Je Kategorie (richtig/gesamt):
+
+| Modell | personal | work | newsletter | notification | invoice | appointment | spam_suspect |
+|---|---|---|---|---|---|---|---|
+| Gemma 4 E2B | 12/12 | 12/12 | 12/12 | 12/12 | 12/12 | 10/10 | 9/10 |
+| Gemma 4 E4B | 12/12 | 12/12 | 12/12 | 12/12 | 12/12 | 10/10 | 10/10 |
+| Qwen 3.5 2B | 12/12 | 10/12 | 12/12 | 9/12 | 12/12 | 10/10 | 5/10 |
+| Qwen 3.5 4B | 12/12 | 11/12 | 11/12 | 12/12 | 12/12 | 10/10 | 10/10 |
+
+**Gemma 4 E2B** – Fehler:
+- Kategorie: s10 (spam_suspect → personal)
+- Zusammenfassung: t01 / wer-ist-dran falsch; t04 / wer-ist-dran falsch; t06 / wer-ist-dran falsch; t07 fehlt: 2.000; t09 / wer-ist-dran falsch; t10 fehlt: 240
+
+**Gemma 4 E4B** – Fehler:
+- Kategorie: keine
+- Zusammenfassung: t04 / wer-ist-dran falsch; t06 / wer-ist-dran falsch; t07 fehlt: 2.000; t08 / wer-ist-dran falsch; t09 / wer-ist-dran falsch
+
+**Qwen 3.5 2B** – Fehler:
+- Kategorie: w05 (work → appointment), w10 (work → invoice), x03 (notification → invoice), x08 (notification → work), x10 (notification → newsletter), s01 (spam_suspect → notification), s02 (spam_suspect → invoice), s05 (spam_suspect → invoice), s09 (spam_suspect → invoice), s10 (spam_suspect → personal)
+- Zusammenfassung: t03 fehlt: 02.10.2026, Gutachter, Kellerabteil / wer-ist-dran falsch; t04 fehlt: Folie 7, Hansen; t06 fehlt: 11.11. / wer-ist-dran falsch; t07 fehlt: 2.000; t08 / wer-ist-dran falsch; t09 fehlt: 1.140; t10 fehlt: 240, Gartenpflege / wer-ist-dran falsch
+
+**Qwen 3.5 4B** – Fehler:
+- Kategorie: w05 (work → appointment), n10 (newsletter → notification)
+- Zusammenfassung: t03 fehlt: Gutachter, Kellerabteil; t06 / wer-ist-dran falsch; t07 fehlt: M8
+
+### Kontrollsatz (28 Mails, nie zum Feintuning benutzt)
+
+Prüft, ob v2 nur auf den eigenen Testsatz passt. Kategorie richtig (Phishing erkannt):
+
+| Modell | v1 | v2 |
+|---|---|---|
+| Gemma 4 E2B | 85,7 % (1/4) | 92,9 % (3/4) |
+| Gemma 4 E4B | 96,4 % (3/4) | 100,0 % (4/4) |
+| Qwen 3.5 2B | 78,6 % (1/4) | 82,1 % (2/4) |
+| Qwen 3.5 4B | 92,9 % (2/4) | 96,4 % (3/4) |
+
+## Ergebnis und Entscheidung
+
+- **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,
+  schnellstes Modell (~3,7 s je Mail, ~13 s je Zusammenfassung auf 4 CPU-Kernen), versteht zusätzlich Bilder und Sprache.
+  Laut Entscheidungsregel („Gemma wird Standard, wenn es beim deutschen Text nicht deutlich schlechter ist“) eindeutig:
+  Gemma 4 E2B ist in diesem Test sogar besser als Qwen 3.5 2B.
+- **Für stärkere Rechner: Gemma 4 E4B** – fehlerfrei in beiden Sätzen, aber etwa doppelt so langsam.
+- **Qwen 3.5 2B** ist auf dieser CPU langsamer *und* ungenauer (Phishing, Fakten in Zusammenfassungen). **Qwen 3.5 4B** ist
+  gut und bei „wer ist dran“ am besten (90 %), auf schwacher Hardware aber mit ~22 s je Mail am langsamsten.
+- Die Phishing-Verbesserung durch v2 trägt auch im Kontrollsatz (Gemma E2B 1/4 → 3/4), ist also keine reine Überanpassung.
+
+**Offen:** „Wer ist dran“ bleibt bei den Gemma-Modellen bei 60 % (v2 half nur Qwen 4B). Fakten in Zusammenfassungen 92 %
+(Ziel Extraktion ≥ 95 %; fehlende Fakten betreffen meist Details bereits erledigter Vorgänge). Nächster Schritt: Prompt für
+Zusammenfassungen gezielt verbessern (v3) und erneut messen. Messung auf dem N97 und mit Grafikkarte steht aus.

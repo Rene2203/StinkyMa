@@ -1812,3 +1812,9 @@ button.attachment-open:hover {
   align-items: center;
   gap: 4px;
 }
+
+.chip.recommended {
+  margin-left: 4px;
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  font-weight: 500;
+}

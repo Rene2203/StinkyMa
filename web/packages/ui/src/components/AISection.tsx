@@ -61,7 +61,9 @@ function ModelRow({ model, selected, busyElsewhere }: { model: AIModelInfo; sele
   return (
     <li className={`model-row${selected ? " selected" : ""}`} data-testid="ai-model" data-model={model.id}>
       <div className="model-info">
-        <strong>{model.name}</strong>
+        <strong>
+          {model.name} {model.recommended && <span className="chip recommended">{t("ai.model.recommended")}</span>}
+        </strong>
         <span className="muted small">
           {t("ai.model.size", { size: formatBytes(model.sizeBytes, locale), ram: model.minRamGb })}
           {model.capabilities.includes("image") && (
