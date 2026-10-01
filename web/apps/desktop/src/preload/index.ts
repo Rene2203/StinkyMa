@@ -5,6 +5,7 @@ const mailMethods = ["accounts", "mailboxes", "messages", "thread", "message", "
   "remoteContentExceptions", "addRemoteContentException", "removeRemoteContentException", "send", "reopenOutgoing", "saveDraft", "deleteDraft", "openDraft", "suggestAddresses", "setSignature", "search"];
 const accountMethods = ["addAccount", "testConnection", "removeAccount", "syncNow", "syncStatus"];
 const fileMethods = ["open", "save"];
+const settingsMethods = ["get", "update", "available"];
 
 const bridge = (channel: string, methods: string[]) =>
   Object.fromEntries(methods.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channel, method, args)]));
@@ -13,6 +14,7 @@ contextBridge.exposeInMainWorld("stinkyma", {
   mail: bridge("mail", mailMethods),
   accounts: bridge("accounts", accountMethods),
   files: bridge("files", fileMethods),
+  settings: bridge("settings", settingsMethods),
   /** Meldet Änderungen (neue Mails, Abgleich, Konten). Gibt eine Abmelde-Funktion zurück. */
   onMailChanged: (callback: () => void) => {
     const listener = () => callback();

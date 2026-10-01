@@ -19,6 +19,8 @@ unten abarbeiten.
 | 30.09.2026 | Ausnahmeliste für externe Inhalte (Adresse/Domain, Subdomains) + Repository-Methoden | `web/packages/core/src/remoteContent.ts`, `repository.ts` |
 | 30.09.2026 | Optionen-Dialog, „Externe Inhalte laden“ pro Mail | `web/packages/ui/src/components/OptionsDialog.tsx`, `SafeHtml.tsx` |
 | 30.09.2026 | Migration `v5-outbox`: Tabelle `outbox` (Postausgang, siehe schema.ts) | `web/packages/core/src/sqlite/schema.ts` |
+| 01.10.2026 | Volltextsuche (Syntax, gleiche Regeln) | `core/src/search.ts` |
+| 01.10.2026 | Neue Mails sofort (IDLE-Wächter), Benachrichtigungs-Modi | `core/src/mail/mailService.ts` (`startWatching`), `core/src/appSettings.ts` |
 | 30.09.2026 | Weiterleiten mit Original-HTML und Original-Anhängen | `core/src/compose.ts` (`prepareCompose`, `emailHtml`), `mailService.send` |
 | 30.09.2026 | Migration `v7-account-signature` (`account.signatureHtml`), Signatur beim Schreiben | `core/src/sqlite/schema.ts`, `core/src/compose.ts` |
 | 30.09.2026 | Adressvorschläge (`suggestAddresses`, `rankContacts`) | `core/src/sqlite/repository.ts`, `core/src/compose.ts` |

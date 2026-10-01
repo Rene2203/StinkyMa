@@ -1,15 +1,18 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, safeStorage, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, safeStorage, shell, Tray } from "electron";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   accountsApiMethods,
+  appSettingsMethods,
   attachmentFilesMethods,
   createMockData,
   isRiskyAttachment,
   displayName,
   mailRepositoryMethods,
   safeFilename,
+  type AppSettings,
+  type AppSettingsApi,
   type AttachmentFiles,
   type Message,
 } from "@stinkyma/core";
@@ -17,6 +20,8 @@ import { MailService } from "@stinkyma/core/mail";
 import { EncryptedFileSecretStore } from "@stinkyma/core/node";
 import { MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
+import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
+import { SettingsFile } from "./settings";
 
 // Tests (und später portable Installationen) können einen eigenen Datenordner vorgeben.
 if (process.env.STINKYMA_USER_DATA) app.setPath("userData", process.env.STINKYMA_USER_DATA);
@@ -27,6 +32,13 @@ const isPrimaryInstance = app.requestSingleInstanceLock();
 let mainWindow: BrowserWindow | null = null;
 let service: MailService | null = null;
 let syncTimer: NodeJS.Timeout | null = null;
+let tray: Tray | null = null;
+let settings: SettingsFile | null = null;
+/** Wird gerade wirklich beendet (Menü „Beenden“, Abmelden)? Sonst schließt das Fenster nur in den Infobereich. */
+let quitting = false;
+/** Mit Windows gestartet: nur im Infobereich, ohne Fenster. */
+const startHidden = process.argv.includes("--hidden");
+const german = () => app.getLocale().startsWith("de");
 
 /**
  * Vollständiger Abgleich aller Ordner alle 15 Minuten. Neue Mails im Posteingang kommen sofort über die
@@ -69,6 +81,7 @@ function notifyRenderer(): void {
   notifyTimer = setTimeout(() => {
     notifyTimer = null;
     mainWindow?.webContents.send("mail:changed");
+    void updateTrayBadge();
   }, 150);
 }
 
@@ -82,26 +95,101 @@ function startSync(): void {
  * Fenster im Vordergrund ist (dann sieht man die Mail ohnehin). Klick öffnet die Mail.
  */
 function showNewMailNotification(messages: Message[]): void {
-  if (!Notification.isSupported() || mainWindow?.isFocused()) return;
+  const mode = settings?.settings.notifications ?? "full";
+  if (mode === "off" || !Notification.isSupported() || mainWindow?.isFocused()) return;
   const [first] = messages;
   if (!first) return;
-  const german = app.getLocale().startsWith("de");
+  const de = german();
+  const count = messages.length;
   const notification =
-    messages.length === 1
-      ? new Notification({ title: displayName(first.from), body: first.subject || (german ? "(kein Betreff)" : "(no subject)"), silent: false })
-      : new Notification({
-          title: "StinkyMa",
-          body: german ? `${messages.length} neue Mails – zuletzt von ${displayName(first.from)}` : `${messages.length} new emails – latest from ${displayName(first.from)}`,
-        });
+    mode === "minimal"
+      ? new Notification({ title: "StinkyMa", body: de ? (count === 1 ? "Neue Mail" : `${count} neue Mails`) : count === 1 ? "New email" : `${count} new emails` })
+      : count === 1
+        ? new Notification({ title: displayName(first.from), body: first.subject || (de ? "(kein Betreff)" : "(no subject)") })
+        : new Notification({
+            title: "StinkyMa",
+            body: de ? `${count} neue Mails – zuletzt von ${displayName(first.from)}` : `${count} new emails – latest from ${displayName(first.from)}`,
+          });
   notification.on("click", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-    mainWindow.webContents.send("mail:open", first.id);
+    showWindow();
+    mainWindow?.webContents.send("mail:open", first.id);
   });
   notification.show();
 }
+
+function showWindow(): void {
+  if (!mainWindow) createWindow();
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+// --- Infobereich (Tray) ---
+
+function createTray(): void {
+  if (tray) return;
+  tray = new Tray(nativeImage.createFromDataURL(trayIconDataUrl));
+  tray.setToolTip("StinkyMa");
+  const de = german();
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: de ? "StinkyMa öffnen" : "Open StinkyMa", click: () => showWindow() },
+      { label: de ? "Jetzt abrufen" : "Check now", click: () => void service?.syncNow() },
+      { type: "separator" },
+      { label: de ? "Beenden" : "Quit", click: () => quitApp() },
+    ]),
+  );
+  tray.on("click", () => showWindow());
+  void updateTrayBadge();
+}
+
+function destroyTray(): void {
+  tray?.destroy();
+  tray = null;
+}
+
+/** Symbol im Infobereich zeigt, ob ungelesene Mails im Posteingang liegen (Anzahl im Tooltip). */
+async function updateTrayBadge(): Promise<void> {
+  if (!tray || !service) return;
+  try {
+    const unread = (await service.overview()).counts.unifiedInbox;
+    if (!tray) return;
+    tray.setImage(nativeImage.createFromDataURL(unread > 0 ? trayIconUnreadDataUrl : trayIconDataUrl));
+    tray.setToolTip(unread > 0 ? `StinkyMa – ${unread} ${german() ? "ungelesen" : "unread"}` : "StinkyMa");
+  } catch {
+    // Datenbank kurz nicht erreichbar – beim nächsten Mal
+  }
+}
+
+function quitApp(): void {
+  quitting = true;
+  app.quit();
+}
+
+// --- App-Einstellungen ---
+
+const loginItemSupported = process.platform === "win32" || process.platform === "darwin";
+
+function applyLoginItem(value: AppSettings): void {
+  if (!loginItemSupported) return;
+  app.setLoginItemSettings({ openAtLogin: value.launchAtLogin, args: ["--hidden"] });
+}
+
+const appSettingsApi: AppSettingsApi = {
+  async get() {
+    return settings!.settings;
+  },
+  async update(patch) {
+    const next = settings!.update(patch);
+    if ("launchAtLogin" in patch) applyLoginItem(next);
+    if ("closeToTray" in patch) (next.closeToTray ? createTray : destroyTray)();
+    return next;
+  },
+  async available() {
+    return { closeToTray: true, launchAtLogin: loginItemSupported, notifications: Notification.isSupported() };
+  },
+};
 
 /** Geöffnete Anhänge landen in einem eigenen Temp-Ordner, der beim Start geleert wird. */
 function attachmentTempDir(): string {
@@ -141,6 +229,7 @@ function registerIpc(): void {
     ["mail", new Set<string>(mailRepositoryMethods), () => service],
     ["accounts", new Set<string>(accountsApiMethods), () => service],
     ["files", new Set<string>(attachmentFilesMethods), () => attachmentFiles],
+    ["settings", new Set<string>(appSettingsMethods), () => (settings ? appSettingsApi : null)],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {
@@ -166,6 +255,7 @@ function createWindow(): void {
     minHeight: 560,
     show: false,
     title: "StinkyMa",
+    icon: nativeImage.createFromDataURL(windowIconDataUrl),
     autoHideMenuBar: true,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#1f1f1f" : "#ffffff",
     webPreferences: {
@@ -177,7 +267,28 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.once("ready-to-show", () => {
+    if (!startHidden) mainWindow?.show();
+  });
+
+  // Schließen = im Infobereich weiterlaufen (Mails kommen weiter an), sofern eingestellt.
+  mainWindow.on("close", (event) => {
+    if (quitting || !settings?.settings.closeToTray || !tray) return;
+    event.preventDefault();
+    mainWindow?.hide();
+    if (!settings.flag("trayHintShown") && Notification.isSupported()) {
+      settings.setFlag("trayHintShown");
+      new Notification({
+        title: "StinkyMa",
+        body: german()
+          ? "StinkyMa läuft im Infobereich weiter. Beenden über das Symbol unten rechts – oder in den Optionen abschalten."
+          : "StinkyMa keeps running in the notification area. Quit via the tray icon – or turn this off in Options.",
+      }).show();
+    }
+  });
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 
   // Keine fremden Seiten im App-Fenster: Links öffnen im Standardbrowser, Navigation wird blockiert.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -202,13 +313,11 @@ if (!isPrimaryInstance) {
 }
 
 function startApp(): void {
-app.on("second-instance", () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.focus();
-});
+app.on("second-instance", () => showWindow());
 
 app.on("window-all-closed", () => {
+  // Mit Infobereich läuft die App weiter; sonst beenden (außer macOS-Konvention).
+  if (tray && !quitting) return;
   if (process.platform !== "darwin") app.quit();
 });
 
@@ -216,17 +325,22 @@ app.whenReady().then(() => {
   app.setAppUserModelId("de.stinkyma.app");
   // Beim letzten Mal geöffnete Anhänge aufräumen (liegen nur temporär auf der Platte).
   rmSync(attachmentTempDir(), { recursive: true, force: true });
+  settings = new SettingsFile(dataPath("settings.json"));
+  applyLoginItem(settings.settings);
   setUpServices();
   registerIpc();
   Menu.setApplicationMenu(buildMenu(app.getLocale()));
   createWindow();
+  if (settings.settings.closeToTray) createTray();
   startSync();
 });
 
 app.on("before-quit", () => {
+  quitting = true;
   if (syncTimer) clearInterval(syncTimer);
   if (notifyTimer) clearTimeout(notifyTimer);
   // Offene IMAP-Verbindungen sofort trennen, damit die App ohne Verzögerung beendet wird.
   service?.dispose();
+  destroyTray();
 });
 }

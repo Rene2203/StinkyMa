@@ -1,4 +1,4 @@
-import { ImageDown, PenLine, Plus, X } from "lucide-react";
+import { AppWindow, ImageDown, PenLine, Plus, X } from "lucide-react";
 import { normalizeRemoteContentException } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -113,6 +113,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
           )}
         </section>
 
+        {state.appSettings && <AppSettingsSection />}
+
         <section className="options-section" aria-labelledby="options-signature-heading">
           <h3 id="options-signature-heading">
             <PenLine size={16} aria-hidden="true" /> {t("signature.title")}
@@ -130,3 +132,60 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
     </dialog>
   );
 }
+
+/** Einstellungen der Windows-App: Infobereich, Autostart, Benachrichtigungen. */
+function AppSettingsSection() {
+  const { store, t } = useUi();
+  const state = useBrowserState();
+  const settings = state.appSettings;
+  const available = state.appSettingsAvailable;
+  if (!settings) return null;
+  return (
+    <section className="options-section" aria-labelledby="options-app-heading">
+      <h3 id="options-app-heading">
+        <AppWindow size={16} aria-hidden="true" /> {t("appSettings.title")}
+      </h3>
+      {available.closeToTray !== false && (
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={settings.closeToTray}
+            data-testid="setting-close-to-tray"
+            onChange={(e) => void store.updateAppSettings({ closeToTray: e.target.checked })}
+          />
+          <span>
+            {t("appSettings.closeToTray")}
+            <span className="hint block">{t("appSettings.closeToTrayHint")}</span>
+          </span>
+        </label>
+      )}
+      {available.launchAtLogin && (
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={settings.launchAtLogin}
+            data-testid="setting-launch-at-login"
+            onChange={(e) => void store.updateAppSettings({ launchAtLogin: e.target.checked })}
+          />
+          <span>
+            {t("appSettings.launchAtLogin")}
+            <span className="hint block">{t("appSettings.launchAtLoginHint")}</span>
+          </span>
+        </label>
+      )}
+      <label className="setting-row">
+        <span>{t("appSettings.notifications")}</span>
+        <select
+          value={settings.notifications}
+          data-testid="setting-notifications"
+          onChange={(e) => void store.updateAppSettings({ notifications: e.target.value as typeof settings.notifications })}
+        >
+          <option value="full">{t("appSettings.notifications.full")}</option>
+          <option value="minimal">{t("appSettings.notifications.minimal")}</option>
+          <option value="off">{t("appSettings.notifications.off")}</option>
+        </select>
+      </label>
+    </section>
+  );
+}
+

@@ -461,6 +461,21 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect(page.getByTestId("message-row").filter({ hasText: "Ganz frisch eingetroffen" })).toBeVisible({ timeout: 10_000 });
   });
 
+  await test.step("App-Einstellungen: Benachrichtigungs-Modus wird gespeichert; Schließen versteckt nur (Infobereich)", async () => {
+    await page.getByTestId("open-options").click();
+    const options = page.getByTestId("options-dialog");
+    await expect(options.getByTestId("setting-close-to-tray")).toBeChecked();
+    await options.getByTestId("setting-notifications").selectOption("minimal");
+    await expect.poll(() => JSON.parse(readFileSync(join(dataDir, "settings.json"), "utf8")).notifications).toBe("minimal");
+    await options.getByRole("button", { name: "Fertig" }).click();
+
+    // Fenster schließen: App läuft weiter, Fenster ist nur versteckt
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([false]);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.show());
+    await expect(page.getByTestId("sidebar-unifiedInbox")).toBeVisible();
+  });
+
   await test.step("Abruf per Knopf", async () => {
     await page.getByTestId("sync-now").click();
     await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });

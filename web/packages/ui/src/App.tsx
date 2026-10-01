@@ -1,4 +1,4 @@
-import type { AccountsApi, AttachmentFiles, MailRepository } from "@stinkyma/core";
+import type { AccountsApi, AppSettingsApi, AttachmentFiles, MailRepository } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
@@ -19,6 +19,8 @@ export interface AppProps {
   accounts?: AccountsApi;
   /** Anhänge öffnen/speichern (Windows-App). Fehlt in der reinen Browser-Vorschau. */
   files?: AttachmentFiles;
+  /** Einstellungen der App (Infobereich, Autostart, Benachrichtigungen) – nur in der Windows-App. */
+  settings?: AppSettingsApi;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
   subscribeChanges?: (onChange: () => void) => () => void;
   /** Von außen gewünschtes Öffnen einer Mail (z. B. Klick auf eine Benachrichtigung). */
@@ -26,8 +28,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, subscribeChanges, subscribeOpenMessage }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files }), [repository, accounts, files]);
+export function App({ repository, locale, accounts, files, settings, subscribeChanges, subscribeOpenMessage }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings }), [repository, accounts, files, settings]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {

@@ -263,3 +263,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Abgleich meldet nichts), Store (Mail aus Benachrichtigung öffnen), E2E (neue Mail erscheint ohne Abruf).
   **Ungeprüft:** die Windows-Benachrichtigung selbst (im Linux-Test nicht darstellbar), IDLE bei iCloud/Gmail über
   Stunden, Verhalten nach Standby/WLAN-Wechsel.
+- **W4 Baustein 3 – Infobereich und Autostart:** Tray mit Ungelesen-Punkt, Schließen = verstecken (sofern
+  eingestellt), Autostart mit `--hidden`, Benachrichtigungs-Modi, Einstellungsdatei (`SettingsFile`), IPC-Kanal
+  „settings“ (Preload-Liste per Test geprüft), Optionen-Bereich „App“. Tests: Einlesen/Standardwerte, Datei samt
+  kaputter Datei, E2E (Modus gespeichert, Schließen versteckt, Beenden/Neustart weiterhin sauber).
+  **Ungeprüft:** Tray-Symbol und Autostart unter echtem Windows (im Linux-Test ohne Infobereich), Verhalten bei
+  Windows-Abmeldung.

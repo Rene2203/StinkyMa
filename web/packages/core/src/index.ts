@@ -10,3 +10,4 @@ export * from "./remoteContent.js";
 export * from "./compose.js";
 export * from "./files.js";
 export * from "./search.js";
+export * from "./appSettings.js";

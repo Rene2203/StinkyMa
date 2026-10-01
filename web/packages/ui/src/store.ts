@@ -7,6 +7,8 @@ import {
   type AccountSettings,
   type AccountsApi,
   type AttachmentFiles,
+  type AppSettings,
+  type AppSettingsApi,
   type Attachment,
   type Mailbox,
   type MailRepository,
@@ -71,6 +73,9 @@ export interface BrowserState {
   outbox: OutboxItem[];
   /** Anhang, der gerade vom Server geholt wird (Öffnen/Speichern). */
   attachmentBusy: string | null;
+  /** Einstellungen der App (nur Windows-App) und welche es auf dieser Plattform gibt. */
+  appSettings: AppSettings | null;
+  appSettingsAvailable: Partial<Record<keyof AppSettings, boolean>>;
 }
 
 export const initialState: BrowserState = {
@@ -92,6 +97,8 @@ export const initialState: BrowserState = {
   compose: null,
   outbox: [],
   attachmentBusy: null,
+  appSettings: null,
+  appSettingsAvailable: {},
 };
 
 // --- Abgeleitete Werte ---
@@ -150,12 +157,37 @@ export class BrowserStore {
 
   readonly #accounts: AccountsApi | undefined;
   readonly #files: AttachmentFiles | undefined;
+  readonly #settings: AppSettingsApi | undefined;
 
-  constructor(repository: MailRepository, options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles } = {}) {
+  constructor(
+    repository: MailRepository,
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi } = {},
+  ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
     this.#accounts = options.accounts;
     this.#files = options.files;
+    this.#settings = options.settings;
+  }
+
+  /** App-Einstellungen ändern (sofort sichtbar, Fehler ins Banner). */
+  async updateAppSettings(patch: Partial<AppSettings>): Promise<void> {
+    const settings = this.#settings;
+    if (!settings) return;
+    const previous = this.#state.appSettings;
+    if (previous) this.#set({ appSettings: { ...previous, ...patch } });
+    await this.#guard(async () => {
+      this.#set({ appSettings: await settings.update(patch) });
+    });
+  }
+
+  async #loadAppSettings(): Promise<void> {
+    const settings = this.#settings;
+    if (!settings) return;
+    await this.#guard(async () => {
+      const [appSettings, appSettingsAvailable] = await Promise.all([settings.get(), settings.available()]);
+      this.#set({ appSettings, appSettingsAvailable });
+    });
   }
 
   /** Können Anhänge geöffnet/gespeichert werden (Windows-App)? */
@@ -204,7 +236,13 @@ export class BrowserStore {
   // --- Laden ---
 
   async start(): Promise<void> {
-    await Promise.all([this.loadSidebar(), this.loadMessages(), this.#loadSyncStatus(), this.#loadRemoteContentExceptions()]);
+    await Promise.all([
+      this.loadSidebar(),
+      this.loadMessages(),
+      this.#loadSyncStatus(),
+      this.#loadRemoteContentExceptions(),
+      this.#loadAppSettings(),
+    ]);
   }
 
   /** Nach Änderungen von außen (Abgleich, andere Fenster): alles neu laden, Auswahl behalten, nichts als gelesen markieren. */

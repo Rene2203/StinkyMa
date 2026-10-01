@@ -1574,3 +1574,27 @@ button.attachment-open:hover {
   font-size: 11px;
   color: var(--fg-muted);
 }
+
+/* Optionen: App */
+
+.hint.block {
+  display: block;
+  margin: 2px 0 0;
+  font-weight: 400;
+}
+
+.dialog .setting-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 400;
+}
+
+.dialog .options-section .checkbox {
+  align-items: flex-start;
+}
+
+.dialog .options-section .checkbox input {
+  margin-top: 3px;
+}

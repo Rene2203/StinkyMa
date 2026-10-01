@@ -13,6 +13,12 @@
   15 statt 5 Minuten.
 - **Windows-Benachrichtigung** für neue ungelesene Mails im Posteingang (Absender und Betreff, nie der Inhalt; nicht
   beim ersten Abgleich eines Kontos, nicht wenn das Fenster vorne ist). Klick öffnet die Mail.
+- **Infobereich:** Schließen versteckt das Fenster, StinkyMa läuft weiter (einmaliger Hinweis). Symbol zeigt
+  ungelesene Mails (roter Punkt, Anzahl im Tooltip); Menü: Öffnen, Jetzt abrufen, Beenden.
+- **Optionen → App:** „Beim Schließen im Infobereich weiterlaufen“ (Standard an), „Mit Windows starten“ (unauffällig
+  im Infobereich, Standard aus), Benachrichtigungen „Absender und Betreff“ / „Nur ‚Neue Mail‘“ / „Aus“.
+  Gespeichert in `settings.json` im Benutzerordner (tolerant gegen kaputte Dateien).
+- Platzhalter-Symbol (Briefumschlag auf Blau) für Fenster, Installer und Infobereich – App-Name/Logo stehen noch aus.
 
 ## W3 – Gmail-Vorbereitung
 
