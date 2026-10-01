@@ -9,7 +9,19 @@ const specialUse: Record<string, MailboxRole> = {
   "\\Trash": "trash",
   "\\Junk": "spam",
   "\\Archive": "archive",
+  // Gmail: „Alle Nachrichten“ – Archivieren heißt dort „aus dem Posteingang nehmen“.
+  "\\All": "archive",
 };
+
+/**
+ * Virtuelle Ordner, die nur Kopien anderer Mails zeigen (Gmail „Markiert“, „Wichtig“) – nicht abgleichen,
+ * sonst wird jede Mail mehrfach geladen und erscheint doppelt.
+ */
+const virtualSpecialUse = new Set(["\\Flagged", "\\Important"]);
+
+export function isVirtualFolder(special?: string | null): boolean {
+  return Boolean(special && virtualSpecialUse.has(special));
+}
 
 const byName: [RegExp, MailboxRole][] = [
   [/^inbox$/i, "inbox"],

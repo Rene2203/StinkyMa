@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampleReply } from "./fixtures.js";
-import { assignUniqueRoles, baseSubject, detectProvider, guessSettings, mailboxRole, normalizeIds, parseMessage, snippetFromText, threadIdFor } from "../src/mail/index.js";
+import { assignUniqueRoles, isVirtualFolder, baseSubject, detectProvider, guessSettings, mailboxRole, normalizeIds, parseMessage, snippetFromText, threadIdFor } from "../src/mail/index.js";
 
 describe("Anbieter erkennen", () => {
   it("kennt iCloud mit app-spezifischem Passwort", () => {
@@ -32,8 +32,17 @@ describe("Ordnerrollen", () => {
     ["Papierkorb", ".", null, "trash"],
     ["Irgendwas", "/", "\\Junk", "spam"],
     ["Finanzen", "/", null, "custom"],
+    ["[Gmail]/All Mail", "/", "\\All", "archive"],
+    ["[Gmail]/Gesendet", "/", "\\Sent", "sent"],
   ] as const)("%s → %s", (path, delimiter, special, role) => {
     expect(mailboxRole(path, delimiter, special)).toBe(role);
+  });
+
+  it("Gmail: virtuelle Ordner „Markiert“/„Wichtig“ werden nicht abgeglichen", () => {
+    expect(isVirtualFolder("\\Flagged")).toBe(true);
+    expect(isVirtualFolder("\\Important")).toBe(true);
+    expect(isVirtualFolder("\\All")).toBe(false);
+    expect(isVirtualFolder(null)).toBe(false);
   });
 
   it("vergibt jede Rolle nur einmal, SPECIAL-USE zuerst", () => {

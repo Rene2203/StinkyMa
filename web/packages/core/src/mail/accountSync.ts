@@ -3,7 +3,7 @@ import type { Account, Mailbox } from "../models.js";
 import type { MailWriter } from "../sqlite/writer.js";
 import { flagsFromImap } from "./flags.js";
 import { parseMessage } from "./parse.js";
-import { assignUniqueRoles, mailboxRole } from "./roles.js";
+import { assignUniqueRoles, isVirtualFolder, mailboxRole } from "./roles.js";
 import { baseSubject, threadIdFor } from "./threading.js";
 
 export interface SyncOptions {
@@ -57,7 +57,9 @@ interface Folder {
 
 async function listFolders(client: ImapFlow, accountId: string): Promise<Folder[]> {
   const list: ListResponse[] = await client.list();
-  const selectable = list.filter((entry) => !entry.flags.has("\\Noselect") && !entry.flags.has("\\NonExistent"));
+  const selectable = list.filter(
+    (entry) => !entry.flags.has("\\Noselect") && !entry.flags.has("\\NonExistent") && !isVirtualFolder(entry.specialUse),
+  );
   const withRoles = assignUniqueRoles(
     selectable.map((entry) => ({
       path: entry.path,

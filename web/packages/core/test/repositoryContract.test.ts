@@ -221,3 +221,30 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
   });
 });
 
+// Gmail: „Alle Nachrichten“ (Archiv) enthält jede Mail des Posteingangs ein zweites Mal.
+describe.each([
+  ["InMemory", (data: ReturnType<typeof createMockData>) => new InMemoryMailRepository(data) as MailRepository],
+  [
+    "SQLite",
+    (data: ReturnType<typeof createMockData>) => {
+      const db = openDatabase(":memory:");
+      seedIfEmpty(db, data);
+      return new SqliteMailRepository(db) as MailRepository;
+    },
+  ],
+])("Archiv-Kopien (%s)", (_name, make) => {
+  it("eine markierte Mail, die auch im Archiv liegt, erscheint in „Markiert“ nur einmal", async () => {
+    const data = createMockData(now);
+    const flaggedBefore = await make(createMockData(now)).messages({ kind: "flagged" }, 100);
+    const original = data.messages.find((m) => isFlagged(m) && m.messageId && data.mailboxes.find((b) => b.id === m.mailboxId)?.role === "inbox")!;
+    const archive = data.mailboxes.find((b) => b.accountId === original.accountId && b.role === "archive")!;
+    data.messages.push({ ...original, id: `${original.id}-kopie`, mailboxId: archive.id, uid: 999 });
+    const repo = make(data);
+    const flagged = await repo.messages({ kind: "flagged" }, 100);
+    expect(flagged.map((m) => m.id).sort()).toEqual(flaggedBefore.map((m) => m.id).sort());
+    expect((await repo.overview()).counts.flagged).toBe((await make(createMockData(now)).overview()).counts.flagged);
+    // Im Archiv selbst bleibt die Kopie sichtbar
+    expect((await repo.messages({ kind: "mailbox", mailboxId: archive.id }, 100)).some((m) => m.id === `${original.id}-kopie`)).toBe(true);
+  });
+});
+

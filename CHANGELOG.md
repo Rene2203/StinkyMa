@@ -1,5 +1,11 @@
 # Changelog
 
+## W3 – Gmail-Vorbereitung
+
+- Gmail (mit App-Passwort): virtuelle Ordner „Markiert“ und „Wichtig“ werden nicht abgeglichen (nur Kopien,
+  sonst doppelte Downloads); „Alle Nachrichten“ (SPECIAL-USE `\\All`) ist der Archiv-Ordner. Mails, die zusätzlich
+  im Archiv liegen, erscheinen in „Markiert“ und im Zähler nur einmal.
+
 ## W3 (Teil 2) – Schreiben alltagstauglich
 
 ### Neu

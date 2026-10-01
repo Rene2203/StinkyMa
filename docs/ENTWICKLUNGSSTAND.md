@@ -242,3 +242,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Weiterleiten ohne Internet (Original-Anhänge nicht ladbar → Hinweis im Mail-Fenster, Mail bleibt offen).
 - **Windows-CI Lauf #40 (W3 Teil 2 komplett) grün** – Installer „StinkyMa-Windows-Installer“ dort. Test mit iCloud
   durch den Nutzer steht aus.
+- **01.10.2026 – Gmail (zweitwichtigstes Konto des Nutzers):** Läuft schon mit App-Passwort (Anbieter-Erkennung,
+  „Gesendet“ wird von Gmail selbst befüllt). Neu: virtuelle Ordner (\\Flagged, \\Important) werden übersprungen,
+  \\All = Archiv, Archiv-Kopien in „Markiert“ nur einmal (beide Speicher, Vertragstest). **Ungeprüft:** echtes
+  Gmail-Konto. **Offen:** OAuth-Anmeldung (siehe Abwägung im Chat; braucht ein Google-Cloud-Projekt des Nutzers).
+  Bekannt: „Alle Nachrichten“ wird für die letzten 30 Tage zusätzlich geladen (Posteingangsmails doppelt übertragen).

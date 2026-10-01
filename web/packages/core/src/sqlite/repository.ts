@@ -69,6 +69,15 @@ export function attachmentFromRow(r: Row): Attachment {
 }
 
 /** Bedingung auf `message` (verbunden mit `mailbox`) für einen Bereich. */
+/**
+ * Kopie im Archiv, die es auch in einem normalen Ordner gibt (Gmail: „Alle Nachrichten“ enthält jede Mail
+ * des Posteingangs) – in „Markiert“ nur einmal zählen und zeigen.
+ */
+const archiveDuplicate = `(mailbox.role = 'archive' AND message.messageId IS NOT NULL AND EXISTS (
+  SELECT 1 FROM message other JOIN mailbox otherBox ON otherBox.id = other.mailboxId
+   WHERE other.messageId = message.messageId AND other.accountId = message.accountId
+     AND otherBox.role NOT IN ('archive', 'trash', 'spam')))`;
+
 export function scopeCondition(scope: MessageScope): { sql: string; params: unknown[] } {
   switch (scope.kind) {
     case "unifiedInbox":
@@ -76,7 +85,7 @@ export function scopeCondition(scope: MessageScope): { sql: string; params: unkn
     case "unread":
       return { sql: "mailbox.role = ? AND (message.flags & ?) = 0", params: ["inbox", MessageFlag.seen] };
     case "flagged":
-      return { sql: "mailbox.role <> ? AND (message.flags & ?) <> 0", params: ["trash", MessageFlag.flagged] };
+      return { sql: `mailbox.role <> ? AND (message.flags & ?) <> 0 AND NOT ${archiveDuplicate}`, params: ["trash", MessageFlag.flagged] };
     case "mailbox":
       return { sql: "message.mailboxId = ?", params: [scope.mailboxId] };
   }
@@ -142,7 +151,7 @@ export class SqliteMailRepository implements MailRepository {
       .prepare(
         `SELECT message.mailboxId AS mailboxId, mailbox.role AS role,
                 SUM(CASE WHEN (message.flags & @seen) = 0 THEN 1 ELSE 0 END) AS unread,
-                SUM(CASE WHEN (message.flags & @seen) = 0 AND (message.flags & @flagged) <> 0 THEN 1 ELSE 0 END) AS flaggedUnread
+                SUM(CASE WHEN (message.flags & @seen) = 0 AND (message.flags & @flagged) <> 0 AND NOT ${archiveDuplicate} THEN 1 ELSE 0 END) AS flaggedUnread
          FROM message JOIN mailbox ON mailbox.id = message.mailboxId
          GROUP BY message.mailboxId`,
       )

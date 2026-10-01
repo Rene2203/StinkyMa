@@ -69,7 +69,7 @@ export class InMemoryMailRepository implements MailRepository {
         counts.unifiedInbox += 1;
         counts.unread += 1;
       }
-      if (role !== "trash" && (m.flags & MessageFlag.flagged) !== 0) counts.flagged += 1;
+      if (role !== "trash" && (m.flags & MessageFlag.flagged) !== 0 && !this.#isArchiveDuplicate(m)) counts.flagged += 1;
     }
     return { accounts, mailboxesByAccount, counts, outbox: [] };
   }
@@ -202,6 +202,15 @@ export class InMemoryMailRepository implements MailRepository {
     return null; // kein Postausgang ohne Server
   }
 
+  /** Kopie im Archiv, die es auch in einem normalen Ordner gibt (Gmail „Alle Nachrichten“). */
+  #isArchiveDuplicate(m: Message): boolean {
+    if (this.#roleOf(m.mailboxId) !== "archive" || !m.messageId) return false;
+    return this.#data.messages.some((other) => {
+      const role = this.#roleOf(other.mailboxId);
+      return other !== m && other.accountId === m.accountId && other.messageId === m.messageId && role !== "archive" && role !== "trash" && role !== "spam";
+    });
+  }
+
   #roleOf(mailboxId: string): MailboxRole | undefined {
     return this.#data.mailboxes.find((b) => b.id === mailboxId)?.role;
   }
@@ -215,7 +224,7 @@ export class InMemoryMailRepository implements MailRepository {
         case "unread":
           return role === "inbox" && (m.flags & MessageFlag.seen) === 0;
         case "flagged":
-          return role !== "trash" && (m.flags & MessageFlag.flagged) !== 0;
+          return role !== "trash" && (m.flags & MessageFlag.flagged) !== 0 && !this.#isArchiveDuplicate(m);
         case "mailbox":
           return m.mailboxId === scope.mailboxId;
       }
