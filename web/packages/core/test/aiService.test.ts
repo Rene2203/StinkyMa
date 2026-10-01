@@ -128,7 +128,7 @@ describe("AIService", () => {
     install("klein");
     const status = await service.update({ enabled: true, modelId: "klein", autoCategorize: false });
     expect(status.ready).toBe(true);
-    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true, vision: false });
+    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true, vision: false, categorizeOlder: false });
     await expect(service.update({ modelId: "gibt-es-nicht" })).rejects.toThrow(/Unbekanntes Modell/);
   });
 
@@ -269,6 +269,20 @@ describe("AIService", () => {
     expect(await service.learnedSenders()).toEqual([]);
     await service.setCategory(first!, null, false);
     expect(db.prepare("SELECT category, categoryOrigin FROM message WHERE id = ?").get(first)).toEqual({ category: null, categoryOrigin: null });
+  });
+
+  it("ältere Mails nur auf Wunsch; der Rückstand wird gemeldet", async () => {
+    const { service, install, results, db, statuses } = setup();
+    install("klein");
+    // Zwei Posteingangs-Mails sind 40 Tage alt
+    const old = new Date(Date.now() - 40 * 86_400_000).toISOString();
+    db.prepare("UPDATE message SET date = ? WHERE id IN (SELECT m.id FROM message m JOIN mailbox b ON b.id = m.mailboxId WHERE b.role = 'inbox' LIMIT 2)").run(old);
+    await service.update({ enabled: true, modelId: "klein" });
+    await until(() => statuses.at(-1)?.categorizing === null && (statuses.at(-1)?.backlog.recent ?? 1) === 0);
+    expect((await service.status()).backlog).toEqual({ recent: 0, older: 2 });
+    await service.update({ categorizeOlder: true });
+    await until(() => results.uncategorizedTotal() === 0 && statuses.at(-1)?.categorizing === null);
+    expect((await service.status()).backlog).toEqual({ recent: 0, older: 0 });
   });
 
   it("Modell löschen gibt es frei und setzt die Auswahl zurück", async () => {

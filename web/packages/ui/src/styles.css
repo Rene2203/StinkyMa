@@ -2624,3 +2624,22 @@ button.attachment-open:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.ai-activity.idle {
+  cursor: default;
+  align-items: center;
+  background: color-mix(in srgb, var(--fg) 4%, var(--bg-sidebar));
+  border-color: var(--border);
+}
+
+.ai-activity.idle > svg {
+  color: var(--fg-muted);
+}
+
+button.ai-activity.idle {
+  cursor: pointer;
+}
+
+.ai-activity.idle .ai-activity-text > span {
+  white-space: normal;
+}

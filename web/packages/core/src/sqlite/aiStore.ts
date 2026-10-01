@@ -53,6 +53,11 @@ export class AIResultStore {
     ).map(messageFromRow);
   }
 
+  /** Alle Posteingangs-Mails ohne Kategorie (ohne Zeitgrenze). */
+  uncategorizedTotal(): number {
+    return this.uncategorizedCount("");
+  }
+
   uncategorizedCount(sinceIso: string): number {
     const row = this.db
       .prepare(

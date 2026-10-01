@@ -91,6 +91,9 @@ export class AIService implements AIApi {
     // Laufende Aufgabe zum Zeitpunkt des Aufrufs festhalten (das Folgende wartet auf Dateizugriffe)
     const activity = this.#activity ? { ...this.#activity, waiting: this.#waiting } : null;
     const categorizing = this.#categorizing ? { ...this.#categorizing } : null;
+    const total = this.options.results.uncategorizedTotal();
+    const recent = this.options.results.uncategorizedCount(this.#categorizeSince());
+    const backlog = { recent, older: Math.max(0, total - recent) };
     const models: AIModelInfo[] = [];
     let selectedInstalled = false;
     for (const model of this.#catalog) {
@@ -122,6 +125,7 @@ export class AIService implements AIApi {
       vision: await this.#visionStatus(),
       categorizing,
       activity,
+      backlog,
       error: this.#error,
     };
   }
@@ -646,6 +650,12 @@ export class AIService implements AIApi {
     this.options.results.forgetSender(address);
   }
 
+  /** Ab wann eingeordnet wird: letzte `categorizeWindowDays` Tage, oder alles (Einstellung „auch ältere“). */
+  #categorizeSince(): string {
+    if (this.#settings.categorizeOlder) return "";
+    return new Date((this.options.now?.() ?? new Date()).getTime() - categorizeWindowDays * 86_400_000).toISOString();
+  }
+
   async resume(): Promise<AIStatus> {
     this.#error = null;
     this.categorizeInBackground();
@@ -666,7 +676,7 @@ export class AIService implements AIApi {
   }
 
   async #categorizeLoop(): Promise<void> {
-    const since = () => new Date((this.options.now?.() ?? new Date()).getTime() - categorizeWindowDays * 86_400_000).toISOString();
+    const since = () => this.#categorizeSince();
     do {
       this.#categorizeRequested = false;
       if (!this.#settings.enabled || !this.#settings.autoCategorize || this.#disposed) break;

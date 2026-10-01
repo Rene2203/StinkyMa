@@ -36,8 +36,49 @@ export function AIActivity() {
   const ai = state.ai;
   const elapsed = useElapsed(ai?.activity?.startedAt ?? null);
   if (!ai?.settings.enabled) return null;
-  const { activity, categorizing, error } = ai;
-  if (!activity && !categorizing && !error) return null;
+  const { activity, categorizing, error, backlog } = ai;
+
+  // Leerlauf: trotzdem sichtbar, damit man weiß, woran man ist
+  if (!activity && !categorizing && !error) {
+    if (!ai.ready) {
+      return (
+        <button type="button" className="ai-activity idle" data-testid="ai-activity" onClick={() => store.openOptions()}>
+          <Cpu size={14} aria-hidden="true" />
+          <span className="ai-activity-text">
+            <span>{t("aiActivity.notReady")}</span>
+          </span>
+        </button>
+      );
+    }
+    const waiting = ai.settings.autoCategorize ? backlog.recent : 0;
+    return (
+      <div className="ai-activity idle" role="status" data-testid="ai-activity">
+        <Cpu size={14} aria-hidden="true" />
+        <span className="ai-activity-text">
+          <span>{t("aiActivity.ready")}</span>
+          <span className="small muted">
+            {!ai.settings.autoCategorize
+              ? t("aiActivity.autoOff")
+              : waiting > 0
+                ? t("aiActivity.waiting", { count: waiting })
+                : backlog.older > 0
+                  ? t("aiActivity.older", { count: backlog.older })
+                  : t("aiActivity.allDone")}
+          </span>
+        </span>
+        {ai.settings.autoCategorize && waiting > 0 && (
+          <button type="button" className="link-button small" data-testid="ai-resume" onClick={() => void store.resumeAI()}>
+            {t("aiActivity.start")}
+          </button>
+        )}
+        {ai.settings.autoCategorize && waiting === 0 && backlog.older > 0 && (
+          <button type="button" className="link-button small" data-testid="ai-older" onClick={() => void store.updateAI({ categorizeOlder: true })}>
+            {t("aiActivity.categorizeOlder")}
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (error && !activity && !categorizing) {
     return (

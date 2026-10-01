@@ -23,9 +23,11 @@ export interface AISettings {
   useGpu: boolean;
   /** Bilder und Scans verstehen (lädt Bild-Baustein und Bild-Laufzeit nach). */
   vision: boolean;
+  /** Auch Posteingangs-Mails einordnen, die älter als `categorizeWindowDays` sind. */
+  categorizeOlder: boolean;
 }
 
-export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true, vision: false };
+export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true, vision: false, categorizeOlder: false };
 
 export function normalizeAISettings(raw: unknown): AISettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -35,6 +37,7 @@ export function normalizeAISettings(raw: unknown): AISettings {
     autoCategorize: typeof value.autoCategorize === "boolean" ? value.autoCategorize : defaultAISettings.autoCategorize,
     useGpu: typeof value.useGpu === "boolean" ? value.useGpu : defaultAISettings.useGpu,
     vision: typeof value.vision === "boolean" ? value.vision : defaultAISettings.vision,
+    categorizeOlder: typeof value.categorizeOlder === "boolean" ? value.categorizeOlder : defaultAISettings.categorizeOlder,
   };
 }
 
@@ -75,6 +78,8 @@ export interface AIStatus {
    * null = Leerlauf.
    */
   activity: { task: AITask; startedAt: string; waiting: number } | null;
+  /** Noch nicht eingeordnete Posteingangs-Mails: im Zeitfenster (werden eingeordnet) und ältere (nur mit `categorizeOlder`). */
+  backlog: { recent: number; older: number };
   /** Letzter Fehler (Download, Laden des Modells) – verständlich, ohne Mail-Inhalte. */
   error: string | null;
 }

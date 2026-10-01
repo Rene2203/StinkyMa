@@ -32,6 +32,12 @@ export function AISection() {
               <span className="hint block">{t("ai.autoCategorizeHint", { days: categorizeWindowDays })}</span>
             </span>
           </label>
+          {settings.autoCategorize && (
+            <label className="checkbox">
+              <input type="checkbox" checked={settings.categorizeOlder} data-testid="ai-categorize-older" onChange={(e) => void store.updateAI({ categorizeOlder: e.target.checked })} />
+              <span>{t("ai.categorizeOlder")}</span>
+            </label>
+          )}
           <label className="checkbox">
             <input type="checkbox" checked={settings.useGpu} data-testid="ai-use-gpu" onChange={(e) => void store.updateAI({ useGpu: e.target.checked })} />
             <span>{t("ai.useGpu")}</span>

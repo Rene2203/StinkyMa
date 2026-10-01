@@ -21,7 +21,7 @@
 - **Einordnung korrigieren:** Klick auf die Einordnung über der Mail; auf Wunsch für den Absender gemerkt – künftige Mails
   kommen ohne KI richtig, andere Mails des Absenders werden mit korrigiert. Migration `v13-sender-category`.
 - **KI-Anzeige** unten in der Seitenleiste: was die KI gerade tut, Fortschrittsbalken der Einordnung, laufende Uhr,
-  bei Stillstand „Weiter einordnen“.
+  bei Stillstand „Weiter einordnen“; im Leerlauf, ob alles eingeordnet ist. Neue Einstellung „Auch ältere Mails einordnen“.
 - **Tagesüberblick** (Sonnen-Knopf unten links; auf Wunsch täglich als Benachrichtigung zur gewählten Uhrzeit, nur mit
   Anzahlen): Fälliges der nächsten 7 Tage und Überfälliges, „wartet auf dich“, neue wichtige ungelesene Mails; Newsletter,
   Benachrichtigungen und Verdächtiges nur gezählt. Ohne KI-Modell, sofort – ungeöffnete neue Mails werden dafür schnell mit

@@ -446,6 +446,12 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Tests noch weiter; die Modelldatei fehlte, der Fehler blieb unbehandelt. Hätte in der App beim Löschen eines Modells genauso
   passieren können. Jetzt: Statusmeldungen im Hintergrund fangen Fehler ab, die Dateiprüfung meldet „nicht da“ statt zu
   scheitern, und die Einordnung ist gegen unerwartete Fehler abgesichert (hält an und meldet).
+- **Nutzertest: „Einordnung bricht noch immer ab“, Anzeige nicht gefunden.** Die Anzeige erschien nur, solange die KI
+  arbeitete. Sehr wahrscheinliche Ursache des „Abbruchs“: Eingeordnet wurden nur Posteingangs-Mails der letzten 14 Tage –
+  danach ist sie fertig, ältere bleiben ohne Einordnung. Jetzt: Anzeige unten links immer sichtbar, solange die KI an ist
+  („KI bereit · alles eingeordnet“ bzw. „N Mails älter als 14 Tage sind nicht eingeordnet · Auch ältere“, „N Mails warten ·
+  Jetzt einordnen“, falls trotz Arbeit nichts läuft). Neue Einstellung „Auch ältere Mails einordnen“. **Ungeprüft**, ob das
+  den Abbruch beim Nutzer vollständig erklärt – nachfragen, was die Anzeige jetzt zeigt.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
   Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
   Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,
