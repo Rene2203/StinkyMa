@@ -417,6 +417,8 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   null (reading 'commands')“ – der Editor war beim schnellen Neuaufbau schon abgebaut, als er den Cursor setzen wollte; der
   Fehler riss den ganzen Composer mit. Jetzt Prüfung `isDestroyed`. Lokal selten (1 von ~20), auf dem langsameren
   Windows-Runner zweimal in Folge. Kann auch beim normalen „Antworten“ aufgetreten sein.
+  **Windows-CI #80/#81 danach grün** (ob das Testmodell dabei einen Vorschlag lieferte, ist Zufall). Nächster Schritt:
+  Nutzer testet den Installer aus der CI selbst (Türsteher, Regeln, Antwortvorschläge, Tagesüberblick).
   **Lokal nicht testbar:** echte Modelle in der E2E-App unter Linux – node-llama-cpp prüft seine Binärdateien in einem
   Kindprozess, der Playwrights Debugger-Schalter erbt und hängen bleibt. Unter Windows (CI) läuft es.
 - **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
