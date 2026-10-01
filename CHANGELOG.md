@@ -7,6 +7,12 @@
   Wortanfang genügt, neueste zuerst. Syntax: Wörter, "feste Wortgruppe", `von:`/`from:` für den Absender.
   Standard: alle Ordner (ohne Papierkorb/Spam), umschaltbar auf „Nur hier“; Treffer aus anderen Ordnern zeigen
   den Ordnernamen. Eingaben werden nie als Index-Syntax gelesen (Sonderzeichen sicher). Esc leert die Suche.
+- **Neue Mails sofort:** je Konto eine Wächter-Verbindung auf den Posteingang (IMAP IDLE, alle 4 min erneuert,
+  Wiederverbindung mit wachsender Pause bis 5 min). Meldet der Server etwas, wird nur der Posteingang abgeglichen;
+  nach jedem (Wieder-)Verbinden einmal nachholen, was in der Lücke kam. Voller Abgleich aller Ordner nur noch alle
+  15 statt 5 Minuten.
+- **Windows-Benachrichtigung** für neue ungelesene Mails im Posteingang (Absender und Betreff, nie der Inhalt; nicht
+  beim ersten Abgleich eines Kontos, nicht wenn das Fenster vorne ist). Klick öffnet die Mail.
 
 ## W3 – Gmail-Vorbereitung
 

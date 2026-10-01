@@ -190,6 +190,19 @@ describe("BrowserStore", () => {
     expect(visibleMessages(store.getState())).toBe(store.getState().messages);
   });
 
+  it("Mail aus einer Benachrichtigung öffnen: Posteingang, Suche beendet, Mail ausgewählt", async () => {
+    store.searchDelayMs = 0;
+    await store.selectScope({ kind: "flagged" });
+    store.setSearchText("xyz");
+    const target = (await repo.messages({ kind: "unifiedInbox" }, 5))[2]!;
+    await store.openMessage(target.id);
+    const state = store.getState();
+    expect(state.selectedScope.kind).toBe("unifiedInbox");
+    expect(state.searchText).toBe("");
+    expect(state.selectedMessageId).toBe(target.id);
+    expect(selectedMessage(state)?.id).toBe(target.id);
+  });
+
   it("Ordnerwechsel beendet eine Suche in allen Ordnern", async () => {
     store.searchDelayMs = 0;
     store.setSearchText("nebenkosten");

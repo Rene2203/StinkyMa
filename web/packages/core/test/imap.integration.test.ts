@@ -445,5 +445,45 @@ describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
     expect(parsed.attachments.map((a) => a.filename)).toEqual(["Abrechnung.pdf"]);
     expect((await extractAttachment(source!, 0))?.content.toString("utf8")).toBe("%PDF Abrechnung");
   });
+
+  it("Neue Mails sofort: der Server meldet sie (IDLE), nur neue ungelesene im Posteingang werden gemeldet", async () => {
+    const account = await addAndSync();
+    service.dispose();
+    const notified: string[] = [];
+    let changed = 0;
+    service = new MailService(repository, new MailWriter(db), secrets, {
+      now: () => now,
+      watchDebounceMs: 100,
+      onChange: () => { changed += 1; },
+      onNewMail: (_accountId, messages) => notified.push(...messages.map((m) => m.subject)),
+    });
+    service.startWatching();
+    await expect.poll(() => service.isWatching(account.id), { timeout: 10_000 }).toBe(true);
+
+    await admin.append("INBOX", rfc822({ from: "Lisa <lisa@example.test>", subject: "Ganz frisch", date: now, messageId: "<frisch@example.test>", body: "Hallo!" }), [], now);
+    await expect.poll(() => notified, { timeout: 15_000 }).toEqual(["Ganz frisch"]);
+    expect(changed).toBeGreaterThan(0);
+    expect((await service.messages({ kind: "unifiedInbox" }, 50)).some((m) => m.subject === "Ganz frisch")).toBe(true);
+
+    // Bereits gelesene neue Mails lösen keine Benachrichtigung aus
+    await admin.append("INBOX", rfc822({ from: "Lisa <lisa@example.test>", subject: "Schon gelesen", date: now, messageId: "<gelesen@example.test>", body: "x" }), ["\\Seen"], now);
+    await expect.poll(async () => (await service.messages({ kind: "unifiedInbox" }, 50)).some((m) => m.subject === "Schon gelesen"), { timeout: 15_000 }).toBe(true);
+    expect(notified).toEqual(["Ganz frisch"]);
+
+    await service.removeAccount(account.id);
+    expect(service.isWatching(account.id)).toBe(false);
+  }, 30_000);
+
+  it("erster Abgleich eines Kontos meldet keine „neuen“ Mails", async () => {
+    const notified: string[] = [];
+    service.dispose();
+    service = new MailService(repository, new MailWriter(db), secrets, {
+      now: () => now,
+      onNewMail: (_a, messages) => notified.push(...messages.map((m) => m.subject)),
+    });
+    await service.addAccount(settings(), "geheim", { removeDemoAccounts: true });
+    await service.syncNow();
+    expect(notified).toEqual([]);
+  });
 });
 

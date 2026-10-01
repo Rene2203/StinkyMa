@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, safeStorage, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, safeStorage, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -7,9 +7,11 @@ import {
   attachmentFilesMethods,
   createMockData,
   isRiskyAttachment,
+  displayName,
   mailRepositoryMethods,
   safeFilename,
   type AttachmentFiles,
+  type Message,
 } from "@stinkyma/core";
 import { MailService } from "@stinkyma/core/mail";
 import { EncryptedFileSecretStore } from "@stinkyma/core/node";
@@ -26,8 +28,11 @@ let mainWindow: BrowserWindow | null = null;
 let service: MailService | null = null;
 let syncTimer: NodeJS.Timeout | null = null;
 
-/** Abgleich alle 5 Minuten, solange die App läuft (IDLE für sofortige Zustellung folgt in W4). */
-const syncIntervalMs = 5 * 60_000;
+/**
+ * Vollständiger Abgleich aller Ordner alle 15 Minuten. Neue Mails im Posteingang kommen sofort über die
+ * Wächter-Verbindung (IMAP IDLE) – der Intervall-Abgleich ist nur das Sicherheitsnetz.
+ */
+const syncIntervalMs = 15 * 60_000;
 
 function dataPath(file: string): string {
   return join(app.getPath("userData"), file);
@@ -53,6 +58,7 @@ function setUpServices(): void {
 
   service = new MailService(new SqliteMailRepository(db), new MailWriter(db), secrets, {
     onChange: notifyRenderer,
+    onNewMail: (_accountId, messages) => showNewMailNotification(messages),
   });
 }
 
@@ -67,8 +73,34 @@ function notifyRenderer(): void {
 }
 
 function startSync(): void {
-  void service?.syncNow();
+  void service?.syncNow().finally(() => service?.startWatching());
   syncTimer = setInterval(() => void service?.syncNow(), syncIntervalMs);
+}
+
+/**
+ * Windows-Benachrichtigung für neue Mails – nur Absender und Betreff, nie der Inhalt. Nicht, solange das
+ * Fenster im Vordergrund ist (dann sieht man die Mail ohnehin). Klick öffnet die Mail.
+ */
+function showNewMailNotification(messages: Message[]): void {
+  if (!Notification.isSupported() || mainWindow?.isFocused()) return;
+  const [first] = messages;
+  if (!first) return;
+  const german = app.getLocale().startsWith("de");
+  const notification =
+    messages.length === 1
+      ? new Notification({ title: displayName(first.from), body: first.subject || (german ? "(kein Betreff)" : "(no subject)"), silent: false })
+      : new Notification({
+          title: "StinkyMa",
+          body: german ? `${messages.length} neue Mails – zuletzt von ${displayName(first.from)}` : `${messages.length} new emails – latest from ${displayName(first.from)}`,
+        });
+  notification.on("click", () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send("mail:open", first.id);
+  });
+  notification.show();
 }
 
 /** Geöffnete Anhänge landen in einem eigenen Temp-Ordner, der beim Start geleert wird. */

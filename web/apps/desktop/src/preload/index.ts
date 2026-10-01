@@ -19,5 +19,13 @@ contextBridge.exposeInMainWorld("stinkyma", {
     ipcRenderer.on("mail:changed", listener);
     return () => ipcRenderer.removeListener("mail:changed", listener);
   },
+  /** Benachrichtigung angeklickt: diese Mail öffnen. */
+  onOpenMessage: (callback: (messageId: string) => void) => {
+    const listener = (_event: unknown, messageId: unknown) => {
+      if (typeof messageId === "string") callback(messageId);
+    };
+    ipcRenderer.on("mail:open", listener);
+    return () => ipcRenderer.removeListener("mail:open", listener);
+  },
   platform: process.platform,
 });

@@ -14,7 +14,7 @@ export function loginFor(account: Pick<Account, "imapHost" | "imapPort" | "imapS
 }
 
 /** Öffnet eine IMAP-Verbindung. Passwörter und Mail-Inhalte werden nie geloggt (logger: false). */
-export async function connectImap(login: ImapLogin, options: { timeoutMs?: number } = {}): Promise<ImapFlow> {
+export async function connectImap(login: ImapLogin, options: { timeoutMs?: number; maxIdleTimeMs?: number } = {}): Promise<ImapFlow> {
   const client = new ImapFlow({
     host: login.host,
     port: login.port,
@@ -26,6 +26,8 @@ export async function connectImap(login: ImapLogin, options: { timeoutMs?: numbe
     connectionTimeout: options.timeoutMs ?? 20_000,
     greetingTimeout: options.timeoutMs ?? 20_000,
     socketTimeout: 5 * 60_000,
+    // Wächter-Verbindungen: IDLE regelmäßig erneuern, damit die stille Leitung nicht als hängend getrennt wird.
+    ...(options.maxIdleTimeMs ? { maxIdleTime: options.maxIdleTimeMs } : {}),
   });
   // Unbehandelte Fehler-Events würden den Prozess beenden; Fehler kommen über die aufrufenden Promises.
   client.on("error", () => undefined);

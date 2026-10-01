@@ -519,6 +519,14 @@ export class BrowserStore {
     });
   }
 
+  /** Öffnet eine bestimmte Mail (z. B. aus einer Benachrichtigung): Posteingang zeigen, Mail auswählen. */
+  async openMessage(id: string): Promise<void> {
+    this.#set({ searchText: "", searchResults: null });
+    if (this.#state.selectedScope.kind !== "unifiedInbox") await this.selectScope({ kind: "unifiedInbox" });
+    else await this.loadMessages();
+    await this.selectMessage(id);
+  }
+
   /** Nächste (+1) oder vorherige (−1) Mail der sichtbaren Liste auswählen. */
   async moveSelection(step: 1 | -1): Promise<void> {
     const list = visibleMessages(this.#state);

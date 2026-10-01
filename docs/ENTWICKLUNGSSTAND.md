@@ -255,3 +255,11 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Ordnerhinweis, Auswahl bleibt beim Neuladen. Tests: Parser, Vertragstests (Wortanfang, Akzente, von:, Bereich,
   Sonderzeichen, Sortierung), Store, E2E (Wort aus dem Mailtext einer archivierten Mail). Lokal alle grün.
   **Ungeprüft:** Tempo mit sehr großen Postfächern auf schwacher Hardware.
+- **W4 Baustein 2 – Neue Mails sofort:** Wächter in `MailService.startWatching` (eigene Verbindung, `idle()` in
+  Schleife – das automatische IDLE von imapflow ist bei uns aus), `syncAccountNow(…, { roles: ["inbox"] })`,
+  `onNewMail` für neue ungelesene Posteingangsmails. Beim Testen gefunden: „Wächter bereit“ wurde zu früh gemeldet
+  (Mails in der Lücke gingen verloren) → bereit erst bei aktivem IDLE + Nachholen nach jedem Verbinden.
+  Tests: GreenMail (Meldung kommt, gelesene neue Mails melden nichts, Konto entfernen stoppt die Wache, erster
+  Abgleich meldet nichts), Store (Mail aus Benachrichtigung öffnen), E2E (neue Mail erscheint ohne Abruf).
+  **Ungeprüft:** die Windows-Benachrichtigung selbst (im Linux-Test nicht darstellbar), IDLE bei iCloud/Gmail über
+  Stunden, Verhalten nach Standby/WLAN-Wechsel.

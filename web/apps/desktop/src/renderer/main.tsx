@@ -11,6 +11,7 @@ declare global {
       accounts: AccountsApi;
       files: AttachmentFiles;
       onMailChanged: (callback: () => void) => () => void;
+      onOpenMessage: (callback: (messageId: string) => void) => () => void;
       platform: string;
     };
   }
@@ -26,7 +27,7 @@ const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <App repository={repository} locale={locale} accounts={bridge?.accounts} files={bridge?.files} subscribeChanges={bridge?.onMailChanged} />
+      <App repository={repository} locale={locale} accounts={bridge?.accounts} files={bridge?.files} subscribeChanges={bridge?.onMailChanged} subscribeOpenMessage={bridge?.onOpenMessage} />
     </StrictMode>,
   );
 }

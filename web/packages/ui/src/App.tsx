@@ -21,10 +21,12 @@ export interface AppProps {
   files?: AttachmentFiles;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
   subscribeChanges?: (onChange: () => void) => () => void;
+  /** Von außen gewünschtes Öffnen einer Mail (z. B. Klick auf eine Benachrichtigung). */
+  subscribeOpenMessage?: (open: (messageId: string) => void) => () => void;
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, subscribeChanges }: AppProps) {
+export function App({ repository, locale, accounts, files, subscribeChanges, subscribeOpenMessage }: AppProps) {
   const store = useMemo(() => new BrowserStore(repository, { accounts, files }), [repository, accounts, files]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
@@ -33,6 +35,7 @@ export function App({ repository, locale, accounts, files, subscribeChanges }: A
   }, [store]);
 
   useEffect(() => subscribeChanges?.(() => void store.reload()), [store, subscribeChanges]);
+  useEffect(() => subscribeOpenMessage?.((id) => void store.openMessage(id)), [store, subscribeOpenMessage]);
 
   useEffect(() => {
     document.documentElement.lang = locale;

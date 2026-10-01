@@ -447,6 +447,20 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     await expect(page.getByTestId("search-input")).toHaveValue("");
   });
 
+  await test.step("Neue Mail erscheint sofort – ohne Abruf (IMAP IDLE)", async () => {
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    const admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: email, pass: "geheim" }, logger: false });
+    await admin.connect();
+    await admin.append(
+      "INBOX",
+      ["From: Lisa <lisa@example.test>", `To: ${email}`, "Subject: Ganz frisch eingetroffen", `Date: ${new Date().toUTCString()}`, "Message-ID: <frisch-e2e@example.test>", "", "Hallo!", ""].join("\r\n"),
+      [],
+      new Date(),
+    );
+    await admin.logout();
+    await expect(page.getByTestId("message-row").filter({ hasText: "Ganz frisch eingetroffen" })).toBeVisible({ timeout: 10_000 });
+  });
+
   await test.step("Abruf per Knopf", async () => {
     await page.getByTestId("sync-now").click();
     await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });

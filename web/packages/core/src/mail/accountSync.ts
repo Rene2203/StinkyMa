@@ -1,5 +1,5 @@
 import type { ImapFlow, ListResponse } from "imapflow";
-import type { Account, Mailbox } from "../models.js";
+import { MessageFlag, type Account, type Mailbox, type MailboxRole } from "../models.js";
 import type { MailWriter } from "../sqlite/writer.js";
 import { flagsFromImap } from "./flags.js";
 import { parseMessage } from "./parse.js";
@@ -12,7 +12,17 @@ export interface SyncOptions {
   /** Wie viele Mails pro FETCH geholt werden. */
   batchSize?: number;
   /** Nach jedem Ordner – damit die Oberfläche neue Mails sofort zeigt, nicht erst am Ende. */
-  onMailboxSynced?: (counts: { added: number; removed: number; flagsChanged: number }) => void;
+  onMailboxSynced?: (counts: MailboxCounts) => void;
+  /** Nur Ordner mit diesen Rollen abgleichen (z. B. nur den Posteingang, wenn der Server neue Mails meldet). */
+  roles?: MailboxRole[];
+}
+
+interface MailboxCounts {
+  added: number;
+  removed: number;
+  flagsChanged: number;
+  /** IDs neu geholter, ungelesener Mails. */
+  newUnread: string[];
 }
 
 export interface SyncResult {
@@ -20,6 +30,8 @@ export interface SyncResult {
   added: number;
   removed: number;
   flagsChanged: number;
+  /** Neue ungelesene Mails im Posteingang (für Benachrichtigungen). */
+  newInInbox: string[];
 }
 
 export const mailboxIdFor = (accountId: string, path: string) => `${accountId}/${path}`;
@@ -27,7 +39,7 @@ export const messageIdFor = (mailboxId: string, uidValidity: number, uid: number
 
 /** Gleicht ein Konto mit dem Server ab: Ordner, neue Mails, Flags, gelöschte Mails. */
 export async function syncAccount(client: ImapFlow, writer: MailWriter, account: Account, options: SyncOptions): Promise<SyncResult> {
-  const result: SyncResult = { mailboxes: 0, added: 0, removed: 0, flagsChanged: 0 };
+  const result: SyncResult = { mailboxes: 0, added: 0, removed: 0, flagsChanged: 0, newInInbox: [] };
   const folders = await listFolders(client, account.id);
 
   // Ordner, die es auf dem Server nicht mehr gibt, entfernen.
@@ -38,7 +50,9 @@ export async function syncAccount(client: ImapFlow, writer: MailWriter, account:
   for (const folder of folders) writer.upsertMailbox(folder.mailbox);
 
   // Posteingang zuerst – dort erwartet man neue Mails.
-  const ordered = [...folders].sort((a, b) => Number(b.mailbox.role === "inbox") - Number(a.mailbox.role === "inbox"));
+  const ordered = [...folders]
+    .filter((f) => !options.roles || options.roles.includes(f.mailbox.role))
+    .sort((a, b) => Number(b.mailbox.role === "inbox") - Number(a.mailbox.role === "inbox"));
   for (const folder of ordered) {
     const counts = await syncMailbox(client, writer, account, folder, options);
     options.onMailboxSynced?.(counts);
@@ -46,6 +60,7 @@ export async function syncAccount(client: ImapFlow, writer: MailWriter, account:
     result.added += counts.added;
     result.removed += counts.removed;
     result.flagsChanged += counts.flagsChanged;
+    if (folder.mailbox.role === "inbox") result.newInInbox.push(...counts.newUnread);
   }
   return result;
 }
@@ -86,11 +101,11 @@ async function syncMailbox(
   account: Account,
   folder: Folder,
   options: SyncOptions,
-): Promise<{ added: number; removed: number; flagsChanged: number }> {
+): Promise<MailboxCounts> {
   const lock = await client.getMailboxLock(folder.path, { readOnly: true });
   try {
     const status = client.mailbox;
-    if (!status) return { added: 0, removed: 0, flagsChanged: 0 };
+    if (!status) return { added: 0, removed: 0, flagsChanged: 0, newUnread: [] };
     const uidValidity = Number(status.uidValidity);
     const stored = writer.mailboxes(account.id).find((m) => m.id === folder.mailbox.id);
     if (stored?.uidValidity !== uidValidity) writer.resetMailbox(folder.mailbox.id, uidValidity);
@@ -102,6 +117,7 @@ async function syncMailbox(
     // 1. Neue Mails holen
     const missing = serverUids.filter((uid) => !known.has(uid)).sort((a, b) => b - a); // neueste zuerst
     let added = 0;
+    const newUnread: string[] = [];
     const batchSize = options.batchSize ?? 25;
     for (let i = 0; i < missing.length; i += batchSize) {
       const batch = missing.slice(i, i + batchSize);
@@ -131,6 +147,7 @@ async function syncMailbox(
           attachments: parsed.attachments,
         });
         added += 1;
+        if ((flagsFromImap(msg.flags) & MessageFlag.seen) === 0) newUnread.push(id);
         // Dem Main-Prozess Luft lassen: Oberfläche und Aktionen bleiben während des Abgleichs bedienbar.
         await new Promise((resolve) => setImmediate(resolve));
       }
@@ -156,7 +173,7 @@ async function syncMailbox(
     const gone = [...known.entries()].filter(([uid, m]) => !serverSet.has(uid) && m.date >= sinceIso).map(([, m]) => m.id);
     writer.deleteMessages(gone);
 
-    return { added, removed: gone.length, flagsChanged };
+    return { added, removed: gone.length, flagsChanged, newUnread };
   } finally {
     lock.release();
   }

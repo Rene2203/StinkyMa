@@ -40,6 +40,10 @@ export interface MailServiceOptions {
   idleTimeoutMs?: number;
   /** Schreibpause, nach der ein Entwurf zum Server geht (Standard 8 Sekunden). */
   draftUploadDelayMs?: number;
+  /** Neue ungelesene Mails im Posteingang (nicht beim ersten Abgleich eines Kontos) – für Benachrichtigungen. */
+  onNewMail?: (accountId: string, messages: Message[]) => void;
+  /** Wartezeit vor dem Abgleich, nachdem der Server neue Mails gemeldet hat (bündelt mehrere Meldungen). */
+  watchDebounceMs?: number;
 }
 
 /** Nach so vielen Fehlversuchen (Server lehnt ab, nicht: offline) wird eine Aktion verworfen. */
@@ -63,6 +67,9 @@ export class MailService implements MailRepository, AccountsApi {
   readonly #idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #draftTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Wächter-Verbindungen (IMAP IDLE auf dem Posteingang), je Konto. */
+  readonly #watchers = new Map<string, { client: ImapFlow | null; timer: ReturnType<typeof setTimeout> | null; failures: number }>();
+  #watching = false;
   #disposed = false;
 
   constructor(
@@ -334,10 +341,12 @@ export class MailService implements MailRepository, AccountsApi {
     this.writer.insertAccount(account);
     this.options.onChange?.();
     void this.syncNow();
+    this.#watch(account.id);
     return account;
   }
 
   async removeAccount(accountId: string): Promise<void> {
+    this.#stopWatcher(accountId);
     this.#dropClient(accountId);
     this.writer.deleteAccount(accountId);
     await this.secrets.remove(SecretKeys.accountPassword(accountId));
@@ -361,9 +370,10 @@ export class MailService implements MailRepository, AccountsApi {
     return this.#running;
   }
 
-  async syncAccountNow(accountId: string): Promise<SyncResult> {
+  async syncAccountNow(accountId: string, options: { roles?: MailboxRole[] } = {}): Promise<SyncResult> {
     const account = this.writer.account(accountId);
     if (!account) throw new Error("Konto nicht gefunden");
+    const firstSync = !account.lastSyncAt;
     const since = new Date(this.#now().getTime() - (this.options.syncDays ?? 30) * 86_400_000);
     try {
       const result = await this.#withAccount(accountId, async (client) => {
@@ -376,12 +386,17 @@ export class MailService implements MailRepository, AccountsApi {
         }
         return syncAccount(client, this.writer, account, {
           since,
+          ...(options.roles ? { roles: options.roles } : {}),
           onMailboxSynced: (counts) => {
             if (counts.added + counts.removed + counts.flagsChanged > 0) this.options.onChange?.();
           },
         });
       });
       this.writer.setSyncStatus(accountId, { lastSyncAt: this.#now().toISOString(), syncError: null });
+      if (!firstSync && result.newInInbox.length > 0 && this.options.onNewMail) {
+        const messages = (await Promise.all(result.newInInbox.map((id) => this.repository.message(id)))).filter((m): m is Message => m !== null);
+        if (messages.length > 0) this.options.onNewMail(accountId, messages);
+      }
       return result;
     } catch (error) {
       this.writer.setSyncStatus(accountId, {
@@ -403,6 +418,98 @@ export class MailService implements MailRepository, AccountsApi {
     }
   }
 
+  // --- Neue Mails sofort (IMAP IDLE) ---
+
+  /**
+   * Hält je Konto eine eigene Verbindung zum Posteingang offen. Der Server meldet neue Mails selbst (IDLE);
+   * dann wird nur der Posteingang abgeglichen. Bricht die Verbindung ab, wird mit wachsender Pause neu verbunden.
+   */
+  startWatching(): void {
+    this.#watching = true;
+    void this.repository.accounts().then((accounts) => {
+      for (const account of accounts) if (!isDemoAccount(account)) this.#watch(account.id);
+    });
+  }
+
+  /** Läuft für dieses Konto gerade eine Wächter-Verbindung? (für Anzeige und Tests) */
+  isWatching(accountId: string): boolean {
+    const client = this.#watchers.get(accountId)?.client;
+    return Boolean(client?.usable && client.idling);
+  }
+
+  #watch(accountId: string): void {
+    if (this.#disposed || !this.#watching || this.#watchers.get(accountId)?.client) return;
+    const entry = this.#watchers.get(accountId) ?? { client: null, timer: null, failures: 0 };
+    this.#watchers.set(accountId, entry);
+    void this.#connectWatcher(accountId, entry);
+  }
+
+  async #connectWatcher(accountId: string, entry: { client: ImapFlow | null; timer: ReturnType<typeof setTimeout> | null; failures: number }): Promise<void> {
+    const account = this.writer.account(accountId);
+    if (!account || this.#disposed) return;
+    try {
+      const password = await this.secrets.get(SecretKeys.accountPassword(accountId));
+      if (password === null) return;
+      const client = await connectImap(loginFor(account, password), { maxIdleTimeMs: 4 * 60_000 });
+      entry.client = client;
+      let debounce: ReturnType<typeof setTimeout> | null = null;
+      const onServerChange = () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          void this.syncAccountNow(accountId, { roles: ["inbox"] }).then(() => this.options.onChange?.(), () => undefined);
+        }, this.options.watchDebounceMs ?? 1_000);
+        debounce.unref?.();
+      };
+      client.on("exists", onServerChange);
+      client.on("expunge", onServerChange);
+      client.on("flags", onServerChange);
+      client.on("close", () => {
+        if (debounce) clearTimeout(debounce);
+        if (entry.client === client) entry.client = null;
+        this.#scheduleRewatch(accountId, entry);
+      });
+      await client.mailboxOpen("INBOX", { readOnly: true });
+      entry.failures = 0;
+      // Was zwischen letztem Abgleich und Start der Wache ankam (z. B. während einer Funkstille), jetzt holen.
+      onServerChange();
+      // Dauerhaft im IDLE-Modus warten (der Server meldet Änderungen selbst). idle() endet z. B. beim
+      // regelmäßigen Erneuern – dann direkt wieder hinein, solange die Verbindung steht.
+      void (async () => {
+        while (client.usable && entry.client === client && !this.#disposed) {
+          try {
+            await client.idle();
+          } catch {
+            break;
+          }
+        }
+      })();
+    } catch {
+      entry.client = null;
+      this.#scheduleRewatch(accountId, entry);
+    }
+  }
+
+  #scheduleRewatch(accountId: string, entry: { client: ImapFlow | null; timer: ReturnType<typeof setTimeout> | null; failures: number }): void {
+    if (this.#disposed || !this.#watching || entry.timer || !this.writer.account(accountId)) return;
+    entry.failures += 1;
+    const delay = Math.min(300_000, 5_000 * 3 ** Math.min(entry.failures - 1, 4));
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      if (!entry.client) void this.#connectWatcher(accountId, entry);
+    }, delay);
+    entry.timer.unref?.();
+  }
+
+  #stopWatcher(accountId: string): void {
+    const entry = this.#watchers.get(accountId);
+    if (!entry) return;
+    this.#watchers.delete(accountId);
+    if (entry.timer) clearTimeout(entry.timer);
+    const client = entry.client;
+    entry.client = null;
+    client?.close();
+  }
+
   /** Beim Beenden: offene Verbindungen sofort schließen, keine neuen mehr öffnen. Die Warteschlange bleibt gespeichert. */
   dispose(): void {
     this.#disposed = true;
@@ -412,6 +519,7 @@ export class MailService implements MailRepository, AccountsApi {
     this.#draftTimers.clear();
     for (const client of this.#clients.values()) client.close();
     this.#clients.clear();
+    for (const accountId of [...this.#watchers.keys()]) this.#stopWatcher(accountId);
   }
 
   // --- Warteschlange ---
