@@ -1,0 +1,39 @@
+# Windows-Installer (NSIS). App-Name „StinkyMail“ (bis Oktober 2026: „StinkyMa“). appId bleibt gleich, damit der
+# neue Installer die alte Version ersetzt; der Datenordner bleibt ebenfalls (siehe userDataFolder in src/main/index.ts).
+appId: de.stinkyma.app
+productName: StinkyMail
+executableName: StinkyMail
+copyright: Copyright © 2026 StinkyMail
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  # Lokale KI (llama.cpp): nur CPU- und Vulkan-Varianten (Vulkan nutzt NVIDIA-, AMD- und Intel-Grafik).
+  # Die CUDA-Pakete (mehrere hundert MB) und fremde Plattformen kommen nicht in den Installer.
+  - "!node_modules/@node-llama-cpp/*cuda*/**"
+  - "!node_modules/@node-llama-cpp/{linux,mac}-*/**"
+  - "!node_modules/node-llama-cpp/llama/gitRelease.bundle"
+asarUnpack:
+  - "**/*.node"
+  - "node_modules/node-llama-cpp/bins/**/*"
+  - "node_modules/node-llama-cpp/llama/localBuilds/**/*"
+  - "node_modules/@node-llama-cpp/*/bins/**/*"
+# better-sqlite3 nutzt Node-API mit fertigen Binärdateien pro Plattform – kein Neubau für Electron nötig.
+npmRebuild: false
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: StinkyMail-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: StinkyMail
+  language: "1031"
+  installerLanguages: [de_DE, en_US]

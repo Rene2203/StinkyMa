@@ -1,0 +1,29 @@
+{
+  "name": "@stinkyma/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StinkyMail – KI-Mail-App für Windows",
+  "author": "StinkyMail",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:browser": "vite --config vite.browser.config.ts",
+    "build": "electron-vite build",
+    "dist:win": "electron-vite build && electron-builder --win --x64 --publish never",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "node-llama-cpp": "^3.22.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@stinkyma/core": "0.1.0",
+    "@stinkyma/ui": "0.1.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "44.5.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "vite": "^7.3.6"
+  }
+}

@@ -1,0 +1,93 @@
+name: CI Windows
+
+on:
+  push:
+    paths:
+      - "web/**"
+      - ".github/workflows/ci-windows.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/ci-windows.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  windows:
+    name: Windows-App (Tests, E2E, Installer)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Abhängigkeiten installieren
+        run: npm ci
+      - name: Typen prüfen
+        run: npm run typecheck
+      # Lokaler Test-Mailserver (IMAP/SMTP) – Integrations- und E2E-Tests laufen nie gegen echte Konten.
+      - name: Test-Mailserver starten (GreenMail)
+        shell: pwsh
+        run: |
+          $jar = Join-Path $env:RUNNER_TEMP "greenmail.jar"
+          Invoke-WebRequest -Uri "https://repo1.maven.org/maven2/com/icegreen/greenmail-standalone/2.1.14/greenmail-standalone-2.1.14.jar" -OutFile $jar
+          Start-Process -FilePath "java" -ArgumentList "-Dgreenmail.setup.test.all","-Dgreenmail.auth.disabled","-Dgreenmail.hostname=127.0.0.1","-Dgreenmail.startup.timeout=30000","-jar",$jar -WindowStyle Hidden
+          for ($i = 0; $i -lt 60; $i++) {
+            if ((Test-NetConnection 127.0.0.1 -Port 3143 -WarningAction SilentlyContinue).TcpTestSucceeded) { Write-Host "GreenMail bereit"; exit 0 }
+            Start-Sleep -Seconds 1
+          }
+          throw "GreenMail ist nicht gestartet"
+      # Winziges Testmodell (1 MB) für llama.cpp: prüft Laden, JSON-Grammatik und Ablauf unter Windows – nicht die Qualität.
+      - name: KI-Testmodell laden
+        shell: pwsh
+        run: |
+          $model = Join-Path $env:RUNNER_TEMP "stories260K.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/models/resolve/main/tinyllamas/stories260K.gguf" -OutFile $model
+          if ((Get-FileHash $model -Algorithm SHA256).Hash -ne "270CBA1BD5109F42D03350F60406024560464DB173C0E387D91F0426D3BD256D") { throw "Prüfsumme des Testmodells stimmt nicht" }
+          "STINKYMA_TEST_MODEL=$model" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "STINKYMA_E2E_MODEL=$model" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Tests (Kern, Oberfläche, IMAP-Integration, llama.cpp inkl. Bild-Laufzeit)
+        run: npm test
+        env:
+          GREENMAIL_IMAP_PORT: "3143"
+          STINKYMA_TEST_LLAMA_RUNTIME: "1"
+      - name: App bauen
+        run: npm run build
+      - name: E2E-Test der Windows-App (mit Screenshots, Konto-Einrichtung gegen den Test-Mailserver, KI mit Testmodell)
+        run: npm run e2e
+        env:
+          GREENMAIL_IMAP_PORT: "3143"
+      - name: Screenshots hochladen
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-screenshots
+          path: web/apps/desktop/test-results/screenshots
+          if-no-files-found: warn
+      - name: Testbericht bei Fehlern hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-bericht
+          path: |
+            web/apps/desktop/test-results
+            web/apps/desktop/playwright-report
+          if-no-files-found: ignore
+      - name: Installer erzeugen
+        working-directory: web/apps/desktop
+        run: npx electron-builder --win --x64 --publish never
+      - name: Installer hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: StinkyMail-Windows-Installer
+          path: web/apps/desktop/release/*.exe
+          if-no-files-found: error

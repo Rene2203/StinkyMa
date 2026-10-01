@@ -1,0 +1,354 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { InMemoryMailRepository, MockIds, createMockData, isFlagged, isRead, type MailRepository } from "@stinkyma/core";
+import { BrowserStore, selectedMessage, showsAccountIndicator, sidebarItem, visibleMessages } from "../src/store.js";
+import type { ComposeLabels } from "@stinkyma/core";
+
+const labels: ComposeLabels = { wrote: (m) => `${m.from.address} schrieb:`, forwardHeader: () => "--- Weitergeleitet ---" };
+
+describe("BrowserStore", () => {
+  let repo: MailRepository;
+  let store: BrowserStore;
+
+  beforeEach(async () => {
+    repo = new InMemoryMailRepository(createMockData(new Date("2026-09-29T10:00:00Z")));
+    store = new BrowserStore(repo);
+    await store.start();
+  });
+
+  it("Seitenleiste: Übersicht plus ein Abschnitt pro Konto", () => {
+    const { sections } = store.getState();
+    expect(sections).toHaveLength(4);
+    expect(sections[0]?.items.map((i) => i.scope.kind)).toEqual(["unifiedInbox", "unread", "flagged"]);
+    expect(sections.slice(1).map((s) => s.account?.id)).toEqual([MockIds.iCloud, MockIds.gmail, MockIds.work]);
+    expect(sidebarItem(store.getState(), { kind: "unifiedInbox" })?.unreadCount).toBeGreaterThan(0);
+  });
+
+  it("Ältere Mails anzeigen: Liste wächst seitenweise, Ordnerwechsel fängt wieder vorn an", async () => {
+    const small = new BrowserStore(repo, { pageSize: 5 });
+    await small.start();
+    expect(small.getState().messages).toHaveLength(5);
+    expect(small.getState().hasMoreMessages).toBe(true);
+    await small.loadMoreMessages();
+    expect(small.getState().messages.length).toBeGreaterThan(5);
+    expect(small.getState().messages.length).toBeLessThanOrEqual(10);
+    while (small.getState().hasMoreMessages) await small.loadMoreMessages();
+    const all = small.getState().messages.length;
+    expect(all).toBe((await repo.messages({ kind: "unifiedInbox" }, 1000)).length);
+    await small.selectScope({ kind: "unread" });
+    await small.selectScope({ kind: "unifiedInbox" });
+    expect(small.getState().messages).toHaveLength(5);
+  });
+
+  it("Zeitraum je Konto wird gespeichert", async () => {
+    await store.setSyncDays(MockIds.gmail, 0);
+    expect(store.getState().accountsById[MockIds.gmail]?.syncDays).toBe(0);
+  });
+
+  it("startet mit dem gemeinsamen Posteingang", () => {
+    const state = store.getState();
+    expect(state.selectedScope.kind).toBe("unifiedInbox");
+    expect(state.messages.length).toBeGreaterThan(10);
+    expect(showsAccountIndicator(state)).toBe(true);
+  });
+
+  it("Ordnerwechsel lädt neu und blendet die Kontofarbe aus", async () => {
+    await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.work, "drafts") });
+    const state = store.getState();
+    expect(state.messages).toHaveLength(1);
+    expect(showsAccountIndicator(state)).toBe(false);
+  });
+
+  it("Mail öffnen lädt die Konversation und markiert als gelesen", async () => {
+    const unread = store.getState().messages.find((m) => !isRead(m) && m.threadId === "mock-thread-relaunch")!;
+    const before = sidebarItem(store.getState(), { kind: "unifiedInbox" })!.unreadCount;
+    await store.selectMessage(unread.id);
+    const state = store.getState();
+    expect(state.thread).toHaveLength(3);
+    expect(selectedMessage(state) && isRead(selectedMessage(state)!)).toBe(true);
+    expect(sidebarItem(state, { kind: "unifiedInbox" })!.unreadCount).toBe(before - 1);
+    expect(isRead((await repo.message(unread.id))!)).toBe(true);
+  });
+
+  it("„Ungelesen“: geöffnete Mail bleibt nach dem Neuladen sichtbar, andere gelesene gehen", async () => {
+    await store.selectScope({ kind: "unread" });
+    const [first, second] = store.getState().messages;
+    await store.selectMessage(first!.id);
+    await store.reload(); // wie nach „mail:changed“ vom Hauptprozess
+    let state = store.getState();
+    expect(state.selectedMessageId).toBe(first!.id);
+    expect(state.messages.some((m) => m.id === first!.id)).toBe(true);
+    expect(selectedMessage(state)).not.toBeNull();
+
+    await store.selectMessage(second!.id);
+    await store.reload();
+    state = store.getState();
+    expect(state.messages.some((m) => m.id === first!.id)).toBe(false);
+    expect(state.messages.some((m) => m.id === second!.id)).toBe(true);
+  });
+
+  it("Optionen: Ausnahmen für externe Inhalte hinzufügen und entfernen", async () => {
+    store.openOptions("shop.example");
+    expect(store.getState().options).toEqual({ suggestion: "shop.example" });
+    expect(await store.addRemoteContentException("Shop <News@Shop.example>")).toBe("news@shop.example");
+    await store.addRemoteContentException("zeitung.example");
+    expect(store.getState().remoteContentExceptions).toEqual(["news@shop.example", "zeitung.example"]);
+    await expect(store.addRemoteContentException("kaputt")).rejects.toThrow();
+    expect(store.getState().error).toBeNull(); // Fehler gehören in den Dialog, nicht ins Banner
+    await store.removeRemoteContentException("news@shop.example");
+    expect(store.getState().remoteContentExceptions).toEqual(["zeitung.example"]);
+    store.closeOptions();
+    expect(store.getState().options).toBeNull();
+  });
+
+  it("Schreiben: Antworten belegt den Composer vor, Senden legt in „Gesendet“ ab und markiert „beantwortet“", async () => {
+    store.openCompose("reply", labels);
+    expect(store.getState().compose).toBeNull(); // ohne geöffnete Mail kein Antworten
+    const original = store.getState().messages.find((m) => m.accountId === MockIds.iCloud)!;
+    await store.selectMessage(original.id);
+    store.openCompose("reply", labels);
+    const draft = store.getState().compose!;
+    expect(draft).toMatchObject({ mode: "reply", accountId: MockIds.iCloud, to: [original.from], answeredMessageId: original.id });
+    expect(draft.bodyText).toContain(`${original.from.address} schrieb:`);
+
+    await store.send({ ...draft, bodyText: `Gern!${draft.bodyText}` });
+    expect(store.getState().compose).toBeNull();
+    expect((selectedMessage(store.getState())!.flags & 2) !== 0).toBe(true);
+    await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.iCloud, "sent") });
+    expect(store.getState().messages.some((m) => m.subject === draft.subject && m.bodyText?.startsWith("Gern!"))).toBe(true);
+  });
+
+  it("Entwürfe: speichern, im Ordner erkennen, bearbeiten, löschen", async () => {
+    store.openCompose("new", labels);
+    const draft = { ...store.getState().compose!, to: [{ address: "anna@example.test" }], subject: "Später weiter" };
+    const id = await store.saveDraft(null, draft);
+    store.closeCompose();
+    await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(draft.accountId, "drafts") });
+    const row = store.getState().messages.find((m) => m.subject === "Später weiter")!;
+    expect(store.isDraft(row)).toBe(true);
+    await store.editDraft(row.id);
+    expect(store.getState().compose).toMatchObject({ draftId: id, subject: "Später weiter" });
+    store.closeCompose();
+    await store.deleteDraftMessage(row.id);
+    expect(store.getState().messages.some((m) => m.subject === "Später weiter")).toBe(false);
+  });
+
+  it("Neue E-Mail nutzt das Konto des geöffneten Ordners", async () => {
+    await store.selectScope({ kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.work, "inbox") });
+    store.openCompose("new", labels);
+    expect(store.getState().compose).toMatchObject({ mode: "new", accountId: MockIds.work, to: [] });
+    store.closeCompose();
+    expect(store.getState().compose).toBeNull();
+  });
+
+  it("lädt Anhänge der Konversation", async () => {
+    const invoice = store.getState().messages.find((m) => m.subject === "Nebenkostenabrechnung 2025")!;
+    await store.selectMessage(invoice.id);
+    expect(store.getState().attachmentsByMessageId[invoice.id]?.map((a) => a.filename)).toEqual(["Nebenkosten_2025.pdf"]);
+  });
+
+  it("markieren und gelesen/ungelesen umschalten", async () => {
+    const message = store.getState().messages.find((m) => !isFlagged(m) && isRead(m))!;
+    await store.toggleFlag(message.id);
+    expect(isFlagged(store.getState().messages.find((m) => m.id === message.id)!)).toBe(true);
+    await store.toggleRead(message.id);
+    expect(isRead(store.getState().messages.find((m) => m.id === message.id)!)).toBe(false);
+    expect(isFlagged((await repo.message(message.id))!)).toBe(true);
+  });
+
+  it("Archivieren wählt die nächste Mail", async () => {
+    const list = store.getState().messages;
+    await store.selectMessage(list[0]!.id);
+    await store.archive([list[0]!.id]);
+    const state = store.getState();
+    expect(state.messages.some((m) => m.id === list[0]!.id)).toBe(false);
+    expect(state.selectedMessageId).toBe(list[1]!.id);
+    expect((await repo.message(list[0]!.id))?.mailboxId).toBe(MockIds.mailbox(list[0]!.accountId, "archive"));
+  });
+
+  it("Papierkorb bei der letzten Mail wählt die vorherige", async () => {
+    const list = store.getState().messages;
+    const last = list.at(-1)!;
+    await store.selectMessage(last.id);
+    await store.moveToTrash([last.id]);
+    expect(store.getState().selectedMessageId).toBe(list.at(-2)!.id);
+    expect((await repo.message(last.id))?.mailboxId).toBe(MockIds.mailbox(last.accountId, "trash"));
+  });
+
+  it("Tastatur-Navigation bleibt in den Grenzen der Liste", async () => {
+    const list = store.getState().messages;
+    await store.moveSelection(1);
+    expect(store.getState().selectedMessageId).toBe(list[0]!.id);
+    await store.moveSelection(-1);
+    expect(store.getState().selectedMessageId).toBe(list[0]!.id);
+    await store.moveSelection(1);
+    expect(store.getState().selectedMessageId).toBe(list[1]!.id);
+  });
+
+  it("Suche: über alle Ordner aus der Datenbank, „nur hier“, Auswahl bleibt, leeren beendet", async () => {
+    store.searchDelayMs = 0;
+    store.setSearchText("nebenkosten");
+    await store.runSearch();
+    expect(visibleMessages(store.getState()).map((m) => m.subject)).toEqual(["Nebenkostenabrechnung 2025"]);
+    // Treffer außerhalb des gewählten Ordners (gesendete Mail an Petra liegt nicht im Posteingang)
+    store.setSearchText("von:anna petra");
+    await store.runSearch();
+    const all = visibleMessages(store.getState()).length;
+    store.setSearchAllFolders(false);
+    await store.runSearch();
+    expect(visibleMessages(store.getState()).length).toBeLessThanOrEqual(all);
+    store.setSearchAllFolders(true);
+
+    store.setSearchText("grillabend");
+    await store.runSearch();
+    const hit = visibleMessages(store.getState())[0]!;
+    await store.selectMessage(hit.id);
+    await store.reload();
+    expect(store.getState().selectedMessageId).toBe(hit.id);
+    expect(selectedMessage(store.getState())?.subject).toContain("Grillabend");
+
+    store.setSearchText("   ");
+    expect(store.getState().searchResults).toBeNull();
+    expect(visibleMessages(store.getState())).toBe(store.getState().messages);
+  });
+
+  it("Mail aus einer Benachrichtigung öffnen: Posteingang, Suche beendet, Mail ausgewählt", async () => {
+    store.searchDelayMs = 0;
+    await store.selectScope({ kind: "flagged" });
+    store.setSearchText("xyz");
+    const target = (await repo.messages({ kind: "unifiedInbox" }, 5))[2]!;
+    await store.openMessage(target.id);
+    const state = store.getState();
+    expect(state.selectedScope.kind).toBe("unifiedInbox");
+    expect(state.searchText).toBe("");
+    expect(state.selectedMessageId).toBe(target.id);
+    expect(selectedMessage(state)?.id).toBe(target.id);
+  });
+
+  it("Ordnerwechsel beendet eine Suche in allen Ordnern", async () => {
+    store.searchDelayMs = 0;
+    store.setSearchText("nebenkosten");
+    await store.runSearch();
+    await store.selectScope({ kind: "flagged" });
+    expect(store.getState().searchText).toBe("");
+    expect(store.getState().searchResults).toBeNull();
+  });
+
+  it("Fehler landen im Zustand statt abzustürzen", async () => {
+    const failing = new BrowserStore({
+      overview: () => Promise.reject(new Error("Datenbank nicht erreichbar")),
+    } as unknown as MailRepository);
+    expect(failing.canManageAccounts).toBe(false);
+    await failing.loadSidebar();
+    expect(failing.getState().error).toBe("Datenbank nicht erreichbar");
+    failing.dismissError();
+    expect(failing.getState().error).toBeNull();
+  });
+
+  it("reload behält die Auswahl und markiert nichts als gelesen", async () => {
+    const message = store.getState().messages.find((m) => isRead(m))!;
+    await store.selectMessage(message.id);
+    const unreadBefore = sidebarItem(store.getState(), { kind: "unifiedInbox" })!.unreadCount;
+    await store.reload();
+    expect(store.getState().selectedMessageId).toBe(message.id);
+    expect(store.getState().thread.length).toBeGreaterThan(0);
+    expect(sidebarItem(store.getState(), { kind: "unifiedInbox" })!.unreadCount).toBe(unreadBefore);
+  });
+
+  it("Abgleich und Konten über die Konto-Schnittstelle", async () => {
+    const calls: string[] = [];
+    const accounts = {
+      syncNow: async () => { calls.push("sync"); },
+      syncStatus: async () => ({ running: false, lastRunAt: "2026-09-30T10:00:00.000Z" }),
+      testConnection: async () => ({ ok: true as const }),
+      addAccount: async () => { calls.push("add"); return (await repo.accounts())[0]!; },
+      removeAccount: async (id: string) => { calls.push(`remove:${id}`); },
+      addOAuthAccount: async (provider: string) => { calls.push(`oauth:${provider}`); return (await repo.accounts())[0]!; },
+      reauthorize: async (id: string) => { calls.push(`reauth:${id}`); },
+      oauthProviders: async () => ["google" as const],
+    };
+    const managed = new BrowserStore(repo, { accounts });
+    await managed.start();
+    expect(managed.canManageAccounts).toBe(true);
+    expect(managed.getState().lastSyncAt).toBe("2026-09-30T10:00:00.000Z");
+    expect(managed.getState().oauthProviders).toEqual(["google"]);
+    await managed.syncNow();
+    await managed.removeAccount(MockIds.gmail);
+    await managed.addOAuthAccount("google", true);
+    await managed.reauthorize(MockIds.gmail);
+    expect(calls).toEqual(["sync", `remove:${MockIds.gmail}`, "oauth:google", `reauth:${MockIds.gmail}`]);
+    expect(managed.getState().syncing).toBe(false);
+  });
+
+  it("Zähler sinken sofort beim Öffnen, noch bevor gespeichert ist", async () => {
+    let release: () => void = () => undefined;
+    const slow = new Proxy(repo, {
+      get(target, prop, receiver) {
+        if (prop === "setFlag") {
+          return (...args: Parameters<MailRepository["setFlag"]>) =>
+            new Promise<void>((resolve) => { release = () => resolve(target.setFlag(...args)); });
+        }
+        return Reflect.get(target, prop, receiver).bind(target);
+      },
+    });
+    const s = new BrowserStore(slow);
+    await s.start();
+    const unread = s.getState().messages.find((m) => !isRead(m))!;
+    const before = sidebarItem(s.getState(), { kind: "unifiedInbox" })!.unreadCount;
+    const opening = s.selectMessage(unread.id);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(sidebarItem(s.getState(), { kind: "unifiedInbox" })!.unreadCount).toBe(before - 1);
+    expect(isRead(s.getState().messages.find((m) => m.id === unread.id)!)).toBe(true);
+    release();
+    await opening;
+    expect(sidebarItem(s.getState(), { kind: "unifiedInbox" })!.unreadCount).toBe(before - 1);
+  });
+
+  it("Archivieren nimmt die Mail sofort aus der Liste", async () => {
+    let release: () => void = () => undefined;
+    const slow = new Proxy(repo, {
+      get(target, prop, receiver) {
+        if (prop === "move") {
+          return (...args: Parameters<MailRepository["move"]>) =>
+            new Promise<void>((resolve) => { release = () => resolve(target.move(...args)); });
+        }
+        return Reflect.get(target, prop, receiver).bind(target);
+      },
+    });
+    const s = new BrowserStore(slow);
+    await s.start();
+    const first = s.getState().messages[0]!;
+    const archiving = s.archive([first.id]);
+    expect(s.getState().messages.some((m) => m.id === first.id)).toBe(false);
+    release();
+    await archiving;
+    expect(s.getState().messages.some((m) => m.id === first.id)).toBe(false);
+  });
+  it("Türsteher: neue Absender warten, Erlauben/Blockieren räumt den Bereich auf", async () => {
+    const data = createMockData(new Date("2026-09-29T10:00:00Z"));
+    data.accounts.find((a) => a.id === MockIds.work)!.screener = true; // ohne Schnappschuss: alle Absender sind neu
+    const s = new BrowserStore(new InMemoryMailRepository(data));
+    await s.start();
+    expect(sidebarItem(s.getState(), { kind: "screener" })).toBeDefined();
+    await s.selectScope({ kind: "screener" });
+    const waiting = s.getState().messages;
+    expect(waiting.length).toBeGreaterThan(1);
+    expect(waiting.every((m) => m.accountId === MockIds.work)).toBe(true);
+
+    const first = waiting[0]!;
+    await s.selectMessage(first.id);
+    await s.decideSender(first.from.address, "allow");
+    let state = s.getState();
+    expect(state.messages.some((m) => m.from.address === first.from.address)).toBe(false);
+    expect(state.selectedMessageId).not.toBe(first.id);
+
+    const blocked = state.messages[0]!;
+    await s.decideSender(blocked.from.address, "block");
+    await s.selectScope({ kind: "unifiedInbox" });
+    state = s.getState();
+    expect(state.messages.some((m) => m.from.address === first.from.address)).toBe(true);
+    expect(state.messages.some((m) => m.from.address === blocked.from.address && m.accountId === MockIds.work)).toBe(false);
+
+    await s.setScreener(MockIds.work, false);
+    expect(sidebarItem(s.getState(), { kind: "screener" })).toBeUndefined();
+  });
+});

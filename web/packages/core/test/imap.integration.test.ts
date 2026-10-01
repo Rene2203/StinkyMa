@@ -1,0 +1,575 @@
+import { randomUUID } from "node:crypto";
+import { ImapFlow } from "imapflow";
+import { waitForGreenMail } from "./greenmail.js";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { createMockData, InMemorySecretStore, isDemoAccount, isRead, SecretKeys } from "../src/index.js";
+import { CleanupService, connectImap, extractAttachment, loginFor, MailService, parseMessage, syncAccount, type AccountSettings } from "../src/mail/index.js";
+import { CleanupStore, MailWriter, openDatabase, seedIfEmpty, SqliteMailRepository } from "../src/sqlite/index.js";
+import { minimalPdf, sampleReply } from "./fixtures.js";
+
+// Läuft gegen einen lokalen GreenMail-Testserver (nie gegen echte Konten):
+//   java -Dgreenmail.setup.test.all -Dgreenmail.auth.disabled -jar greenmail-standalone.jar
+//   GREENMAIL_IMAP_PORT=3143 npx vitest run
+// Ohne GREENMAIL_IMAP_PORT werden diese Tests übersprungen (z. B. in der Windows-CI).
+const port = Number(process.env.GREENMAIL_IMAP_PORT ?? 0);
+const host = process.env.GREENMAIL_HOST ?? "127.0.0.1";
+
+const now = new Date("2026-09-30T12:00:00Z");
+const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000);
+
+function rfc822(opts: { from: string; subject: string; date: Date; messageId: string; body: string; inReplyTo?: string }): string {
+  return [
+    `From: ${opts.from}`,
+    "To: Anna Beispiel <anna@example.test>",
+    `Subject: ${opts.subject}`,
+    `Date: ${opts.date.toUTCString()}`,
+    `Message-ID: ${opts.messageId}`,
+    ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`, `References: ${opts.inReplyTo}`] : []),
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    opts.body,
+    "",
+  ].join("\r\n");
+}
+
+describe.skipIf(!port)("IMAP-Abgleich gegen GreenMail", () => {
+  beforeAll(() => waitForGreenMail(host, port), 70_000);
+
+  let user: string;
+  let admin: ImapFlow;
+  let service: MailService;
+  let repository: SqliteMailRepository;
+  let secrets: InMemorySecretStore;
+  let changes = 0;
+  let db: ReturnType<typeof openDatabase>;
+
+  const settings = (): AccountSettings => ({
+    email: user, displayName: "Test", provider: "imap", username: user,
+    imapHost: host, imapPort: port, imapSecurity: "none",
+    smtpHost: host, smtpPort: 3025, smtpSecurity: "none",
+  });
+
+  beforeEach(async () => {
+    user = `anna-${randomUUID().slice(0, 8)}@example.test`;
+    admin = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user, pass: "geheim" }, logger: false });
+    await admin.connect();
+    await admin.mailboxCreate("Archiv");
+    await admin.mailboxCreate("Papierkorb");
+    const inbox = "INBOX";
+    await admin.append(inbox, rfc822({ from: "Anna Beispiel <anna@example.test>", subject: "Angebot?", date: daysAgo(3), messageId: "<m0@example.test>", body: "Kannst du mir das Angebot schicken?" }), [], daysAgo(3));
+    await admin.append(inbox, sampleReply, [], daysAgo(1));
+    await admin.append(inbox, rfc822({ from: "Newsletter <news@shop.example>", subject: "Wochenangebote", date: daysAgo(2), messageId: "<n1@shop.example>", body: "Alles reduziert." }), ["\\Seen"], daysAgo(2));
+    await admin.append(inbox, rfc822({ from: "Alt <alt@example.test>", subject: "Uralt", date: daysAgo(90), messageId: "<old@example.test>", body: "Sehr alt." }), [], daysAgo(90));
+
+    db = openDatabase(":memory:");
+    seedIfEmpty(db, createMockData(now));
+    repository = new SqliteMailRepository(db);
+    secrets = new InMemorySecretStore();
+    changes = 0;
+    service = new MailService(repository, new MailWriter(db), secrets, { now: () => now, onChange: () => { changes += 1; } });
+  });
+
+  afterEach(async () => {
+    service?.dispose();
+    await admin?.logout().catch(() => admin.close());
+  });
+
+  async function serverFlags(subject: string, mailbox = "INBOX"): Promise<string[] | undefined> {
+    await admin.mailboxOpen(mailbox);
+    for await (const msg of admin.fetch("1:*", { flags: true, envelope: true })) {
+      if (msg.envelope?.subject === subject) return [...(msg.flags ?? [])];
+    }
+    return undefined;
+  }
+
+  async function addAndSync() {
+    const account = await service.addAccount(settings(), "geheim", { removeDemoAccounts: true });
+    await service.syncNow();
+    return account;
+  }
+
+  it("Konto hinzufügen: Passwort sicher gespeichert, Beispielkonten entfernt", async () => {
+    const account = await addAndSync();
+    const accounts = await service.accounts();
+    expect(accounts.map((a) => a.id)).toEqual([account.id]);
+    expect(accounts.some(isDemoAccount)).toBe(false);
+    expect(await secrets.get(SecretKeys.accountPassword(account.id))).toBe("geheim");
+    expect(accounts[0]?.lastSyncAt).toBe(now.toISOString());
+    expect(accounts[0]?.syncError).toBeNull();
+    expect(changes).toBeGreaterThan(0);
+  });
+
+  it("gleicht Ordner, Mails der letzten 30 Tage und Konversationen ab", async () => {
+    const account = await addAndSync();
+    const boxes = await service.mailboxes(account.id);
+    expect(boxes.map((b) => b.role).sort()).toEqual(["archive", "inbox", "trash"]);
+
+    const inbox = await service.messages({ kind: "unifiedInbox" }, 100);
+    expect(inbox.map((m) => m.subject).sort()).toEqual(["Angebot?", "Grüße aus München", "Wochenangebote"]);
+    expect(inbox.some((m) => m.subject === "Uralt")).toBe(false);
+
+    const reply = inbox.find((m) => m.subject === "Grüße aus München")!;
+    expect(reply.hasAttachments).toBe(true);
+    expect(reply.bodyHtml).toContain("<b>Angebot</b>");
+    expect((await service.attachments(reply.id)).map((a) => a.filename)).toEqual(["Angebot.pdf"]);
+    const thread = await service.thread(reply.threadId);
+    expect(thread.map((m) => m.subject)).toEqual(["Angebot?", "Grüße aus München"]);
+
+    expect(isRead(inbox.find((m) => m.subject === "Wochenangebote")!)).toBe(true);
+    expect(await service.unreadCount({ kind: "unifiedInbox" })).toBe(2);
+  });
+
+  it("zweiter Abgleich holt nichts doppelt und übernimmt Änderungen vom Server", async () => {
+    const account = await addAndSync();
+    const first = await service.messages({ kind: "unifiedInbox" }, 100);
+
+    // Auf dem Server: eine Mail gelesen, eine gelöscht, eine neue
+    await admin.mailboxOpen("INBOX");
+    const all = await admin.search({ all: true }, { uid: true });
+    const uids = (all || []).sort((a, b) => a - b);
+    await admin.messageFlagsAdd(String(uids[0]), ["\\Seen"], { uid: true });
+    await admin.messageDelete(String(uids[2]), { uid: true });
+    await admin.append("INBOX", rfc822({ from: "Neu <neu@example.test>", subject: "Neu", date: daysAgo(0), messageId: "<neu@example.test>", body: "Hallo" }), [], daysAgo(0));
+
+    const result = await service.syncAccountNow(account.id);
+    expect(result.added).toBe(1);
+    expect(result.removed).toBe(1);
+    expect(result.flagsChanged).toBe(1);
+    const second = await service.messages({ kind: "unifiedInbox" }, 100);
+    expect(second).toHaveLength(first.length); // −1 gelöscht, +1 neu
+    expect(second.some((m) => m.subject === "Neu")).toBe(true);
+  });
+
+  it("Aktionen wirken sofort lokal und gehen über die Warteschlange zum Server", async () => {
+    await addAndSync();
+    const inbox = await service.messages({ kind: "unifiedInbox" }, 100);
+    const target = inbox.find((m) => m.subject === "Grüße aus München")!;
+
+    // Sofort lokal – ohne auf den Server zu warten
+    await service.setFlag("seen", true, [target.id]);
+    expect(isRead((await service.message(target.id))!)).toBe(true);
+    expect((await service.overview()).counts.unifiedInbox).toBe(1);
+
+    await service.move([target.id], "archive");
+    const archivedLocal = await service.messages({ kind: "mailbox", mailboxId: `${target.accountId}/Archiv` }, 100);
+    expect(archivedLocal.map((m) => m.subject)).toEqual(["Grüße aus München"]);
+    expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Grüße aus München")).toBe(false);
+
+    // Dann auf dem Server
+    await service.flushNow(target.accountId);
+    expect(service.pendingChanges()).toBe(0);
+    expect(await serverFlags("Grüße aus München", "Archiv")).toContain("\\Seen");
+    const status = await admin.status("Archiv", { messages: true });
+    expect(status && status.messages).toBe(1);
+
+    // Nach erneutem Abgleich keine Dubletten, Anhänge bleiben
+    await service.syncAccountNow(target.accountId);
+    const archived = await service.messages({ kind: "mailbox", mailboxId: `${target.accountId}/Archiv` }, 100);
+    expect(archived).toHaveLength(1);
+    expect((await service.attachments(archived[0]!.id)).map((a) => a.filename)).toEqual(["Angebot.pdf"]);
+  });
+
+  it("Abgleich überschreibt eine noch nicht übertragene Änderung nicht (Mail bleibt gelesen)", async () => {
+    const account = await addAndSync();
+    const target = (await service.messages({ kind: "unifiedInbox" }, 100)).find((m) => m.subject === "Grüße aus München")!;
+    expect(isRead(target)).toBe(false);
+    // Wie beim Öffnen während eines laufenden Abgleichs: lokal gelesen + Auftrag in der Warteschlange, Server noch ungelesen
+    const writer = new MailWriter(db);
+    writer.updateFlags(target.id, target.flags | 1);
+    writer.enqueueAction({ accountId: account.id, messageId: target.id, kind: "flag", payload: { flag: "seen", enabled: true }, createdAt: now.toISOString() });
+    const client = await connectImap(loginFor(account, "geheim"));
+    try {
+      await syncAccount(client, writer, account, { since: daysAgo(30) });
+    } finally {
+      await client.logout();
+    }
+    expect(isRead((await service.message(target.id))!)).toBe(true);
+    // Nach dem Übertragen gilt wieder der Server
+    await service.flushNow(account.id);
+    expect(await serverFlags("Grüße aus München")).toContain("\\Seen");
+  });
+
+  it("offline: Änderungen bleiben in der Warteschlange und werden später übertragen", async () => {
+    const account = await addAndSync();
+    const inbox = await service.messages({ kind: "unifiedInbox" }, 100);
+    const target = inbox.find((m) => m.subject === "Angebot?")!;
+
+    // Server „weg“: offene Verbindung schließen, Port ins Leere zeigen lassen
+    service.dispose();
+    db.prepare("UPDATE account SET imapPort = 1 WHERE id = ?").run(account.id);
+    service = new MailService(repository, new MailWriter(db), secrets, { now: () => now });
+
+    await service.setFlag("flagged", true, [target.id]);
+    expect(service.pendingChanges(account.id)).toBe(1);
+    await expect(service.syncAccountNow(account.id)).rejects.toThrow();
+    expect(service.pendingChanges(account.id)).toBe(1); // nichts verloren
+    expect((await service.message(target.id))?.flags).toBe(target.flags | 4); // lokal weiterhin markiert
+
+    // Server wieder da: der nächste Abruf überträgt zuerst die Warteschlange
+    db.prepare("UPDATE account SET imapPort = ? WHERE id = ?").run(port, account.id);
+    await service.syncAccountNow(account.id);
+    expect(service.pendingChanges(account.id)).toBe(0);
+    expect(await serverFlags("Angebot?")).toContain("\\Flagged");
+    expect((await service.accounts())[0]?.syncError).toBeNull();
+  });
+
+  it("Warteschlange überlebt einen Neustart der App", async () => {
+    const account = await addAndSync();
+    const target = (await service.messages({ kind: "unifiedInbox" }, 100)).find((m) => m.subject === "Angebot?")!;
+    service.dispose(); // App beendet, bevor übertragen wurde
+    const restarted = new MailService(repository, new MailWriter(db), secrets, { now: () => now });
+    // Aktion direkt in die Warteschlange (wie vor dem Beenden gespeichert)
+    await restarted.setFlag("seen", true, [target.id]);
+    restarted.dispose();
+    const again = new MailService(repository, new MailWriter(db), secrets, { now: () => now });
+    expect(again.pendingChanges(account.id)).toBe(1);
+    await again.syncNow();
+    expect(again.pendingChanges(account.id)).toBe(0);
+    expect(await serverFlags("Angebot?")).toContain("\\Seen");
+    again.dispose();
+    service = again;
+  });
+
+  it("Konto entfernen löscht Mails und Passwort", async () => {
+    const account = await addAndSync();
+    await service.removeAccount(account.id);
+    expect(await service.accounts()).toEqual([]);
+    expect(await secrets.get(SecretKeys.accountPassword(account.id))).toBeNull();
+    expect(await service.messages({ kind: "unifiedInbox" }, 100)).toEqual([]);
+  });
+
+  it("verständliche Fehlermeldung, wenn der Server nicht erreichbar ist", async () => {
+    const result = await service.testConnection({ ...settings(), imapPort: 1 }, "geheim");
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("abgelehnt") });
+    await expect(service.addAccount({ ...settings(), imapPort: 1 }, "geheim", { removeDemoAccounts: true })).rejects.toThrow(/abgelehnt/);
+    expect((await service.accounts()).every(isDemoAccount)).toBe(true); // nichts verändert
+  });
+
+  async function receivedBy(address: string, subject: string): Promise<string | null> {
+    const client = new ImapFlow({ host, port, secure: false, doSTARTTLS: false, auth: { user: address, pass: "x" }, logger: false });
+    await client.connect();
+    try {
+      await client.mailboxOpen("INBOX");
+      for await (const msg of client.fetch("1:*", { envelope: true, source: true })) {
+        if (msg.envelope?.subject === subject) return msg.source?.toString("utf8") ?? "";
+      }
+      return null;
+    } finally {
+      await client.logout();
+    }
+  }
+
+  it("Senden: Antwort geht raus (inkl. Bcc), liegt in „Gesendet“, Original wird „beantwortet“", async () => {
+    await admin.mailboxCreate("Sent");
+    const account = await addAndSync();
+    const original = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Angebot?")!;
+    const bcc = `bcc-${randomUUID().slice(0, 8)}@example.test`;
+    const other = `carl-${randomUUID().slice(0, 8)}@example.test`;
+    await service.send({
+      accountId: account.id,
+      to: [{ name: "Carl", address: other }],
+      cc: [],
+      bcc: [{ address: bcc }],
+      subject: "Re: Angebot?",
+      bodyText: "Anbei das Angebot.\n\n> Kannst du mir das Angebot schicken?\n",
+      inReplyTo: original.messageId,
+      references: [original.messageId!],
+      answeredMessageId: original.id,
+    });
+    expect((await service.overview()).outbox).toHaveLength(1); // sofort im Postausgang
+    await service.flushNow(account.id);
+    expect((await service.overview()).outbox).toHaveLength(0);
+    expect(service.outgoingCount()).toBe(0);
+
+    const delivered = await receivedBy(other, "Re: Angebot?");
+    expect(delivered).toContain("Anbei das Angebot.");
+    expect(delivered).toMatch(/In-Reply-To: <m0@example.test>/i);
+    expect(delivered).not.toContain(bcc); // Bcc steht nicht in der Mail
+    expect(await receivedBy(bcc, "Re: Angebot?")).not.toBeNull(); // kommt aber an
+
+    expect(await serverFlags("Re: Angebot?", "Sent")).toContain("\\Seen");
+    await service.flushNow(account.id); // „beantwortet“ über die Warteschlange
+    expect(await serverFlags("Angebot?")).toContain("\\Answered");
+    await service.syncAccountNow(account.id);
+    const sentBox = (await service.mailboxes(account.id)).find((m) => m.role === "sent")!;
+    expect((await service.messages({ kind: "mailbox", mailboxId: sentBox.id }, 10)).map((m) => m.subject)).toEqual(["Re: Angebot?"]);
+  });
+
+  it("Senden ohne erreichbaren SMTP-Server: Mail bleibt im Postausgang und lässt sich zurückholen", async () => {
+    const account = await service.addAccount({ ...settings(), smtpPort: 1 }, "geheim", { removeDemoAccounts: true });
+    await service.syncNow();
+    const mail = { accountId: account.id, to: [{ address: "x@example.test" }], cc: [], bcc: [], subject: "Wartet", bodyText: "Hallo" };
+    await service.send(mail);
+    await service.flushNow(account.id);
+    const [item] = (await service.overview()).outbox;
+    expect(item).toMatchObject({ subject: "Wartet", status: "queued" });
+    expect(item?.error).toMatch(/Postausgang/);
+    expect(service.outgoingCount(account.id)).toBe(1);
+    // Abruf läuft trotzdem (IMAP geht), die Mail bleibt liegen
+    await service.syncAccountNow(account.id);
+    expect(service.outgoingCount(account.id)).toBe(1);
+    expect(await service.reopenOutgoing(item!.id)).toEqual(mail);
+    expect((await service.overview()).outbox).toHaveLength(0);
+  });
+
+  it("Senden ohne Empfänger wird abgelehnt", async () => {
+    const account = await addAndSync();
+    await expect(service.send({ accountId: account.id, to: [], cc: [], bcc: [], subject: "x", bodyText: "" })).rejects.toThrow(/Empfänger/);
+  });
+
+  it("Anhänge: Inhalt wird bei Bedarf vom Server geholt; gesendete Anhänge kommen an", async () => {
+    const boundary = "grenze42";
+    await admin.append(
+      "INBOX",
+      [
+        "From: Stadtwerke <rechnung@stadtwerke.example>",
+        `To: ${user}`,
+        "Subject: Rechnung mit Anhang",
+        `Date: ${now.toUTCString()}`,
+        "Message-ID: <anhang1@stadtwerke.example>",
+        "MIME-Version: 1.0",
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        "",
+        `--${boundary}`,
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        "Anbei die Rechnung.",
+        `--${boundary}`,
+        'Content-Type: application/pdf; name="Rechnung.pdf"',
+        'Content-Disposition: attachment; filename="Rechnung.pdf"',
+        "Content-Transfer-Encoding: base64",
+        "",
+        Buffer.from("%PDF-1.4 Testinhalt").toString("base64"),
+        `--${boundary}--`,
+        "",
+      ].join("\r\n"),
+      [],
+      now,
+    );
+    const account = await addAndSync();
+    const mail = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Rechnung mit Anhang")!;
+    const [attachment] = await service.attachments(mail.id);
+    expect(attachment).toMatchObject({ filename: "Rechnung.pdf", mimeType: "application/pdf" });
+    const content = await service.attachmentContent(attachment!.id);
+    expect(content.filename).toBe("Rechnung.pdf");
+    expect(content.content.toString("utf8")).toBe("%PDF-1.4 Testinhalt");
+    await expect(service.attachmentContent(`${mail.id}/a9`)).rejects.toThrow(/nicht gefunden/);
+
+    // Senden mit Anhang
+    const to = `anhang-${randomUUID().slice(0, 8)}@example.test`;
+    await service.send({
+      accountId: account.id, to: [{ address: to }], cc: [], bcc: [], subject: "Weiter damit", bodyText: "Hier.",
+      attachments: [{ filename: "Notiz.txt", mimeType: "text/plain", size: 4, contentBase64: Buffer.from("Test").toString("base64") }],
+    });
+    await service.flushNow(account.id);
+    const delivered = await receivedBy(to, "Weiter damit");
+    expect(delivered).toMatch(/filename="?Notiz.txt/);
+    expect(delivered).toContain(Buffer.from("Test").toString("base64"));
+  });
+
+  it("Entwürfe: gebündelt zum Server, ersetzt statt verdoppelt, gelöscht nach dem Senden", async () => {
+    await admin.mailboxCreate("Drafts");
+    const account = await addAndSync();
+    const draft = { mode: "new" as const, accountId: account.id, to: [{ address: "anna@example.test" }], cc: [], bcc: [], subject: "Planung", bodyText: "Erster Stand", bodyHtml: "<p>Erster Stand</p>" };
+    const id = await service.saveDraft(null, draft);
+    const draftsBox = (await service.mailboxes(account.id)).find((m) => m.role === "drafts")!;
+    const local = () => service.messages({ kind: "mailbox", mailboxId: draftsBox.id }, 10);
+    expect((await local()).map((m) => m.subject)).toEqual(["Planung"]); // sofort sichtbar
+
+    await service.flushNow(account.id);
+    expect(await serverFlags("Planung", "Drafts")).toEqual(expect.arrayContaining(["\\Draft", "\\Seen"]));
+    expect((await local())[0]?.uid).toBeGreaterThan(0);
+
+    await service.saveDraft(id, { ...draft, subject: "Planung v2", bodyHtml: "<p>Zweiter Stand</p>" });
+    await service.flushNow(account.id);
+    const status = await admin.status("Drafts", { messages: true });
+    expect(status && status.messages).toBe(1); // ersetzt, nicht verdoppelt
+    expect(await serverFlags("Planung v2", "Drafts")).toBeDefined();
+    await service.syncAccountNow(account.id);
+    expect((await local()).map((m) => m.subject)).toEqual(["Planung v2"]); // kein Duplikat nach dem Abgleich
+
+    await service.send({ ...draft, subject: "Planung v2", draftId: id });
+    await service.flushNow(account.id);
+    const after = await admin.status("Drafts", { messages: true });
+    expect(after && after.messages).toBe(0);
+    expect(await local()).toEqual([]);
+  });
+
+  it("Entwurf von einem anderen Gerät öffnen und weiterschreiben", async () => {
+    await admin.mailboxCreate("Drafts");
+    await admin.append("Drafts", rfc822({ from: user, subject: "Vom iPhone", date: daysAgo(0), messageId: "<d1@example.test>", body: "Angefangen unterwegs" }), ["\\Draft", "\\Seen"], daysAgo(0));
+    const account = await addAndSync();
+    const draftsBox = (await service.mailboxes(account.id)).find((m) => m.role === "drafts")!;
+    const [serverDraft] = await service.messages({ kind: "mailbox", mailboxId: draftsBox.id }, 10);
+    const opened = await service.openDraft(serverDraft!.id);
+    expect(opened).toMatchObject({ subject: "Vom iPhone", bodyText: expect.stringContaining("Angefangen unterwegs") });
+    await service.saveDraft(opened!.draftId!, { ...opened!, bodyText: "Fertig geschrieben", bodyHtml: "<p>Fertig geschrieben</p>" });
+    await service.flushNow(account.id);
+    const status = await admin.status("Drafts", { messages: true });
+    expect(status && status.messages).toBe(1); // alte Fassung vom iPhone ersetzt
+  });
+
+  it("Weiterleiten: Anhang der Originalmail wird vom Server geholt und mitgesendet, Layout bleibt", async () => {
+    const boundary = "fwd42";
+    await admin.append(
+      "INBOX",
+      [
+        "From: Stadtwerke <rechnung@stadtwerke.example>", `To: ${user}`, "Subject: Abrechnung", `Date: ${now.toUTCString()}`,
+        "Message-ID: <fwd1@stadtwerke.example>", "MIME-Version: 1.0", `Content-Type: multipart/mixed; boundary="${boundary}"`, "",
+        `--${boundary}`, "Content-Type: text/html; charset=utf-8", "", "<table><tr><td>Betrag 86 EUR</td></tr></table>",
+        `--${boundary}`, 'Content-Type: application/pdf; name="Abrechnung.pdf"', 'Content-Disposition: attachment; filename="Abrechnung.pdf"',
+        "Content-Transfer-Encoding: base64", "", Buffer.from("%PDF Abrechnung").toString("base64"),
+        `--${boundary}--`, "",
+      ].join("\r\n"),
+      [],
+      now,
+    );
+    const account = await addAndSync();
+    const original = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Abrechnung")!;
+    const [attachment] = await service.attachments(original.id);
+    const to = `fwd-${randomUUID().slice(0, 8)}@example.test`;
+    await service.send({
+      accountId: account.id, to: [{ address: to }], cc: [], bcc: [], subject: "Fwd: Abrechnung",
+      bodyText: "Zur Info", bodyHtml: "<p>Zur Info</p>",
+      forwardedHtml: "<table><tr><td>Betrag 86 EUR</td></tr></table>", forwardedText: "Betrag 86 EUR",
+      forwardAttachments: [{ id: attachment!.id, filename: attachment!.filename, mimeType: attachment!.mimeType, size: attachment!.size }],
+    });
+    await service.flushNow(account.id);
+    const source = await receivedBy(to, "Fwd: Abrechnung");
+    const parsed = await parseMessage(source!);
+    expect(parsed.bodyHtml).toContain("<table><tr><td>Betrag 86 EUR</td></tr></table>");
+    expect(parsed.bodyText).toContain("Zur Info");
+    expect(parsed.bodyText).toContain("Betrag 86 EUR");
+    expect(parsed.attachments.map((a) => a.filename)).toEqual(["Abrechnung.pdf"]);
+    expect((await extractAttachment(source!, 0))?.content.toString("utf8")).toBe("%PDF Abrechnung");
+  });
+
+  it("Neue Mails sofort: der Server meldet sie (IDLE), nur neue ungelesene im Posteingang werden gemeldet", async () => {
+    const account = await addAndSync();
+    service.dispose();
+    const notified: string[] = [];
+    let changed = 0;
+    service = new MailService(repository, new MailWriter(db), secrets, {
+      now: () => now,
+      watchDebounceMs: 100,
+      onChange: () => { changed += 1; },
+      onNewMail: (_accountId, messages) => notified.push(...messages.map((m) => m.subject)),
+    });
+    service.startWatching();
+    await expect.poll(() => service.isWatching(account.id), { timeout: 10_000 }).toBe(true);
+
+    await admin.append("INBOX", rfc822({ from: "Lisa <lisa@example.test>", subject: "Ganz frisch", date: now, messageId: "<frisch@example.test>", body: "Hallo!" }), [], now);
+    await expect.poll(() => notified, { timeout: 15_000 }).toEqual(["Ganz frisch"]);
+    expect(changed).toBeGreaterThan(0);
+    expect((await service.messages({ kind: "unifiedInbox" }, 50)).some((m) => m.subject === "Ganz frisch")).toBe(true);
+
+    // Bereits gelesene neue Mails lösen keine Benachrichtigung aus
+    await admin.append("INBOX", rfc822({ from: "Lisa <lisa@example.test>", subject: "Schon gelesen", date: now, messageId: "<gelesen@example.test>", body: "x" }), ["\\Seen"], now);
+    await expect.poll(async () => (await service.messages({ kind: "unifiedInbox" }, 50)).some((m) => m.subject === "Schon gelesen"), { timeout: 15_000 }).toBe(true);
+    expect(notified).toEqual(["Ganz frisch"]);
+
+    await service.removeAccount(account.id);
+    expect(service.isWatching(account.id)).toBe(false);
+  }, 30_000);
+
+  it("erster Abgleich eines Kontos meldet keine „neuen“ Mails", async () => {
+    const notified: string[] = [];
+    service.dispose();
+    service = new MailService(repository, new MailWriter(db), secrets, {
+      now: () => now,
+      onNewMail: (_a, messages) => notified.push(...messages.map((m) => m.subject)),
+    });
+    await service.addAccount(settings(), "geheim", { removeDemoAccounts: true });
+    await service.syncNow();
+    expect(notified).toEqual([]);
+  });
+
+  it("Zeitraum: länger holt ältere Mails ohne Benachrichtigung, kürzer entfernt sie nur lokal", async () => {
+    const notified: string[] = [];
+    service.dispose();
+    service = new MailService(repository, new MailWriter(db), secrets, { now: () => now, onNewMail: (_a, messages) => notified.push(...messages.map((m) => m.subject)) });
+    const account = await addAndSync();
+    expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Uralt")).toBe(false);
+
+    await service.setSyncDays(account.id, 365);
+    await service.syncNow();
+    expect((await service.accounts())[0]?.syncDays).toBe(365);
+    expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Uralt")).toBe(true);
+    expect(notified).toEqual([]); // nachgeladene alte Mail ist keine „neue“ Mail
+
+    await service.setSyncDays(account.id, 30);
+    expect((await service.messages({ kind: "unifiedInbox" }, 100)).some((m) => m.subject === "Uralt")).toBe(false);
+    const status = await admin.status("INBOX", { messages: true });
+    expect(status && status.messages).toBe(4); // auf dem Server unverändert
+
+    await service.setSyncDays(account.id, 0); // alle
+    await service.syncNow();
+    expect((await service.messages({ kind: "unifiedInbox" }, 100))).toHaveLength(4);
+  });
+
+  it("Viele Mails verschieben: ein MOVE für alle, lokal mit neuer UID umgehängt", async () => {
+    const account = await addAndSync();
+    const inbox = await service.messages({ kind: "unifiedInbox" }, 100);
+    expect(inbox).toHaveLength(3);
+    await service.move(inbox.map((m) => m.id), "trash");
+    await service.flushNow(account.id);
+    expect(service.pendingChanges()).toBe(0);
+    expect(((await admin.status("Papierkorb", { messages: true })) || { messages: -1 }).messages).toBe(3);
+    expect(((await admin.status("INBOX", { messages: true })) || { messages: -1 }).messages).toBe(1); // nur „Uralt“ (außerhalb des Zeitraums)
+    const trash = await service.messages({ kind: "mailbox", mailboxId: `${account.id}/Papierkorb` }, 100);
+    expect(trash.map((m) => m.subject).sort()).toEqual(["Angebot?", "Grüße aus München", "Wochenangebote"]);
+    expect(trash.every((m) => typeof m.uid === "number")).toBe(true);
+    // Nächster Abgleich: keine Dubletten
+    await service.syncAccountNow(account.id);
+    expect(await service.messages({ kind: "mailbox", mailboxId: `${account.id}/Papierkorb` }, 100)).toHaveLength(3);
+  });
+
+  it("Abbestellen: Angabe beim Abgleich gelesen, bei alten Mails vom Server geholt; Abmelde-Mail kommt an", async () => {
+    const leave = `leave-${randomUUID().slice(0, 8)}@example.test`;
+    const raw = rfc822({ from: "Shop <news@shop.example>", subject: "Herbst-Angebote", date: daysAgo(1), messageId: "<herbst@shop.example>", body: "Alles reduziert." })
+      .replace("Content-Type:", `List-Unsubscribe: <mailto:${leave}?subject=Abmelden>,\r\n <https://shop.example/u?id=7>\r\nContent-Type:`);
+    await admin.append("INBOX", raw, [], daysAgo(1));
+    const account = await addAndSync();
+    const mail = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Herbst-Angebote")!;
+    const stored = () => (db.prepare("SELECT listUnsubscribe FROM message WHERE id = ?").get(mail.id) as { listUnsubscribe: string | null }).listUnsubscribe;
+    expect(stored()).toContain(leave);
+    expect(JSON.parse(stored()!)).toMatchObject({ oneClickUrl: null, url: "https://shop.example/u?id=7" }); // ohne Post-Kopfzeile kein Ein-Klick
+
+    // Wie eine Mail von vor dieser Funktion: Angabe fehlt und wird vom Server geholt
+    db.prepare("UPDATE message SET listUnsubscribe = NULL WHERE id = ?").run(mail.id);
+    const cleanup = new CleanupService(new CleanupStore(db), service);
+    const view = await cleanup.unsubscribeInfo(mail.id);
+    expect(view.method).toBe("mail");
+    expect(view.info?.mailto).toEqual({ address: leave, subject: "Abmelden", body: "unsubscribe" });
+
+    expect(await cleanup.unsubscribe(mail.id)).toEqual({ method: "mail" });
+    await service.flushNow(account.id);
+    expect(await receivedBy(leave, "Abmelden")).not.toBeNull();
+    expect((await cleanup.unsubscribeInfo(mail.id)).done?.method).toBe("mail");
+    // Ohne Angabe: kein Abbestellen
+    const other = (await service.messages({ kind: "unifiedInbox" }, 50)).find((m) => m.subject === "Angebot?")!;
+    expect((await cleanup.unsubscribeInfo(other.id)).info).toBeNull();
+  });
+
+  it("Anhang-Text: PDF wird beim Abgleich gelesen und ist durchsuchbar", async () => {
+    const boundary = "pdf42";
+    await admin.append(
+      "INBOX",
+      [
+        "From: Versicherung <post@versicherung.example>", `To: ${user}`, "Subject: Ihre Unterlagen", `Date: ${now.toUTCString()}`,
+        "Message-ID: <pdf1@versicherung.example>", "MIME-Version: 1.0", `Content-Type: multipart/mixed; boundary="${boundary}"`, "",
+        `--${boundary}`, "Content-Type: text/plain; charset=utf-8", "", "Anbei Ihre Police.",
+        `--${boundary}`, 'Content-Type: application/pdf; name="Police.pdf"', 'Content-Disposition: attachment; filename="Police.pdf"',
+        "Content-Transfer-Encoding: base64", "", minimalPdf("Versicherungsschein Nummer VS-424242").toString("base64"),
+        `--${boundary}--`, "",
+      ].join("\r\n"),
+      [],
+      now,
+    );
+    await addAndSync();
+    const hits = await service.search("versicherungsschein", { limit: 10 });
+    expect(hits.map((m) => m.subject)).toEqual(["Ihre Unterlagen"]);
+    expect((await service.search("424242", { limit: 10 })).map((m) => m.subject)).toEqual(["Ihre Unterlagen"]);
+  });
+});
+
