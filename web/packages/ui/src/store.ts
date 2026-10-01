@@ -22,6 +22,8 @@ import {
   type SummaryView,
   type AttachmentReadingView,
   type MessageActionsView,
+  type ReplyDraftsView,
+  type DigestView,
   type AIImage,
   type Attachment,
   type Mailbox,
@@ -37,6 +39,7 @@ import {
   type OutgoingMail,
   isDemoAccount,
   prepareCompose,
+  joinGreeting,
 } from "@stinkyma/core";
 
 // Zustand des Drei-Spalten-Layouts – Gegenstück zu MailboxBrowserModel (Swift). Ohne React testbar.
@@ -105,6 +108,17 @@ export interface BrowserState {
   actions: MessageActionsView | null;
   /** Regeln in normaler Sprache (nur Windows-App); null = nicht verfügbar. */
   rules: RulesState | null;
+  /** Antwortvorschläge zur geöffneten Mail (nur auf Klick). */
+  replies: RepliesState | null;
+  /** Tagesüberblick (Dialog); null = geschlossen. */
+  digest: { view: DigestView | null; busy: boolean; error: string | null } | null;
+}
+
+export interface RepliesState {
+  messageId: string;
+  view: ReplyDraftsView | null;
+  busy: boolean;
+  error: string | null;
 }
 
 export interface RulesState {
@@ -165,6 +179,8 @@ export const initialState: BrowserState = {
   oauthProviders: [],
   actions: null,
   rules: null,
+  replies: null,
+  digest: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -383,6 +399,61 @@ export class BrowserStore {
       const error = e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e);
       if (this.#state.summary?.threadId === threadId) this.#set({ summary: { threadId, view: this.#state.summary.view, busy: false, error } });
     }
+  }
+
+  /** Gibt es den Tagesüberblick (nur Windows-App)? */
+  get canShowDigest(): boolean {
+    return !!this.#ai;
+  }
+
+  /** Tagesüberblick öffnen (W6.6) – ohne Modell, sofort. */
+  async openDigest(): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    this.#set({ digest: { view: this.#state.digest?.view ?? null, busy: true, error: null } });
+    try {
+      const view = await ai.dailyDigest();
+      if (this.#state.digest) this.#set({ digest: { view, busy: false, error: null } });
+    } catch (e) {
+      if (this.#state.digest) this.#set({ digest: { view: null, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  closeDigest(): void {
+    this.#set({ digest: null });
+  }
+
+  /** Mail aus dem Überblick öffnen. */
+  async openFromDigest(messageId: string): Promise<void> {
+    this.#set({ digest: null });
+    await this.openMessage(messageId);
+  }
+
+  /** Antwortvorschläge zur geöffneten Mail (W6.5) – nur auf Klick, mit dem lokalen Modell. */
+  async loadReplyDrafts(): Promise<void> {
+    const ai = this.#ai;
+    const message = selectedMessage(this.#state);
+    if (!ai || !message || this.#state.replies?.busy) return;
+    const messageId = message.id;
+    this.#set({ replies: { messageId, view: null, busy: true, error: null } });
+    try {
+      const view = await ai.replyDrafts(messageId);
+      if (this.#state.replies?.messageId === messageId) this.#set({ replies: { messageId, view, busy: false, error: null } });
+    } catch (e) {
+      if (this.#state.replies?.messageId === messageId) this.#set({ replies: { messageId, view: null, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  closeReplyDrafts(): void {
+    this.#set({ replies: null });
+  }
+
+  /** Vorschlag übernehmen: öffnet „Antworten“ mit Anrede und Text – verschickt wird erst, wenn der Nutzer sendet. */
+  useReplyDraft(index: number, labels: ComposeLabels): void {
+    const view = this.#state.replies?.view;
+    const reply = view?.replies[index];
+    if (!view || !reply || selectedMessage(this.#state)?.id !== view.messageId) return;
+    this.openCompose("reply", labels, joinGreeting(view.greeting, reply.text));
   }
 
   /** Bild-Baustein und Bild-Laufzeit laden (Fehler stehen im Status, nicht im Banner). */
@@ -635,7 +706,7 @@ export class BrowserStore {
    * Öffnet den Composer. Antworten/Weiterleiten beziehen sich auf die geöffnete Mail; ohne geöffnete Mail
    * gibt es nur „Neue E-Mail“. `labels` kommen aus der Oberfläche (Sprache des Zitat-Kopfs).
    */
-  openCompose(mode: ComposeMode, labels: ComposeLabels): void {
+  openCompose(mode: ComposeMode, labels: ComposeLabels, replyText?: string): void {
     const state = this.#state;
     const original = selectedMessage(state);
     if (mode !== "new" && !original) return;
@@ -648,7 +719,7 @@ export class BrowserStore {
     const thread = original ? threadFor(state, original) : [];
     const attachments = original ? (state.attachmentsByMessageId[original.id] ?? []) : [];
     this.#set({
-      compose: prepareCompose(mode, { account, original, thread, ownAddresses, labels, signatureHtml: account.signatureHtml, attachments }),
+      compose: prepareCompose(mode, { account, original, thread, ownAddresses, labels, signatureHtml: account.signatureHtml, attachments, ...(replyText ? { replyText } : {}) }),
     });
   }
 
@@ -878,7 +949,7 @@ export class BrowserStore {
       }
       // Auswahl bleibt, solange die Mail noch in der Liste oder in den Suchergebnissen steht.
       const keepSelection = selected !== null && (messages.some((m) => m.id === selected) || Boolean(this.#state.searchResults?.some((m) => m.id === selected)));
-      this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null }) });
+      this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null }) });
     });
   }
 
@@ -887,7 +958,7 @@ export class BrowserStore {
     // Ordnerwechsel beendet eine Suche in allen Ordnern; „nur in diesem Ordner“ sucht im neuen Ordner weiter.
     const keepSearch = isSearching(this.#state) && !this.#state.searchAllFolders;
     this.#set({
-      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null,
+      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null,
       ...(keepSearch ? {} : { searchText: "", searchResults: null }),
     });
     await Promise.all([this.loadMessages(), keepSearch ? this.runSearch() : Promise.resolve()]);
@@ -929,13 +1000,14 @@ export class BrowserStore {
     const request = ++this.#threadRequest;
     this.#set({ selectedMessageId: id });
     if (id === null) {
-      this.#set({ thread: [], attachmentsByMessageId: {}, summary: null, actions: null });
+      this.#set({ thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null });
       return;
     }
     const message = this.#find(id);
     if (!message) return;
     if (this.#state.summary && this.#state.summary.threadId !== message.threadId) this.#set({ summary: null });
     if (this.#state.actions?.messageId !== id) this.#set({ actions: null });
+    if (this.#state.replies && this.#state.replies.messageId !== id) this.#set({ replies: null });
     void this.#loadCachedSummary();
     void this.#loadActions(id);
     await this.#guard(async () => {

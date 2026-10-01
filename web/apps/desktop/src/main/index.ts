@@ -5,6 +5,9 @@ import { totalmem } from "node:os";
 import { join } from "node:path";
 import {
   aiMethods,
+  digestCounts,
+  digestDue,
+  localDay,
   rulesApiMethods,
   oauthProviders,
   refreshTokens,
@@ -29,7 +32,7 @@ import {
 import { MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
 import { AIService, ModelStore, RuntimeStore } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, DigestStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -159,6 +162,7 @@ function setUpServices(): void {
     },
     results: new AIResultStore(db),
     actions: new ActionStore(db, () => randomUUID()),
+    digest: new DigestStore(db),
     message: (messageId) => repository.message(messageId),
     onActionsUpdated: () => notifyRenderer(),
     // Kalendereintrag: .ics im Temp-Ordner ablegen und mit dem Standardprogramm (Outlook, Kalender) öffnen
@@ -215,6 +219,7 @@ function startSync(): void {
 
 /** Fällige Erinnerungen als Windows-Benachrichtigung; Klick öffnet die Mail. */
 function checkReminders(): void {
+  void checkDigest();
   const due = ai?.takeDueReminders() ?? [];
   if (due.length === 0 || !Notification.isSupported()) return;
   const de = german();
@@ -230,6 +235,31 @@ function checkReminders(): void {
       if (reminder.messageId) mainWindow?.webContents.send("mail:open", reminder.messageId);
     });
     notification.show();
+  }
+}
+
+/** Tagesüberblick (W6.6) als Benachrichtigung zur eingestellten Uhrzeit – einmal am Tag, nur Zahlen. Klick öffnet ihn. */
+async function checkDigest(): Promise<void> {
+  const time = settings?.settings.digestTime;
+  if (!time || !ai || !settings || !Notification.isSupported()) return;
+  const now = new Date();
+  if (!digestDue(now, time, settings.text("digestShownDay"))) return;
+  settings.setText("digestShownDay", localDay(now));
+  try {
+    const counts = digestCounts(await ai.dailyDigest());
+    const de = german();
+    const parts = de
+      ? [counts.dueToday && `${counts.dueToday} heute fällig`, counts.overdue && `${counts.overdue} überfällig`, counts.important && `${counts.important} neue wichtige Mails`, counts.waiting && `${counts.waiting}× wartet auf dich`]
+      : [counts.dueToday && `${counts.dueToday} due today`, counts.overdue && `${counts.overdue} overdue`, counts.important && `${counts.important} new important emails`, counts.waiting && `${counts.waiting}× waiting on you`];
+    const body = parts.filter(Boolean).join(" · ") || (de ? "Nichts Dringendes – schönen Tag!" : "Nothing urgent – have a nice day!");
+    const notification = new Notification({ title: de ? "Dein Tagesüberblick" : "Your daily overview", body });
+    notification.on("click", () => {
+      showWindow();
+      mainWindow?.webContents.send("digest:open");
+    });
+    notification.show();
+  } catch {
+    // Tagesüberblick ist ein Extra – Fehler halten nichts auf.
   }
 }
 
@@ -330,7 +360,7 @@ const appSettingsApi: AppSettingsApi = {
     return next;
   },
   async available() {
-    return { closeToTray: true, launchAtLogin: loginItemSupported, notifications: Notification.isSupported(), oauthClients: true };
+    return { closeToTray: true, launchAtLogin: loginItemSupported, notifications: Notification.isSupported(), oauthClients: true, digestTime: Notification.isSupported() };
   },
 };
 

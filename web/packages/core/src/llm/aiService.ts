@@ -2,11 +2,14 @@ import { actionsPromptVersion, extractActions, ruleActions } from "../ai/actions
 import { cleanMailText } from "../ai/prepare.js";
 import { calendarFileName, toICalendar } from "../calendar.js";
 import type { ActionStatus, ActionStore, StoredAction } from "../sqlite/actionStore.js";
-import { categorizeWindowDays, maxPageImageChars, normalizeAISettings, type ActionView, type MessageActionsView, type AIApi, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
+import { categorizeWindowDays, maxPageImageChars, normalizeAISettings, type ActionView, type MessageActionsView, type ReplyDraftsView, type AIApi, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
 import { modelCatalog, type CatalogModel } from "../ai/catalog.js";
 import { promptVersions } from "../ai/prompts.js";
 import { AIRouter, GrantPolicy } from "../ai/router.js";
 import { interpretRule, interpretRuleWithRules, type RuleInterpretation } from "../ai/rules.js";
+import { draftReplies } from "../ai/replies.js";
+import { isDigestImportant, localDay, type DigestView } from "../digest.js";
+import type { DigestStore } from "../sqlite/digestStore.js";
 import { categorizeMessage, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
 import { AIBlockedError, AINotConfiguredError, type AIImage, type AIProvider, type AIRequest } from "../ai/types.js";
 import type { Message } from "../models.js";
@@ -50,6 +53,8 @@ export interface AIServiceOptions {
   onStatus?: (status: AIStatus) => void;
   /** Eine Mail hat eine Kategorie bekommen – Oberfläche neu laden. */
   onCategorized?: () => void;
+  /** Abfragen für den Tagesüberblick (W6.6). */
+  digest?: DigestStore;
   now?: () => Date;
 }
 
@@ -441,6 +446,45 @@ export class AIService implements AIApi {
   /** Für Tests: wartet, bis laufende Hintergrund-Erkennungen fertig sind. */
   async settled(): Promise<void> {
     await Promise.all([...this.#scanning.values()]);
+  }
+
+  /**
+   * Tagesüberblick (W6.6) – ohne Modell, sofort. Vorher werden neue Posteingangs-Mails, die noch niemand geöffnet hat,
+   * schnell mit den Regeln nach Fristen/Terminen/Zahlungen durchsucht (das Modell verfeinert erst beim Öffnen).
+   */
+  async dailyDigest(): Promise<DigestView> {
+    const digest = this.options.digest;
+    if (!digest) throw new Error("Der Tagesüberblick ist hier nicht verfügbar.");
+    const store = this.#actionStore();
+    const now = this.options.now?.() ?? new Date();
+    const day = 86_400_000;
+    const since = new Date(now.getTime() - 2 * day).toISOString();
+    for (const mail of digest.unscannedInbox(new Date(now.getTime() - 14 * day).toISOString(), 200)) {
+      if (mail.category === "newsletter" || mail.category === "spam_suspect") continue;
+      const actions = ruleActions(mail.subject, cleanMailText(mail.body, 2000), new Date(mail.date));
+      store.saveScan(mail.id, actions, { origin: "rules", promptVersion: actionsPromptVersion, at: now.toISOString() });
+    }
+    const today = localDay(now);
+    const unread = digest.unreadInbox(since, 200);
+    const count = (category: string) => unread.filter((m) => m.category === category).length;
+    return {
+      day: today,
+      due: digest.openActions(localDay(new Date(now.getTime() - 14 * day)), localDay(new Date(now.getTime() + 7 * day)), today, 20),
+      important: unread.filter((m) => isDigestImportant(m.category)).slice(0, 15),
+      waitingOnMe: digest.waitingOnMe(new Date(now.getTime() - 14 * day).toISOString(), 10),
+      counts: { newsletter: count("newsletter"), notification: count("notification"), spamSuspect: count("spam_suspect"), flagged: digest.flaggedCount() },
+    };
+  }
+
+  /** Antwortvorschläge (W6.5) – nur auf Klick, mit dem gewählten lokalen Modell. */
+  async replyDrafts(messageId: string): Promise<ReplyDraftsView> {
+    const message = await this.options.message?.(messageId);
+    if (!message) throw new Error("Die Mail wurde nicht gefunden.");
+    const { router, model } = await this.#router();
+    const thread = await this.options.thread(message.threadId);
+    const earlier = thread.filter((m) => m.id !== message.id && m.date <= message.date);
+    const result = await draftReplies(router, message, { earlier });
+    return { messageId, form: result.form, greeting: result.greeting, replies: result.replies, modelName: model.name, durationMs: result.durationMs };
   }
 
   /**

@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 01.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent** in Arbeit: W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher) und W6.4 (Regeln in eigenen Worten) fertig, lokal geprüft. Als Nächstes W6.5 Antwortentwürfe, W6.6 Tages-Digest; danach Feinabstimmung der Modelle (Wunsch des Nutzers)
+**Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft – **W6 abgeschlossen**. Als Nächstes: Feinabstimmung der Modelle (Wunsch des Nutzers)
 
 ## Überblick
 
@@ -403,4 +403,14 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Geprüft: Unit-Tests (Regeln, RuleService mit SQLite, Store), E2E gegen GreenMail (Regel anlegen → neue Mail landet im
   Ordner „Verein“ auf dem Server). Verschachtelte Ordner („INBOX/Verein“) werden auch über den letzten
   Namensteil gefunden (Unit-Test). **Ungeprüft:** echte Konten mit vielen Ordnern; Gemma E4B/Qwen siehe `docs/KI-MESSUNG.md`.
+- **W6.6 – Tagesüberblick (lokal geprüft):** Sonnen-Knopf unten links öffnet ihn; optional täglich als Windows-
+  Benachrichtigung zur gewählten Uhrzeit (Optionen → App, Standard aus; nur Anzahlen, keine Betreffzeilen; einmal am Tag).
+  Inhalt **ohne Modell**: offene Fristen/Termine/Zahlungen der nächsten 7 Tage und Überfälliges (nur Posteingang, Archiv,
+  eigene Ordner), „wartet auf dich“ aus gespeicherten Zusammenfassungen (nur wenn sie zum letzten Stand passen), ungelesene
+  wichtige Mails der letzten 2 Tage; Newsletter/Benachrichtigungen/Verdächtiges/Markiertes nur gezählt; Türsteher-Mails
+  bleiben draußen. Vorher werden ungeöffnete neue Mails schnell mit den Regeln nach Aktionen durchsucht – sonst fehlten
+  Fristen aus Mails, die noch niemand geöffnet hat. Geprüft: Unit-Tests mit SQLite (Abschlagsrechnung wird ungeöffnet
+  gefunden, später überfällig, Erledigtes/Papierkorb fehlt), Store-Test, E2E mit Beispieldaten (Klick öffnet die Mail).
+  **Grenzen:** Die Regeln erkennen Wochentage („am Dienstag um 9:30“) noch nicht – solche Termine erscheinen erst, wenn die
+  Mail geöffnet und vom Modell gelesen wurde. Die Benachrichtigung selbst (Uhrzeit-Auslösung unter Windows) ist ungeprüft.
 

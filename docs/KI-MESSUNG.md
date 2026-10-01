@@ -129,12 +129,19 @@ benutzt), z. B. „Rechnungen von stadtwerke.example in Steuer 2026“. Richtig 
 | Regeln (ohne KI) | 24/24 | 10/12 | – | 0 s |
 | Gemma 4 E2B, nur Modell | 18/24 | 6/12 | 36 | 5,3 s |
 | **Gemma 4 E2B, Regeln zuerst** (Standard) | **24/24** | **11/12** | 1 | 8,4 s |
+| Gemma 4 E4B, nur Modell | 23/24 | **12/12** | 36 | 10,1 s |
+| Gemma 4 E4B, Regeln zuerst | 24/24 | 11/12 | 1 | 16,2 s |
+| Qwen 3.5 2B, nur Modell | 17/24 | 8/12 | 36 (15 unbrauchbar) | 9,8 s |
+| Qwen 3.5 2B, Regeln zuerst | 24/24 | 10/12 | 1 | 9,9 s |
 
 - Das Modell allein **erfindet eine „Art“ dazu** („Lohnsteuer im Betreff“ → Rechnung, „Chefin“ → Arbeit, „Oma Hilde“ →
   persönlich) und setzt bei „markieren“ manchmal zusätzlich „gelesen“. Für ein ~3B-Modell ist die Aufgabe offenbar zu offen.
 - Deshalb entscheidet die App: **zuerst die Regeln, das Modell nur, wenn die nichts Brauchbares ergeben** (keine Bedingung,
   keine Aktion, unbekannter Ordner). Im Kontrollsatz rettet es so „Spam-Verdacht direkt in den Junk-Ordner“.
-- Offen: Verneinung („nicht markieren, nur archivieren“) – beide Verfahren markieren trotzdem. Im Formular sichtbar.
+- **Gemma 4 E4B versteht die Aufgabe dagegen sehr gut** (Kontrollsatz fehlerfrei, auch die Verneinung) – bei doppelter Zeit.
+  Kandidat für die Feinabstimmung: auf stärkeren Rechnern mit E4B „Modell zuerst“ (Regeln als Prüfung), sonst wie bisher.
+- Qwen 3.5 2B liefert ohne Regeln oft gar nichts Brauchbares (15 von 36).
+- Offen: Verneinung („nicht markieren, nur archivieren“) – Regeln und E2B markieren trotzdem. Im Formular sichtbar.
 
 ## Ergebnis und Entscheidung
 

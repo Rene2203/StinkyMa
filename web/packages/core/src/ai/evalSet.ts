@@ -379,3 +379,21 @@ export const evalRuleHoldout: EvalRuleCase[] = [
   { id: "rh11", text: "Spam-Verdacht direkt in den Junk-Ordner", expected: { category: "spam_suspect", move: "spam" } },
   { id: "rh12", text: "Betreff enthält Abo – dann als gelesen markieren und ins Archiv", expected: { subject: ["Abo"], markRead: true, move: "archive" } },
 ];
+
+// --- Antwortvorschläge (W6.5) ---
+
+/** Mails aus dem Testsatz, auf die man antworten würde, mit der erwarteten Anrede. */
+export const evalReplyCases: { mailId: string; form: "du" | "Sie" }[] = [
+  { mailId: "p01", form: "du" },
+  { mailId: "p03", form: "du" },
+  { mailId: "p04", form: "du" },
+  { mailId: "p06", form: "du" },
+  { mailId: "p07", form: "du" },
+  { mailId: "p09", form: "du" },
+  { mailId: "p12", form: "du" },
+  { mailId: "w01", form: "Sie" },
+  { mailId: "w02", form: "du" },
+  { mailId: "w03", form: "du" },
+  { mailId: "w04", form: "Sie" },
+  { mailId: "w05", form: "Sie" },
+];

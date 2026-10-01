@@ -74,7 +74,7 @@ export function attachmentFromRow(r: Row): Attachment {
  * Kopie im Archiv, die es auch in einem normalen Ordner gibt (Gmail: „Alle Nachrichten“ enthält jede Mail
  * des Posteingangs) – in „Markiert“ nur einmal zählen und zeigen.
  */
-const archiveDuplicate = `(mailbox.role = 'archive' AND message.messageId IS NOT NULL AND EXISTS (
+export const archiveDuplicate = `(mailbox.role = 'archive' AND message.messageId IS NOT NULL AND EXISTS (
   SELECT 1 FROM message other JOIN mailbox otherBox ON otherBox.id = other.mailboxId
    WHERE other.messageId = message.messageId AND other.accountId = message.accountId
      AND otherBox.role NOT IN ('archive', 'trash', 'spam')))`;

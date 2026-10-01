@@ -2,6 +2,7 @@ import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, Mai
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
+import { DigestDialog } from "./components/DigestDialog.js";
 import { composeLabels } from "./composeLabels.js";
 import { MessageList } from "./components/MessageList.js";
 import { Sidebar } from "./components/Sidebar.js";
@@ -32,10 +33,11 @@ export interface AppProps {
   subscribeChanges?: (onChange: () => void) => () => void;
   /** Von außen gewünschtes Öffnen einer Mail (z. B. Klick auf eine Benachrichtigung). */
   subscribeOpenMessage?: (open: (messageId: string) => void) => () => void;
+  subscribeOpenDigest?: (open: () => void) => () => void;
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, ai, rules, subscribeAIStatus, subscribeChanges, subscribeOpenMessage }: AppProps) {
+export function App({ repository, locale, accounts, files, settings, ai, rules, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
   const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules }), [repository, accounts, files, settings, ai, rules]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
@@ -46,6 +48,7 @@ export function App({ repository, locale, accounts, files, settings, ai, rules, 
   useEffect(() => subscribeChanges?.(() => void store.reload()), [store, subscribeChanges]);
   useEffect(() => subscribeAIStatus?.((status) => store.setAIStatus(status)), [store, subscribeAIStatus]);
   useEffect(() => subscribeOpenMessage?.((id) => void store.openMessage(id)), [store, subscribeOpenMessage]);
+  useEffect(() => subscribeOpenDigest?.(() => void store.openDigest()), [store, subscribeOpenDigest]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -78,6 +81,7 @@ function Shell() {
           <AttachmentViewer key={state.preview.attachmentId} {...state.preview} />
         </Suspense>
       )}
+      {state.digest && <DigestDialog />}
       {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}
       {state.error && (
         <div className="error-banner" role="alert">

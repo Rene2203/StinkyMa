@@ -195,6 +195,29 @@ function AppSettingsSection() {
           <option value="off">{t("appSettings.notifications.off")}</option>
         </select>
       </label>
+      {available.digestTime !== false && (
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={settings.digestTime !== ""}
+            data-testid="setting-digest"
+            onChange={(e) => void store.updateAppSettings({ digestTime: e.target.checked ? "07:30" : "" })}
+          />
+          <span>
+            {t("appSettings.digest")}{" "}
+            {settings.digestTime && (
+              <input
+                type="time"
+                value={settings.digestTime}
+                aria-label={t("appSettings.digestTime")}
+                data-testid="setting-digest-time"
+                onChange={(e) => e.target.value && void store.updateAppSettings({ digestTime: e.target.value })}
+              />
+            )}
+            <span className="hint block">{t("appSettings.digestHint")}</span>
+          </span>
+        </label>
+      )}
     </section>
   );
 }

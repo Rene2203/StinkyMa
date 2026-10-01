@@ -74,6 +74,12 @@ describe("Antworten vorbereiten", () => {
     expect(draft.bodyText).toBe("\n\nAnna schrieb:\n> Kommst du?\n>> alte Zeile\n");
   });
 
+  it("Antwort mit Vorschlagstext: Text über Signatur und Zitat", () => {
+    const draft = prepareCompose("reply", { account: me, original: message(), thread, labels, replyText: "Hallo Anna,\nja, ich komme gern!", signatureHtml: "<p>Gruß Ich</p>" });
+    expect(draft.bodyText).toBe("Hallo Anna,\nja, ich komme gern!\n\nGruß Ich\n\nAnna schrieb:\n> Kommst du?\n>> alte Zeile\n");
+    expect(draft.bodyHtml?.startsWith("<p>Hallo Anna,</p><p>ja, ich komme gern!</p><p></p><p>Gruß Ich</p>")).toBe(true);
+  });
+
   it("Allen antworten: ohne mich selbst, ohne Doppelte", () => {
     const draft = prepareCompose("replyAll", { account: me, original: message(), thread, labels });
     expect(draft.to.map((a) => a.address)).toEqual(["anna@example.test", "bernd@example.test"]);

@@ -1,3 +1,4 @@
+import type { DigestView } from "../digest.js";
 import type { MailAction } from "./actions.js";
 import type { CatalogModel, ModelCapability } from "./catalog.js";
 import type { DocumentType } from "./prompts.js";
@@ -117,6 +118,16 @@ export interface MessageActionsView {
   origin: ResultOrigin | null;
 }
 
+/** Antwortvorschläge zur geöffneten Mail (nur auf Klick, nicht gespeichert). */
+export interface ReplyDraftsView {
+  messageId: string;
+  form: "du" | "Sie";
+  greeting: string;
+  replies: { kind: "agree" | "decline" | "ask"; label: string; text: string }[];
+  modelName: string;
+  durationMs: number;
+}
+
 export interface AIApi {
   status(): Promise<AIStatus>;
   update(patch: Partial<AISettings>): Promise<AIStatus>;
@@ -148,6 +159,10 @@ export interface AIApi {
   cancelReminder(reminderId: string): Promise<void>;
   /** Kalendereintrag (.ics) erzeugen und mit dem Standard-Kalender öffnen. */
   addToCalendar(actionId: string): Promise<void>;
+  /** 2–3 Antwortvorschläge zur Mail (nur auf Klick). Leere Liste: das Modell lieferte nichts Brauchbares. */
+  replyDrafts(messageId: string): Promise<ReplyDraftsView>;
+  /** Tagesüberblick: Fälliges, wichtige ungelesene Mails, „wartet auf dich“ (ohne Modell, sofort). */
+  dailyDigest(): Promise<DigestView>;
 }
 
-export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar"] as const satisfies readonly (keyof AIApi)[];
+export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest"] as const satisfies readonly (keyof AIApi)[];

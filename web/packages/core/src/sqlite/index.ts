@@ -6,3 +6,4 @@ export * from "./writer.js";
 export * from "./aiStore.js";
 export * from "./actionStore.js";
 export * from "./ruleStore.js";
+export * from "./digestStore.js";

@@ -16,3 +16,4 @@ export * from "./oauth.js";
 export * from "./calendar.js";
 export * from "./phishing.js";
 export * from "./rules.js";
+export * from "./digest.js";

@@ -7,7 +7,7 @@ const accountMethods = ["addAccount", "addOAuthAccount", "reauthorize", "oauthPr
 const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
 const rulesMethods = ["list", "folders", "interpret", "preview", "save", "setEnabled", "remove"];
-const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar"];
+const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest"];
 
 const bridge = (channel: string, methods: string[]) =>
   Object.fromEntries(methods.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channel, method, args)]));
@@ -32,6 +32,12 @@ contextBridge.exposeInMainWorld("stinkyma", {
     };
     ipcRenderer.on("mail:open", listener);
     return () => ipcRenderer.removeListener("mail:open", listener);
+  },
+  /** Tagesüberblick-Benachrichtigung angeklickt. */
+  onOpenDigest: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("digest:open", listener);
+    return () => ipcRenderer.removeListener("digest:open", listener);
   },
   /** KI-Status (Download-Fortschritt, Einordnung) hat sich geändert. */
   onAIStatus: (callback: (status: unknown) => void) => {

@@ -1,6 +1,6 @@
 # Changelog
 
-## W6 – Assistent (in Arbeit)
+## W6 – Assistent
 
 ### Neu
 - **Zu tun:** Termine, Fristen, Zahlungen und Bitten werden über der Mail angezeigt – sofort (Regeln), auf Wunsch mit KI
@@ -15,6 +15,13 @@
   und welche Mails im Posteingang jetzt schon passen; auf Wunsch auch auf diese anwenden. Gilt danach für neu ankommende
   Mails – lokal sofort, auf dem Server über die Warteschlange; Weggeräumtes löst keine Benachrichtigung aus. Gelesen wird
   zuerst mit einfachen Regeln, das lokale Modell hilft nur, wenn die nichts Brauchbares ergeben. Migration `v12-mail-rules`.
+- **Antwortvorschläge** (Knopf in der Mail, nur mit lokalem Modell): 2–3 kurze Varianten (z. B. zusagen, absagen,
+  nachfragen) in der Anrede der Mail (du/Sie). Klick übernimmt Anrede und Text in „Antworten“ – über Signatur und Zitat;
+  gesendet wird nur vom Nutzer. Vorschläge mit Platzhaltern, falscher Anrede oder erfundenen Zahlen werden verworfen.
+- **Tagesüberblick** (Sonnen-Knopf unten links; auf Wunsch täglich als Benachrichtigung zur gewählten Uhrzeit, nur mit
+  Anzahlen): Fälliges der nächsten 7 Tage und Überfälliges, „wartet auf dich“, neue wichtige ungelesene Mails; Newsletter,
+  Benachrichtigungen und Verdächtiges nur gezählt. Ohne KI-Modell, sofort – ungeöffnete neue Mails werden dafür schnell mit
+  den Regeln nach Fristen und Zahlungen durchsucht.
 
 ### Behoben
 - Archivierte/verschobene Mails verloren den gelesenen Anhang-Text (Suche in Scans) und KI-Leseergebnisse.

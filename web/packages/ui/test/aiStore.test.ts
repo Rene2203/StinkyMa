@@ -66,6 +66,15 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     cancelReminder: async (id) => {
       calls.push(`cancel:${id}`);
     },
+    dailyDigest: async () => {
+      calls.push("digest");
+      return { day: "2026-09-29", due: [], important: [], waitingOnMe: [], counts: { newsletter: 2, notification: 0, spamSuspect: 0, flagged: 1 } };
+    },
+    replyDrafts: async (messageId) => {
+      calls.push(`replies:${messageId}`);
+      if (options.fail) throw new Error(`Error invoking remote method 'ai': Error: ${options.fail}`);
+      return { messageId, form: "du", greeting: "Hallo Jonas,", replies: [{ kind: "agree", label: "Zusagen", text: "Klar, ich bin dabei!" }, { kind: "decline", label: "Absagen", text: "Da kann ich leider nicht." }], modelName: "Gemma", durationMs: 4000 };
+    },
     addToCalendar: async (id) => {
       calls.push(`calendar:${id}`);
     },
@@ -219,5 +228,49 @@ describe("BrowserStore – KI", () => {
     const opening = store.selectMessage(second.id);
     expect(store.getState().actions?.messageId ?? second.id).not.toBe(first.id);
     await opening;
+  });
+
+  it("Antwortvorschläge: nur auf Klick, Übernehmen öffnet „Antworten“ mit Anrede und Text; Wechsel verwirft sie", async () => {
+    const ai = fakeAI();
+    const store = await setup(ai);
+    const [first, second] = store.getState().messages;
+    if (!first || !second) throw new Error("keine Mails");
+    await store.selectMessage(first.id);
+    await flush();
+    expect(ai.calls.some((c) => c.startsWith("replies:"))).toBe(false);
+    await store.loadReplyDrafts();
+    expect(store.getState().replies).toMatchObject({ messageId: first.id, busy: false, view: { greeting: "Hallo Jonas,", replies: [{ label: "Zusagen" }, { label: "Absagen" }] } });
+    store.useReplyDraft(1, { wrote: () => "schrieb:", forwardHeader: () => "" });
+    const compose = store.getState().compose;
+    expect(compose?.mode).toBe("reply");
+    expect(compose?.bodyText.startsWith("Hallo Jonas,\nda kann ich leider nicht.\n")).toBe(true);
+    expect(ai.calls.filter((c) => c.startsWith("send"))).toEqual([]); // nichts verschickt
+    store.closeCompose();
+    await store.selectMessage(second.id);
+    expect(store.getState().replies).toBeNull();
+  });
+
+  it("Antwortvorschläge: Fehler in der Karte (ohne Electron-Vorspann)", async () => {
+    const store = await setup(fakeAI({ fail: "Noch kein KI-Modell gewählt" }));
+    const first = store.getState().messages[0];
+    if (!first) throw new Error("keine Mail");
+    await store.selectMessage(first.id);
+    await store.loadReplyDrafts();
+    expect(store.getState().replies).toMatchObject({ busy: false, view: null, error: "Noch kein KI-Modell gewählt" });
+    expect(store.getState().error).toBeNull();
+  });
+
+  it("Tagesüberblick: öffnen, Mail daraus öffnen schließt ihn; ohne KI-Schnittstelle nicht da", async () => {
+    const ai = fakeAI();
+    const store = await setup(ai);
+    expect(store.canShowDigest).toBe(true);
+    await store.openDigest();
+    expect(store.getState().digest).toMatchObject({ busy: false, view: { counts: { newsletter: 2, flagged: 1 } } });
+    const first = store.getState().messages[0];
+    if (!first) throw new Error("keine Mail");
+    await store.openFromDigest(first.id);
+    expect(store.getState().digest).toBeNull();
+    expect(store.getState().selectedMessageId).toBe(first.id);
+    expect(new BrowserStore(new InMemoryMailRepository(createMockData())).canShowDigest).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ describe("App-Einstellungen", () => {
       launchAtLogin: false,
       notifications: "full",
       oauthClients: { google: { clientId: "", clientSecret: "" }, microsoft: { clientId: "" } },
+      digestTime: "",
     });
   });
 
@@ -18,8 +19,13 @@ describe("App-Einstellungen", () => {
       launchAtLogin: false,
       notifications: "full",
       oauthClients: defaultAppSettings.oauthClients,
+      digestTime: "",
     });
     expect(normalizeAppSettings({ notifications: "minimal" }).notifications).toBe("minimal");
+    // Tagesüberblick: nur gültige Uhrzeiten
+    expect(normalizeAppSettings({ digestTime: "07:30" }).digestTime).toBe("07:30");
+    expect(normalizeAppSettings({ digestTime: "25:00" }).digestTime).toBe("");
+    expect(normalizeAppSettings({ digestTime: "7 Uhr" }).digestTime).toBe("");
   });
 
   it("App-Registrierung für die Anmeldung per Browser: getrimmt, Kaputtes wird leer", () => {

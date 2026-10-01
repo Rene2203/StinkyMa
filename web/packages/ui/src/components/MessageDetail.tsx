@@ -1,4 +1,4 @@
-import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, Pencil, Reply, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
+import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, MessageSquareReply, Pencil, Reply, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import { assessPhishing, displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -12,6 +12,7 @@ import { SummaryCard } from "./SummaryCard.js";
 import { ActionsCard } from "./ActionsCard.js";
 import { PhishingBanner } from "./PhishingBanner.js";
 import { ScreenerBar } from "./ScreenerBar.js";
+import { ReplyDraftsCard } from "./ReplyDraftsCard.js";
 
 export function MessageDetail() {
   const { store, t, locale } = useUi();
@@ -68,6 +69,18 @@ export function MessageDetail() {
                 <Sparkles size={17} /> <span>{t("summary.action")}</span>
               </button>
             )}
+            {state.ai?.ready && (
+              <button
+                type="button"
+                title={t("replies.action")}
+                aria-label={t("replies.action")}
+                data-testid="action-replies"
+                disabled={state.replies?.busy && state.replies.messageId === message.id}
+                onClick={() => void store.loadReplyDrafts()}
+              >
+                <MessageSquareReply size={17} />
+              </button>
+            )}
             <span className="toolbar-gap" aria-hidden="true" />
             <button type="button" title={`${flagged ? t("action.unflag") : t("action.flag")} (S)`} onClick={() => void store.toggleFlag(message.id)}>
               {flagged ? <FlagOff size={17} /> : <Flag size={17} />}
@@ -94,6 +107,7 @@ export function MessageDetail() {
             />
           )}
           {state.summary?.threadId === message.threadId && <SummaryCard summary={state.summary} />}
+          {state.replies?.messageId === message.id && <ReplyDraftsCard replies={state.replies} />}
           {state.actions?.messageId === message.id && <ActionsCard view={state.actions} />}
           {thread.map((m) => (
             <ThreadMessage

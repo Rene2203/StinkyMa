@@ -39,6 +39,17 @@ export class SettingsFile {
     this.#write();
   }
 
+  /** Interner Text-Merker (z. B. Tag des letzten Tagesüberblicks). */
+  text(name: string): string | null {
+    const value = this.#extra[name];
+    return typeof value === "string" ? value : null;
+  }
+
+  setText(name: string, value: string): void {
+    this.#extra[name] = value;
+    this.#write();
+  }
+
   /** KI-Einstellungen (Modellwahl usw.) – geprüft und vereinheitlicht im KI-Dienst. */
   get ai(): unknown {
     return this.#ai;

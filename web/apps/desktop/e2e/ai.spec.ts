@@ -77,6 +77,23 @@ test("KI: Modelle in den Optionen, Zusammenfassung auf diesem Gerät", async () 
     await expect(card.getByText("Auf diesem Gerät berechnet", { exact: false })).toBeVisible();
   });
 
+  await test.step("Antwortvorschläge: nur auf Klick, Übernehmen öffnet die Antwort (nichts wird gesendet)", async () => {
+    await page.getByTestId("action-replies").click();
+    const card = page.getByTestId("replies-card");
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute("aria-busy", "false", { timeout: 180_000 });
+    // Das winzige Testmodell schreibt Unsinn – den filtert die Prüfung weg; dann steht ein Hinweis da
+    if (tinyModel && (await card.getByTestId("reply-option").count()) === 0) return;
+    await expect(card.getByTestId("reply-option").first()).toBeVisible();
+    await page.screenshot({ path: join(screenshotDir, "25-Antwortvorschlaege.png") });
+    await card.getByTestId("reply-option").first().click();
+    await expect(page.getByTestId("compose-send")).toBeVisible();
+    await page.getByTestId("compose-discard").click();
+    const confirm = page.getByTestId("compose-confirm-discard");
+    if (await confirm.isVisible()) await confirm.click();
+    await expect(page.getByTestId("compose-send")).toHaveCount(0);
+  });
+
   if (tinyModel) return;
   await test.step("Gespeichert: beim erneuten Öffnen sofort da", async () => {
     await page.getByTestId("message-row").nth(1).click();

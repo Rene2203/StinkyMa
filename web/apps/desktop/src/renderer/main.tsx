@@ -16,6 +16,7 @@ declare global {
       onAIStatus: (callback: (status: AIStatus) => void) => () => void;
       onMailChanged: (callback: () => void) => () => void;
       onOpenMessage: (callback: (messageId: string) => void) => () => void;
+      onOpenDigest: (callback: () => void) => () => void;
       platform: string;
     };
   }
@@ -31,7 +32,7 @@ const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <App repository={repository} locale={locale} accounts={bridge?.accounts} files={bridge?.files} settings={bridge?.settings} ai={bridge?.ai} rules={bridge?.rules} subscribeAIStatus={bridge?.onAIStatus} subscribeChanges={bridge?.onMailChanged} subscribeOpenMessage={bridge?.onOpenMessage} />
+      <App repository={repository} locale={locale} accounts={bridge?.accounts} files={bridge?.files} settings={bridge?.settings} ai={bridge?.ai} rules={bridge?.rules} subscribeAIStatus={bridge?.onAIStatus} subscribeChanges={bridge?.onMailChanged} subscribeOpenMessage={bridge?.onOpenMessage} subscribeOpenDigest={bridge?.onOpenDigest} />
     </StrictMode>,
   );
 }

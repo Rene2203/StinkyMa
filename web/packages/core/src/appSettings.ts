@@ -16,6 +16,8 @@ export interface AppSettings {
    * Google-Desktop-App ist laut Google nicht geheim; Microsoft braucht keins.
    */
   oauthClients: { google: { clientId: string; clientSecret: string }; microsoft: { clientId: string } };
+  /** Tagesüberblick als Benachrichtigung um diese Uhrzeit (HH:MM); leer = aus. */
+  digestTime: string;
 }
 
 export const defaultAppSettings: AppSettings = {
@@ -23,6 +25,7 @@ export const defaultAppSettings: AppSettings = {
   launchAtLogin: false,
   notifications: "full",
   oauthClients: { google: { clientId: "", clientSecret: "" }, microsoft: { clientId: "" } },
+  digestTime: "",
 };
 
 export interface AppSettingsApi {
@@ -44,6 +47,7 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
     launchAtLogin: typeof value.launchAtLogin === "boolean" ? value.launchAtLogin : defaultAppSettings.launchAtLogin,
     notifications: notifications === "full" || notifications === "minimal" || notifications === "off" ? notifications : defaultAppSettings.notifications,
     oauthClients: normalizeOAuthClients(value.oauthClients),
+    digestTime: typeof value.digestTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.digestTime) ? value.digestTime : "",
   };
 }
 

@@ -117,6 +117,19 @@ test("Zu tun: Zahlung erkannt (ohne KI-Modell), Erinnerung setzen, erledigt", as
   await expect(card.locator(".action-row.done")).toHaveCount(1);
 });
 
+test("Tagesüberblick ohne KI: wichtige neue Mails, Klick öffnet die Mail", async () => {
+  await page.getByTestId("open-digest").click();
+  const dialog = page.getByTestId("digest-dialog");
+  await expect(dialog).toBeVisible();
+  const important = dialog.getByTestId("digest-important");
+  await expect(important.getByTestId("digest-row").first()).toBeVisible();
+  await page.screenshot({ path: join(screenshotDir, "26-Tagesueberblick.png") });
+  const subject = (await important.getByTestId("digest-row").first().locator(".digest-main .small").textContent()) ?? "";
+  await important.getByTestId("digest-row").first().click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId("thread-subject")).toHaveText(subject);
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

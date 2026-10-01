@@ -1,8 +1,9 @@
 import type { Message, MessageCategory } from "../models.js";
-import { evalActionCases, evalHoldoutMails, evalMails, evalRuleCases, evalRuleFolders, evalRuleHoldout, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
+import { evalActionCases, evalHoldoutMails, evalMails, evalReplyCases, evalRuleCases, evalRuleFolders, evalRuleHoldout, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
 import { extractActions, ruleActions, type MailAction } from "./actions.js";
 import { cleanMailText } from "./prepare.js";
 import { interpretRule, interpretRuleWithRules } from "./rules.js";
+import { draftReplies, joinGreeting } from "./replies.js";
 import { ruleEquals } from "../rules.js";
 import { categories } from "./prompts.js";
 import { AIRouter, GrantPolicy } from "./router.js";
@@ -356,5 +357,50 @@ export function formatRulesReports(reports: RulesEvalReport[]): string {
   const lines = ["| Verfahren | Testsatz | Kontrollsatz | Modell gefragt | davon unbrauchbar | Zeit je Modell-Aufruf (Median) |", "|---|---|---|---|---|---|"];
   for (const r of reports) lines.push(`| ${r.name} | ${r.correct}/${r.total} | ${r.holdoutCorrect}/${r.holdoutTotal} | ${r.modelCalls} | ${r.fallbacks} | ${seconds(r.medianMs)} |`);
   for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
+  return lines.join("\n");
+}
+
+// --- Antwortvorschläge (W6.5) ---
+
+export interface RepliesEvalReport {
+  name: string;
+  cases: number;
+  /** Fälle mit mindestens zwei brauchbaren Vorschlägen (Ziel) bzw. mindestens einem */
+  twoOrMore: number;
+  atLeastOne: number;
+  formCorrect: number;
+  medianMs: number;
+  /** Alle Vorschläge zum Lesen (Qualität lässt sich nur so beurteilen) */
+  samples: string[];
+}
+
+export async function evaluateReplies(provider: AIProvider, options: { onProgress?: (done: number, total: number) => void } = {}): Promise<RepliesEvalReport> {
+  const router = new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() });
+  const report: RepliesEvalReport = { name: provider.displayName, cases: evalReplyCases.length, twoOrMore: 0, atLeastOne: 0, formCorrect: 0, medianMs: 0, samples: [] };
+  const durations: number[] = [];
+  for (const [index, testCase] of evalReplyCases.entries()) {
+    const mail = evalMails.find((m) => m.id === testCase.mailId);
+    if (!mail) throw new Error(`Testmail ${testCase.mailId} fehlt`);
+    const result = await draftReplies(router, evalMailToMessage(mail));
+    durations.push(result.durationMs);
+    if (result.replies.length >= 2) report.twoOrMore++;
+    if (result.replies.length >= 1) report.atLeastOne++;
+    if (result.form === testCase.form) report.formCorrect++;
+    report.samples.push(
+      `**${mail.id} – ${mail.subject}** (${result.form}, ${seconds(result.durationMs)})`,
+      ...result.replies.map((r) => `- *${r.label}:* ${joinGreeting(result.greeting, r.text).replace(/\n+/g, " ")}`),
+      ...(result.replies.length ? [] : ["- (kein brauchbarer Vorschlag)"]),
+      "",
+    );
+    options.onProgress?.(index + 1, evalReplyCases.length);
+  }
+  report.medianMs = median(durations);
+  return report;
+}
+
+export function formatRepliesReports(reports: RepliesEvalReport[]): string {
+  const lines = ["| Modell | ≥ 2 Vorschläge | ≥ 1 Vorschlag | du/Sie richtig | Zeit (Median) |", "|---|---|---|---|---|"];
+  for (const r of reports) lines.push(`| ${r.name} | ${r.twoOrMore}/${r.cases} | ${r.atLeastOne}/${r.cases} | ${r.formCorrect}/${r.cases} | ${seconds(r.medianMs)} |`);
+  for (const r of reports) lines.push("", `### ${r.name}`, "", ...r.samples);
   return lines.join("\n");
 }

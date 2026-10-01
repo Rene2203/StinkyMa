@@ -94,6 +94,8 @@ export function prepareCompose(
     signatureHtml?: string | null;
     /** Anhänge der Originalmail (für Weiterleiten). */
     attachments?: Attachment[];
+    /** Vorformulierter Antworttext (z. B. Antwortvorschlag) – steht über Signatur und Zitat. */
+    replyText?: string;
   },
 ): ComposeDraft {
   const { account, original, labels } = options;
@@ -150,6 +152,7 @@ export function prepareCompose(
     .filter((id): id is string => Boolean(id));
   const references = uniqueStrings([...threadIds, ...(original.messageId ? [original.messageId] : [])]);
 
+  const replyText = options.replyText?.trim() ?? "";
   return {
     ...empty,
     mode,
@@ -157,8 +160,10 @@ export function prepareCompose(
     to,
     cc,
     subject: replySubject(original.subject),
-    bodyText: `${leadText}${labels.wrote(original)}\n${quoteText(body)}\n`,
-    bodyHtml: `<p></p>${signatureHtml}<p></p>${textToHtml(labels.wrote(original))}<blockquote>${textToHtml(body)}</blockquote>`,
+    bodyText: replyText
+      ? `${replyText}\n${signature ? `\n${plainFromHtml(signature)}\n` : ""}\n${labels.wrote(original)}\n${quoteText(body)}\n`
+      : `${leadText}${labels.wrote(original)}\n${quoteText(body)}\n`,
+    bodyHtml: `${replyText ? textToHtml(replyText) : "<p></p>"}${signatureHtml}<p></p>${textToHtml(labels.wrote(original))}<blockquote>${textToHtml(body)}</blockquote>`,
     inReplyTo: original.messageId ?? null,
     references,
     answeredMessageId: original.id,
