@@ -431,6 +431,22 @@ test("Konto einrichten, Mails abrufen, HTML sicher anzeigen", async () => {
     expect(forwarded?.text).toContain("Anbei die Unterlagen.");
   });
 
+  await test.step("Suche: findet Text im Mailinhalt über alle Ordner, „nur hier“ schränkt ein", async () => {
+    await page.getByTestId("sidebar-unifiedInbox").click();
+    await page.getByTestId("search-input").fill("kundenkonto"); // steht nur im Text der archivierten HTML-Rechnung
+    const rows = page.getByTestId("message-row");
+    await expect(rows.filter({ hasText: "Ihre Rechnung als HTML" }).first()).toBeVisible();
+    await expect(rows.filter({ hasText: "Ihre Rechnung als HTML" }).first().getByTestId("row-folder")).toHaveText("Archiv");
+    await page.screenshot({ path: join(screenshotDir, "16-Suche.png") });
+    await page.getByTestId("search-here").click();
+    await expect(page.getByText("Keine Treffer")).toBeVisible();
+    await page.getByTestId("search-all").click();
+    await rows.filter({ hasText: "Ihre Rechnung als HTML" }).first().click();
+    await expect(page.getByTestId("thread-subject")).toHaveText("Ihre Rechnung als HTML");
+    await page.getByTestId("search-input").press("Escape");
+    await expect(page.getByTestId("search-input")).toHaveValue("");
+  });
+
   await test.step("Abruf per Knopf", async () => {
     await page.getByTestId("sync-now").click();
     await expect(page.getByTestId("sync-status")).toContainText("Abgerufen um", { timeout: 20_000 });

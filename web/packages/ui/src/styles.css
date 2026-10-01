@@ -1533,3 +1533,44 @@ button.attachment-open:hover {
 .forwarded-original .safe-html {
   margin-top: 8px;
 }
+
+/* Suche */
+
+.search-scope {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.search-scope button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.search-scope button[aria-pressed="true"] {
+  background: var(--bg-selected);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.search-scope .muted {
+  margin-left: auto;
+}
+
+.row-folder {
+  display: inline-block;
+  align-self: flex-start;
+  width: fit-content;
+  margin-top: 3px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--bg-card);
+  font-size: 11px;
+  color: var(--fg-muted);
+}

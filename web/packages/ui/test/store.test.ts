@@ -163,13 +163,40 @@ describe("BrowserStore", () => {
     expect(store.getState().selectedMessageId).toBe(list[1]!.id);
   });
 
-  it("Suche filtert lokal", () => {
+  it("Suche: über alle Ordner aus der Datenbank, „nur hier“, Auswahl bleibt, leeren beendet", async () => {
+    store.searchDelayMs = 0;
     store.setSearchText("nebenkosten");
+    await store.runSearch();
     expect(visibleMessages(store.getState()).map((m) => m.subject)).toEqual(["Nebenkostenabrechnung 2025"]);
-    store.setSearchText("petra");
-    expect(visibleMessages(store.getState())).toHaveLength(2);
+    // Treffer außerhalb des gewählten Ordners (gesendete Mail an Petra liegt nicht im Posteingang)
+    store.setSearchText("von:anna petra");
+    await store.runSearch();
+    const all = visibleMessages(store.getState()).length;
+    store.setSearchAllFolders(false);
+    await store.runSearch();
+    expect(visibleMessages(store.getState()).length).toBeLessThanOrEqual(all);
+    store.setSearchAllFolders(true);
+
+    store.setSearchText("grillabend");
+    await store.runSearch();
+    const hit = visibleMessages(store.getState())[0]!;
+    await store.selectMessage(hit.id);
+    await store.reload();
+    expect(store.getState().selectedMessageId).toBe(hit.id);
+    expect(selectedMessage(store.getState())?.subject).toContain("Grillabend");
+
     store.setSearchText("   ");
-    expect(visibleMessages(store.getState())).toHaveLength(store.getState().messages.length);
+    expect(store.getState().searchResults).toBeNull();
+    expect(visibleMessages(store.getState())).toBe(store.getState().messages);
+  });
+
+  it("Ordnerwechsel beendet eine Suche in allen Ordnern", async () => {
+    store.searchDelayMs = 0;
+    store.setSearchText("nebenkosten");
+    await store.runSearch();
+    await store.selectScope({ kind: "flagged" });
+    expect(store.getState().searchText).toBe("");
+    expect(store.getState().searchResults).toBeNull();
   });
 
   it("Fehler landen im Zustand statt abzustürzen", async () => {

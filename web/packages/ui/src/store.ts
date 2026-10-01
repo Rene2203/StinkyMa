@@ -1,6 +1,5 @@
 import {
   MessageFlag,
-  displayName,
   isFlagged,
   isRead,
   scopeKey,
@@ -51,6 +50,10 @@ export interface BrowserState {
   messages: Message[];
   selectedMessageId: string | null;
   searchText: string;
+  /** Ergebnisse der Volltextsuche (Datenbank); `null`, solange nicht gesucht wird. */
+  searchResults: Message[] | null;
+  /** Suche in allen Ordnern (Standard) oder nur im gewählten. */
+  searchAllFolders: boolean;
   thread: Message[];
   attachmentsByMessageId: Record<string, Attachment[]>;
   error: string | null;
@@ -77,6 +80,8 @@ export const initialState: BrowserState = {
   messages: [],
   selectedMessageId: null,
   searchText: "",
+  searchResults: null,
+  searchAllFolders: true,
   thread: [],
   attachmentsByMessageId: {},
   error: null,
@@ -91,23 +96,30 @@ export const initialState: BrowserState = {
 
 // --- Abgeleitete Werte ---
 
+/** Die Liste in der Mitte: Suchergebnisse, solange gesucht wird, sonst der gewählte Ordner. */
 export function visibleMessages(state: BrowserState): Message[] {
-  const query = state.searchText.trim().toLocaleLowerCase();
-  if (!query) return state.messages;
-  return state.messages.filter((m) =>
-    [m.subject, displayName(m.from), m.from.address, m.snippet].some((field) => field.toLocaleLowerCase().includes(query)),
-  );
+  return state.searchResults ?? state.messages;
+}
+
+export function isSearching(state: BrowserState): boolean {
+  return state.searchText.trim() !== "";
 }
 
 export function selectedMessage(state: BrowserState): Message | null {
   const id = state.selectedMessageId;
   if (!id) return null;
-  return state.messages.find((m) => m.id === id) ?? state.thread.find((m) => m.id === id) ?? null;
+  return (
+    state.messages.find((m) => m.id === id) ??
+    state.searchResults?.find((m) => m.id === id) ??
+    state.thread.find((m) => m.id === id) ??
+    null
+  );
 }
 
 /** Zeigt die Liste Mails aus mehreren Konten? Dann kennzeichnet die UI das Konto farbig. */
 export function showsAccountIndicator(state: BrowserState): boolean {
-  return state.selectedScope.kind !== "mailbox" && Object.keys(state.accountsById).length > 1;
+  const acrossFolders = state.selectedScope.kind !== "mailbox" || (state.searchResults !== null && state.searchAllFolders);
+  return acrossFolders && Object.keys(state.accountsById).length > 1;
 }
 
 export function sidebarItem(state: BrowserState, scope: MessageScope): SidebarItem | undefined {
@@ -130,6 +142,10 @@ export class BrowserStore {
   readonly #repository: MailRepository;
   readonly pageSize: number;
   #messagesRequest = 0;
+  #searchRequest = 0;
+  #searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Wartezeit nach der letzten Eingabe, bevor gesucht wird (in Tests 0). */
+  searchDelayMs = 200;
   #threadRequest = 0;
 
   readonly #accounts: AccountsApi | undefined;
@@ -193,9 +209,14 @@ export class BrowserStore {
 
   /** Nach Änderungen von außen (Abgleich, andere Fenster): alles neu laden, Auswahl behalten, nichts als gelesen markieren. */
   async reload(): Promise<void> {
-    await Promise.all([this.loadSidebar(), this.loadMessages(), this.#loadSyncStatus()]);
+    await Promise.all([
+      this.loadSidebar(),
+      this.loadMessages(),
+      this.#loadSyncStatus(),
+      isSearching(this.#state) ? this.runSearch() : Promise.resolve(),
+    ]);
     const selected = this.#state.selectedMessageId;
-    const message = selected ? this.#state.messages.find((m) => m.id === selected) : undefined;
+    const message = selected ? this.#find(selected) : undefined;
     if (!message) return;
     const request = ++this.#threadRequest;
     await this.#guard(async () => {
@@ -428,19 +449,52 @@ export class BrowserStore {
       if (kept && (scope.kind === "unread" || scope.kind === "flagged") && !messages.some((m) => m.id === selected)) {
         messages = [...messages, kept].sort((a, b) => b.date.localeCompare(a.date));
       }
-      const keepSelection = selected !== null && messages.some((m) => m.id === selected);
+      // Auswahl bleibt, solange die Mail noch in der Liste oder in den Suchergebnissen steht.
+      const keepSelection = selected !== null && (messages.some((m) => m.id === selected) || Boolean(this.#state.searchResults?.some((m) => m.id === selected)));
       this.#set({ messages, ...(keepSelection ? {} : { selectedMessageId: null, thread: [], attachmentsByMessageId: {} }) });
     });
   }
 
   async selectScope(scope: MessageScope): Promise<void> {
     if (scopeKey(scope) === scopeKey(this.#state.selectedScope)) return;
-    this.#set({ selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {} });
-    await this.loadMessages();
+    // Ordnerwechsel beendet eine Suche in allen Ordnern; „nur in diesem Ordner“ sucht im neuen Ordner weiter.
+    const keepSearch = isSearching(this.#state) && !this.#state.searchAllFolders;
+    this.#set({
+      selectedScope: scope, selectedMessageId: null, thread: [], attachmentsByMessageId: {},
+      ...(keepSearch ? {} : { searchText: "", searchResults: null }),
+    });
+    await Promise.all([this.loadMessages(), keepSearch ? this.runSearch() : Promise.resolve()]);
   }
 
+  /** Suchtext ändern – gesucht wird kurz nach der letzten Eingabe (nicht bei jedem Tastendruck). */
   setSearchText(searchText: string): void {
     this.#set({ searchText });
+    if (this.#searchTimer) clearTimeout(this.#searchTimer);
+    if (!searchText.trim()) {
+      this.#searchRequest++;
+      this.#set({ searchResults: null });
+      return;
+    }
+    this.#searchTimer = setTimeout(() => void this.runSearch(), this.searchDelayMs);
+  }
+
+  setSearchAllFolders(all: boolean): void {
+    this.#set({ searchAllFolders: all });
+    if (isSearching(this.#state)) void this.runSearch();
+  }
+
+  /** Sucht in der Datenbank (Volltext). Ältere, überholte Anfragen werden verworfen. */
+  async runSearch(): Promise<void> {
+    if (this.#searchTimer) clearTimeout(this.#searchTimer);
+    this.#searchTimer = null;
+    const text = this.#state.searchText;
+    if (!text.trim()) return;
+    const request = ++this.#searchRequest;
+    const scope = this.#state.searchAllFolders ? null : this.#state.selectedScope;
+    await this.#guard(async () => {
+      const results = await this.#repository.search(text, { scope, limit: 300 });
+      if (request === this.#searchRequest) this.#set({ searchResults: results });
+    });
   }
 
   /** Öffnet eine Mail: lädt die Konversation und markiert die Mail als gelesen. */
@@ -451,7 +505,7 @@ export class BrowserStore {
       this.#set({ thread: [], attachmentsByMessageId: {} });
       return;
     }
-    const message = this.#state.messages.find((m) => m.id === id);
+    const message = this.#find(id);
     if (!message) return;
     await this.#guard(async () => {
       const thread = await this.#repository.thread(message.threadId);
@@ -507,7 +561,8 @@ export class BrowserStore {
     const next = this.#selectionAfterRemoving(ids);
     const selected = this.#state.selectedMessageId;
     // Sofort aus der Liste nehmen – nicht auf Datenbank oder Server warten.
-    this.#set({ messages: this.#state.messages.filter((m) => !ids.includes(m.id)) });
+    const keep = (list: Message[]) => list.filter((m) => !ids.includes(m.id));
+    this.#set({ messages: keep(this.#state.messages), searchResults: this.#state.searchResults && keep(this.#state.searchResults) });
     if (selected !== null && ids.includes(selected)) void this.selectMessage(next);
     await this.#guard(async () => {
       await this.#repository.move(ids, role);
@@ -522,7 +577,11 @@ export class BrowserStore {
     // Sofort anzeigen (auch die Zähler), dann speichern. Aus „Ungelesen“/„Markiert“ verschwinden Mails
     // erst beim nächsten Laden, damit die Liste beim Lesen nicht unter dem Mauszeiger wegspringt.
     const before = this.#state.messages.concat(this.#state.thread).filter((m) => ids.includes(m.id));
-    this.#set({ messages: apply(this.#state.messages), thread: apply(this.#state.thread) });
+    this.#set({
+      messages: apply(this.#state.messages),
+      thread: apply(this.#state.thread),
+      searchResults: this.#state.searchResults && apply(this.#state.searchResults),
+    });
     if (flag === "seen") this.#adjustUnreadCounts(before, enabled);
     await this.#repository.setFlag(flag, enabled, ids);
     await this.loadSidebar();
@@ -552,7 +611,11 @@ export class BrowserStore {
   }
 
   #find(id: string): Message | undefined {
-    return this.#state.messages.find((m) => m.id === id) ?? this.#state.thread.find((m) => m.id === id);
+    return (
+      this.#state.messages.find((m) => m.id === id) ??
+      this.#state.searchResults?.find((m) => m.id === id) ??
+      this.#state.thread.find((m) => m.id === id)
+    );
   }
 
   /** Nächste sinnvolle Auswahl, wenn Mails verschwinden: die folgende, sonst die vorherige. */

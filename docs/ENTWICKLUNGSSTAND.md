@@ -5,7 +5,7 @@ nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHA
 
 **Zuletzt aktualisiert:** 30.09.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
-**Aktuelle Phase:** W3 Teil 2 fertig (lokal geprüft) – Test durch den Nutzer mit iCloud steht aus; danach OAuth-Frage (Gmail/Outlook) bzw. W4
+**Aktuelle Phase:** W4 – Suche, IDLE, Infobereich, Anhang-Ansicht (in Arbeit). Gmail vorerst mit App-Passwort (Entscheidung Nutzer).
 
 ## Überblick
 
@@ -248,3 +248,10 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Gmail-Konto. **Offen:** OAuth-Anmeldung (siehe Abwägung im Chat; braucht ein Google-Cloud-Projekt des Nutzers).
   Bekannt: „Alle Nachrichten“ wird für die letzten 30 Tage zusätzlich geladen (Posteingangsmails doppelt übertragen).
 - **Windows-CI Lauf #44 (Gmail-Anpassungen) grün** – aktueller Installer. Antwort des Nutzers zu App-Passwort vs. OAuth steht aus.
+- **01.10.2026 – Entscheidung Nutzer:** Gmail vorerst per App-Passwort, weiter mit W4 (OAuth später).
+- **W4 Baustein 1 – Volltextsuche:** `search` in beiden Speichern (FTS5 bzw. Textvergleich mit gleicher Logik),
+  `parseSearchQuery`/`ftsExpression` (jede Eingabe als Phrase – keine FTS-Syntax-Injektion), Archiv-Duplikate
+  (Gmail) ausgeblendet. Oberfläche: Suche aus der Datenbank (200 ms nach der letzten Eingabe), „Alle Ordner“/„Nur hier“,
+  Ordnerhinweis, Auswahl bleibt beim Neuladen. Tests: Parser, Vertragstests (Wortanfang, Akzente, von:, Bereich,
+  Sonderzeichen, Sortierung), Store, E2E (Wort aus dem Mailtext einer archivierten Mail). Lokal alle grün.
+  **Ungeprüft:** Tempo mit sehr großen Postfächern auf schwacher Hardware.

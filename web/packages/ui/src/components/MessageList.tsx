@@ -3,7 +3,7 @@ import { displayName, isFlagged, isRead, type Message } from "@stinkyma/core";
 import { useState, type MouseEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { formatListDate } from "../format.js";
-import { showsAccountIndicator, sidebarItem, visibleMessages } from "../store.js";
+import { isSearching, showsAccountIndicator, sidebarItem, visibleMessages } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
 import { ContextMenu, type ContextMenuState } from "./ContextMenu.js";
 import { composeLabels } from "../composeLabels.js";
@@ -16,6 +16,14 @@ export function MessageList() {
   const withAccount = showsAccountIndicator(state);
   const item = sidebarItem(state, state.selectedScope);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const searching = isSearching(state);
+  // Ordnername je Mail (für Suchergebnisse aus allen Ordnern)
+  const folderNames = new Map(
+    state.sections.flatMap((section) =>
+      section.items.flatMap((i) => (i.kind.type === "mailbox" ? [[i.kind.mailbox.id, sidebarTitle(i, t)] as const] : [])),
+    ),
+  );
+  const showFolder = searching && state.searchAllFolders;
 
   const openMenu = (event: MouseEvent, message: Message) => {
     event.preventDefault();
@@ -46,8 +54,26 @@ export function MessageList() {
             aria-label={t("list.search")}
             value={state.searchText}
             onChange={(e) => store.setSearchText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void store.runSearch();
+              if (e.key === "Escape") store.setSearchText("");
+            }}
+            data-testid="search-input"
           />
         </label>
+        {searching && (
+          <div className="search-scope" role="group" aria-label={t("search.scope")}>
+            <button type="button" aria-pressed={state.searchAllFolders} onClick={() => store.setSearchAllFolders(true)} data-testid="search-all">
+              {t("search.allFolders")}
+            </button>
+            <button type="button" aria-pressed={!state.searchAllFolders} onClick={() => store.setSearchAllFolders(false)} data-testid="search-here">
+              {t("search.onlyHere", { folder: item ? sidebarTitle(item, t) : "" })}
+            </button>
+            {state.searchResults && (
+              <span className="muted small" data-testid="search-count">{t("search.count", { count: state.searchResults.length })}</span>
+            )}
+          </div>
+        )}
       </header>
 
       {messages.length === 0 ? (
@@ -64,6 +90,7 @@ export function MessageList() {
               selected={message.id === state.selectedMessageId}
               accountColor={withAccount ? state.accountsById[message.accountId]?.color : undefined}
               accountName={state.accountsById[message.accountId]?.displayName}
+              folderName={showFolder ? folderNames.get(message.mailboxId) : undefined}
               onContextMenu={(e) => openMenu(e, message)}
             />
           ))}
@@ -79,9 +106,10 @@ function MessageRow(props: {
   selected: boolean;
   accountColor: string | undefined;
   accountName: string | undefined;
+  folderName?: string | undefined;
   onContextMenu: (event: MouseEvent) => void;
 }) {
-  const { message, selected, accountColor, accountName } = props;
+  const { message, selected, accountColor, accountName, folderName } = props;
   const { store, t, locale } = useUi();
   const read = isRead(message);
   const flagged = isFlagged(message);
@@ -115,6 +143,7 @@ function MessageRow(props: {
         </div>
         <div className="row-subject">{message.subject}</div>
         <div className="row-snippet">{message.snippet}</div>
+        {folderName && <span className="row-folder" data-testid="row-folder">{folderName}</span>}
         {message.category && <CategoryChip category={message.category} />}
       </div>
       <div className="row-actions" onClick={(e) => e.stopPropagation()}>

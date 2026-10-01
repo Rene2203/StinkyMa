@@ -212,6 +212,26 @@ describe.each(implementations)("MailRepository (%s)", (_name, make) => {
     expect((await repo.suggestAddresses("example", 3)).length).toBeLessThanOrEqual(3);
   });
 
+  it("Suche: Wortanfang, ohne Akzente, mehrere Wörter, von:, Bereich, sicher bei Sonderzeichen", async () => {
+    const repo = make();
+    const subjects = async (q: string, scope?: Parameters<MailRepository["search"]>[1]["scope"]) =>
+      (await repo.search(q, { scope, limit: 50 })).map((m) => m.subject);
+    expect(await subjects("nebenkosten")).toEqual(["Nebenkostenabrechnung 2025"]);
+    expect(await subjects("wochenruckblick")).toEqual(["Wochenrückblick: KI auf dem Gerät und Datenschutz"]);
+    expect(await subjects("website relaunch")).toContain("Angebot Website-Relaunch");
+    expect(await subjects("website zebra")).toEqual([]);
+    const fromJonas = await repo.search("von:jonas", { limit: 50 });
+    expect(fromJonas.length).toBeGreaterThan(0);
+    expect(fromJonas.every((m) => m.from.address.startsWith("jonas"))).toBe(true);
+    expect(await subjects("grillabend", { kind: "mailbox", mailboxId: MockIds.mailbox(MockIds.work, "inbox") })).toEqual([]);
+    for (const tricky of ['"', "*", "(", "AND", "NEAR(", "a\"b", "von:"]) {
+      await expect(repo.search(tricky, { limit: 5 })).resolves.toBeInstanceOf(Array);
+    }
+    expect(await repo.search("   ", { limit: 5 })).toEqual([]);
+    const dates = (await repo.search("re", { limit: 50 })).map((m) => m.date);
+    expect(dates).toEqual([...dates].sort().reverse()); // neueste zuerst
+  });
+
   it("Signatur setzen und wieder entfernen", async () => {
     const repo = make();
     await repo.setSignature(MockIds.iCloud, "<p>Viele Grüße</p>");

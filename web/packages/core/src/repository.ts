@@ -45,6 +45,11 @@ export interface MailRepository {
    * dann häufige und zuletzt genutzte Kontakte. Eigene Adressen fehlen.
    */
   suggestAddresses(query: string, limit: number): Promise<EmailAddress[]>;
+  /**
+   * Volltextsuche (Betreff, Absender, Text) – neueste zuerst. Ohne `scope` in allen Ordnern außer Papierkorb
+   * und Spam. Syntax: Wörter (Wortanfang genügt), "feste Wortgruppe", von:absender.
+   */
+  search(query: string, options: { scope?: MessageScope | null; limit: number }): Promise<Message[]>;
   /** Signatur eines Kontos setzen (leer/`null` = keine Signatur). */
   setSignature(accountId: string, html: string | null): Promise<void>;
 }
@@ -103,6 +108,7 @@ export const mailRepositoryMethods = [
   "openDraft",
   "suggestAddresses",
   "setSignature",
+  "search",
 ] as const satisfies readonly (keyof MailRepository)[];
 
 export type MailRepositoryMethod = (typeof mailRepositoryMethods)[number];

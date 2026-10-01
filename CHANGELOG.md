@@ -1,5 +1,13 @@
 # Changelog
 
+## W4 – Suche, sofortige Zustellung, Infobereich, Anhänge ansehen
+
+### Neu
+- **Volltextsuche** über den SQLite-Index (FTS5): Betreff, Absender und kompletter Mailtext, ohne Akzente,
+  Wortanfang genügt, neueste zuerst. Syntax: Wörter, "feste Wortgruppe", `von:`/`from:` für den Absender.
+  Standard: alle Ordner (ohne Papierkorb/Spam), umschaltbar auf „Nur hier“; Treffer aus anderen Ordnern zeigen
+  den Ordnernamen. Eingaben werden nie als Index-Syntax gelesen (Sonderzeichen sicher). Esc leert die Suche.
+
 ## W3 – Gmail-Vorbereitung
 
 - Gmail (mit App-Passwort): virtuelle Ordner „Markiert“ und „Wichtig“ werden nicht abgeglichen (nur Kopien,

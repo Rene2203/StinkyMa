@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 // Sichere Brücke zum Main-Prozess. Der Renderer sieht nur `window.stinkyma` – kein Node.js, kein Dateizugriff.
 const mailMethods = ["accounts", "mailboxes", "messages", "thread", "message", "attachments", "unreadCount", "overview", "setFlag", "move",
-  "remoteContentExceptions", "addRemoteContentException", "removeRemoteContentException", "send", "reopenOutgoing", "saveDraft", "deleteDraft", "openDraft", "suggestAddresses", "setSignature"];
+  "remoteContentExceptions", "addRemoteContentException", "removeRemoteContentException", "send", "reopenOutgoing", "saveDraft", "deleteDraft", "openDraft", "suggestAddresses", "setSignature", "search"];
 const accountMethods = ["addAccount", "testConnection", "removeAccount", "syncNow", "syncStatus"];
 const fileMethods = ["open", "save"];
 

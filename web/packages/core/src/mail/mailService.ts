@@ -157,6 +157,10 @@ export class MailService implements MailRepository, AccountsApi {
     this.options.onChange?.();
   }
 
+  search(query: string, options: { scope?: MessageScope | null; limit: number }): Promise<Message[]> {
+    return this.repository.search(query, options);
+  }
+
   suggestAddresses(query: string, limit: number): Promise<EmailAddress[]> {
     return this.repository.suggestAddresses(query, limit);
   }

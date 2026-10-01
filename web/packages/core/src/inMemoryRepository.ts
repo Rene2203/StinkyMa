@@ -3,6 +3,7 @@ import { MessageFlag, mailboxRoleRank } from "./models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
 import { requireRemoteContentException } from "./remoteContent.js";
+import { foldText, isEmptySearch, parseSearchQuery } from "./search.js";
 import { normalizeSignature, draftFromMessage, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "./compose.js";
 
 /** `MailRepository` im Arbeitsspeicher – für UI-Tests und Vorschauen, ohne Datenbank. */
@@ -165,6 +166,26 @@ export class InMemoryMailRepository implements MailRepository {
     const draft: ComposeDraft = { ...draftFromMessage(message), draftId: id };
     this.#drafts.set(id, { draft, messageId });
     return draft;
+  }
+
+  async search(query: string, options: { scope?: MessageScope | null; limit: number }): Promise<Message[]> {
+    const parsed = parseSearchQuery(query);
+    if (isEmptySearch(parsed)) return [];
+    // Wortanfang wie bei FTS5: Begriff muss am Anfang eines Wortes stehen
+    const startsWord = (text: string, term: string) => foldText(text).split(/[^\p{L}\p{N}]+/u).some((word) => word.startsWith(foldText(term)));
+    const phraseIn = (text: string, term: string) => (term.includes(" ") ? foldText(text).includes(foldText(term)) : startsWord(text, term));
+    const pool = options.scope
+      ? this.#inScope(options.scope)
+      : this.#data.messages.filter((m) => !["trash", "spam"].includes(this.#roleOf(m.mailboxId) ?? ""));
+    return pool
+      .filter((m) => !this.#isArchiveDuplicate(m))
+      .filter((m) => {
+        const all = [m.subject, m.from.name ?? "", m.from.address, m.snippet, m.bodyText ?? ""].join(" ");
+        const sender = `${m.from.name ?? ""} ${m.from.address}`;
+        return parsed.terms.every((t) => phraseIn(all, t)) && parsed.from.every((t) => phraseIn(sender, t));
+      })
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, options.limit);
   }
 
   async setSignature(accountId: string, html: string | null): Promise<void> {

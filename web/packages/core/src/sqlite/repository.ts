@@ -13,6 +13,7 @@ import type {
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 import { requireRemoteContentException } from "../remoteContent.js";
+import { ftsExpression, isEmptySearch, parseSearchQuery } from "../search.js";
 import { normalizeSignature, draftFromMessage, formatAddressList, localDraftMessage, localSentMessage, rankContacts, type ComposeDraft, type ContactUsage, type OutgoingMail } from "../compose.js";
 import type { OutboxItem } from "../repository.js";
 
@@ -275,6 +276,25 @@ export class SqliteMailRepository implements MailRepository {
 
   async setSignature(accountId: string, html: string | null): Promise<void> {
     this.db.prepare("UPDATE account SET signatureHtml = ? WHERE id = ?").run(normalizeSignature(html), accountId);
+  }
+
+  // --- Suche ---
+
+  async search(query: string, options: { scope?: MessageScope | null; limit: number }): Promise<Message[]> {
+    const parsed = parseSearchQuery(query);
+    if (isEmptySearch(parsed)) return [];
+    const scope = options.scope ? scopeCondition(options.scope) : { sql: "mailbox.role NOT IN ('trash', 'spam')", params: [] };
+    const rows = this.db
+      .prepare(
+        `SELECT message.* FROM messageFTS
+           JOIN message ON message.rowid = messageFTS.rowid
+           JOIN mailbox ON mailbox.id = message.mailboxId
+          WHERE messageFTS MATCH ? AND ${scope.sql} AND NOT ${archiveDuplicate}
+          ORDER BY message.date DESC
+          LIMIT ?`,
+      )
+      .all(ftsExpression(parsed), ...scope.params, options.limit) as Row[];
+    return rows.map(messageFromRow);
   }
 
   // --- Adressvorschläge ---
