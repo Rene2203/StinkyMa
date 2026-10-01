@@ -276,3 +276,5 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   echtes PDF → Seite gerendert, Suche findet Anhang-Text). **W4 damit komplett.** Lokal alle Tests + 3 E2E grün.
   **Bekannt:** bereits abgerufene Mails haben noch keinen Anhang-Text (kein erneuter Download); gescannte PDFs ohne
   Textebene bleiben unauffindbar (Texterkennung/OCR später). **Ungeprüft:** Tempo der PDF-Auslese auf dem N97.
+- **Windows-CI Lauf #53 (W4 komplett) grün** – aktueller Installer (alle W4-Läufe #47, #49, #51, #53 grün).
+  Test durch den Nutzer und Entscheidung zu W5 stehen aus.
