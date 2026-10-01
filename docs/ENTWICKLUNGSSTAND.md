@@ -247,3 +247,4 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   \\All = Archiv, Archiv-Kopien in „Markiert“ nur einmal (beide Speicher, Vertragstest). **Ungeprüft:** echtes
   Gmail-Konto. **Offen:** OAuth-Anmeldung (siehe Abwägung im Chat; braucht ein Google-Cloud-Projekt des Nutzers).
   Bekannt: „Alle Nachrichten“ wird für die letzten 30 Tage zusätzlich geladen (Posteingangsmails doppelt übertragen).
+- **Windows-CI Lauf #44 (Gmail-Anpassungen) grün** – aktueller Installer. Antwort des Nutzers zu App-Passwort vs. OAuth steht aus.
