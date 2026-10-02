@@ -5,3 +5,4 @@ export * from "./aiService.js";
 export * from "./runtimeStore.js";
 export * from "./llamaServer.js";
 export * from "./subscriptionService.js";
+export * from "./userCategoryService.js";

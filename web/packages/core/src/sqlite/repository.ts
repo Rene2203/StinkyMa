@@ -54,7 +54,7 @@ export function messageFromRow(r: Row): Message {
     to: json<EmailAddress[]>(r.to), cc: json<EmailAddress[]>(r.cc),
     subject: str(r.subject), date: str(r.date), snippet: str(r.snippet),
     bodyText: optStr(r.bodyText), bodyHtml: optStr(r.bodyHTML), flags: num(r.flags),
-    hasAttachments: bool(r.hasAttachments), category: optStr(r.category) as MessageCategory | null,
+    hasAttachments: bool(r.hasAttachments), category: optStr(r.category) as MessageCategory | null, userCategory: optStr(r.userCategory),
     priorityScore: optNum(r.priorityScore), snoozedUntil: optStr(r.snoozedUntil),
   };
 }
@@ -100,6 +100,13 @@ export function scopeCondition(scope: MessageScope): { sql: string; params: unkn
       return { sql: `message.mailboxId = ? AND NOT ${screenedOut}`, params: [scope.mailboxId] };
     case "screener":
       return { sql: `mailbox.role = ? AND ${pendingSender}`, params: ["inbox"] };
+    case "category": {
+      const own = scope.category.startsWith("u:");
+      return {
+        sql: `mailbox.role IN ('inbox', 'archive', 'custom') AND NOT ${archiveDuplicate} AND NOT ${screenedOut} AND ${own ? "message.userCategory" : "message.category"} = ?`,
+        params: [own ? scope.category.slice(2) : scope.category],
+      };
+    }
   }
 }
 

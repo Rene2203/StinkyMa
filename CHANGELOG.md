@@ -25,6 +25,19 @@
     abgebucht …). „19 % MwSt.“ gilt nicht mehr als Werbung. Englische Beträge („€9.98“) und „will renew … on“ erkennen
     jetzt auch die Regeln.
   - Migration `v17-subscription-mails`.
+- **Kategorien in der Seitenleiste und eigene Kategorien** (Wunsch des Nutzers):
+  - Neuer Abschnitt **„Kategorien“** unter „Übersicht“ (einklappbar): ein Klick zeigt alle Mails dieser Kategorie über
+    alle Konten (Posteingang, Archiv, eigene Ordner) – für die eigenen Kategorien und, wenn die KI an ist, auch für die
+    feste Einordnung (Persönlich, Rechnung, Newsletter …). Mit Zahl der ungelesenen Mails.
+  - **Eigene Kategorie anlegen** („+“): Name, wofür sie da ist (das liest die KI), Absender/Domains, die immer
+    dazugehören (klappt auch ohne KI), Farbe. Bearbeiten und Löschen (Mails bleiben, nur die Zuordnung fällt weg).
+  - Die eigene Kategorie ist ein **zweites Etikett**: Die feste Einordnung bleibt, damit Schutz beim Aufräumen, Abos und
+    Tagesüberblick weiter funktionieren. Reihenfolge: von Hand gesetzt → für den Absender gemerkt → Absenderliste → KI.
+  - **An der Mail ändern** (Auswahl neben der Einordnung), standardmäßig für den Absender gemerkt – seine anderen Mails folgen.
+  - Die **lokale KI** prüft in einem eigenen kurzen Schritt („welche eigene Kategorie passt – oder keine“), im
+    Hintergrund, die neuesten 300 Mails und alle neuen; ändern sich die Kategorien, prüft sie neu. Der gemessene Prompt
+    der festen Einordnung bleibt unverändert.
+  - Migration `v18-user-categories`.
 
 ## Aufräumen und mehr Mails (nach W6)
 

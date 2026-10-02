@@ -7,6 +7,7 @@ import { attachmentIcon } from "../icons.js";
 import { selectedMessage, threadFor } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
 import { CategoryPicker } from "./CategoryPicker.js";
+import { UserCategoryPicker } from "./UserCategoryPicker.js";
 import { composeLabels } from "../composeLabels.js";
 import { SafeHtml } from "./SafeHtml.js";
 import { SummaryCard } from "./SummaryCard.js";
@@ -105,7 +106,10 @@ export function MessageDetail() {
         <div className="detail-content">
           <h2 className="thread-subject" data-testid="thread-subject">{message.subject}</h2>
           {isDraft && <p className="draft-banner"><Pencil size={14} aria-hidden="true" /> {t("draft.banner")}</p>}
-          {state.ai && !isDraft ? <CategoryPicker message={message} /> : message.category && <CategoryChip category={message.category} />}
+          <div className="detail-categories">
+            {state.ai && !isDraft ? <CategoryPicker message={message} /> : message.category && <CategoryChip category={message.category} />}
+            {store.canUserCategories && !isDraft && <UserCategoryPicker message={message} />}
+          </div>
           {state.selectedScope.kind === "screener" && <ScreenerBar message={message} />}
           {!isDraft && (
             <PhishingBanner

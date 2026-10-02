@@ -3318,3 +3318,146 @@ dialog.webpanel::backdrop {
     border-right: none;
   }
 }
+
+/* Eigene Kategorien */
+
+.sidebar-heading-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.ucat-item {
+  position: relative;
+}
+
+.ucat-item .ucat-edit {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+
+.ucat-item:hover .ucat-edit,
+.ucat-item .ucat-edit:focus-visible {
+  opacity: 1;
+}
+
+.ucat-item:hover .badge {
+  visibility: hidden;
+}
+
+.ucat-dot {
+  width: 18px;
+  display: inline-flex;
+  justify-content: center;
+  flex: none;
+}
+
+.ucat-dot .account-dot {
+  width: 10px;
+  height: 10px;
+}
+
+.ucat-checking {
+  margin: 2px 12px 0;
+}
+
+.ucat-chip .account-dot,
+.ucat-option .account-dot {
+  display: inline-block;
+}
+
+.ucat-chip.color-blue, .ucat-chip.color-green, .ucat-chip.color-orange, .ucat-chip.color-purple,
+.ucat-chip.color-pink, .ucat-chip.color-teal, .ucat-chip.color-red, .ucat-chip.color-yellow {
+  color: var(--account-color);
+  background: color-mix(in srgb, var(--account-color) 14%, transparent);
+}
+
+.detail-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.ucat-textarea {
+  font: inherit;
+  font-weight: 400;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  resize: vertical;
+}
+
+.ucat-colors {
+  display: flex;
+  gap: 10px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.ucat-colors legend {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.dialog .ucat-color {
+  flex-direction: row;
+  cursor: pointer;
+}
+
+.ucat-color input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.ucat-color .account-dot {
+  width: 22px;
+  height: 22px;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.ucat-color input:checked + .account-dot {
+  border-color: var(--bg);
+  box-shadow: 0 0 0 2px var(--account-color);
+}
+
+.ucat-color input:focus-visible + .account-dot {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dialog-footer .ucat-remove {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--danger);
+}
+
+.row-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sidebar-subsection {
+  margin-top: 10px;
+}

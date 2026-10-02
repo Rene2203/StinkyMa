@@ -277,6 +277,39 @@ test("Abos: „Das ist ein Abo“ per Rechtsklick, von Hand durchsuchen, zusamme
   await expect(page.getByTestId("thread-subject")).toContainText("Probeabo");
 });
 
+test("Eigene Kategorie: anlegen mit Absender, Filter in der Seitenleiste, an der Mail ändern und für den Absender merken", async () => {
+  await page.getByTestId("ucat-new").click();
+  const dialog = page.getByTestId("category-dialog");
+  await dialog.getByTestId("ucat-name").fill("Verein");
+  await dialog.getByTestId("ucat-description").fill("Sportverein, Training, Vereinsfeste");
+  await dialog.getByTestId("ucat-senders").fill("tsv-musterstadt.example");
+  await dialog.getByTestId("ucat-save").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId("list-title")).toHaveText("Verein");
+  await expect(rows()).toHaveCount(1);
+  await expect(rows().first().getByTestId("ucat-chip")).toHaveText("Verein");
+  await shot("33-Eigene-Kategorie");
+
+  // Andere Mail von Hand zuordnen, für den Absender merken
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  const other = rows().filter({ hasText: "Stadtwerke" }).first();
+  await other.click();
+  await page.getByTestId("ucat-picker").click();
+  await page.getByTestId("ucat-option-Verein").click();
+  await expect(page.getByTestId("ucat-note")).toBeVisible();
+  await expect(page.getByTestId("ucat-picker")).toContainText("Verein");
+  await page.getByTestId("sidebar-ucat-Verein").click();
+  await expect(rows()).toHaveCount(2);
+
+  // Bearbeiten: umbenennen; Löschen nimmt nur die Zuordnung weg
+  await page.getByTestId("sidebar-ucat-Verein").hover();
+  await page.getByRole("button", { name: "„Verein“ bearbeiten" }).click();
+  page.once("dialog", (d) => void d.accept());
+  await page.getByTestId("ucat-remove").click();
+  await expect(page.getByTestId("sidebar-ucat-Verein")).toHaveCount(0);
+  await expect(page.getByTestId("list-title")).toHaveText("Alle Posteingänge");
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

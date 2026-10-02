@@ -117,6 +117,8 @@ export interface Message {
   flags: number;
   hasAttachments: boolean;
   category?: MessageCategory | null;
+  /** Eigene Kategorie des Nutzers (ID aus `userCategory`), zusätzlich zur festen Einordnung */
+  userCategory?: string | null;
   priorityScore?: number | null;
   snoozedUntil?: string | null;
 }
@@ -159,10 +161,12 @@ export type MessageScope =
   | { kind: "flagged" }
   | { kind: "mailbox"; mailboxId: string }
   /** Türsteher: Mails neuer Absender, die noch auf „Erlauben“ oder „Blockieren“ warten */
-  | { kind: "screener" };
+  | { kind: "screener" }
+  /** Alle Mails einer Kategorie (Posteingang, Archiv, eigene Ordner): feste Kategorie oder eigene als `u:<id>` */
+  | { kind: "category"; category: string };
 
 export function scopeKey(scope: MessageScope): string {
-  return scope.kind === "mailbox" ? `mailbox:${scope.mailboxId}` : scope.kind;
+  return scope.kind === "mailbox" ? `mailbox:${scope.mailboxId}` : scope.kind === "category" ? `category:${scope.category}` : scope.kind;
 }
 
 export function isRead(message: Pick<Message, "flags">): boolean {

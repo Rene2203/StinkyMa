@@ -12,6 +12,7 @@ const taskKey: Record<AITask, MessageKey> = {
   parseRule: "aiActivity.parseRule",
   draftReply: "aiActivity.draftReply",
   extractSubscription: "aiActivity.extractSubscription",
+  userCategory: "aiActivity.userCategory",
 };
 
 /** Sekunden seit `iso`, jede Sekunde neu – damit man sieht, dass sich etwas tut. */

@@ -286,6 +286,11 @@ export class InMemoryMailRepository implements MailRepository {
           return role !== "trash" && (m.flags & MessageFlag.flagged) !== 0 && !this.#isArchiveDuplicate(m);
         case "mailbox":
           return m.mailboxId === scope.mailboxId;
+        case "category": {
+          if (role !== "inbox" && role !== "archive" && role !== "custom") return false;
+          if (this.#isArchiveDuplicate(m)) return false;
+          return scope.category.startsWith("u:") ? m.userCategory === scope.category.slice(2) : m.category === scope.category;
+        }
       }
     });
   }

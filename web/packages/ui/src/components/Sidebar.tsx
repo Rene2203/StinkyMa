@@ -7,6 +7,7 @@ import { sidebarIcon } from "../icons.js";
 import type { SidebarItem } from "../store.js";
 import type { Translate } from "../i18n.js";
 import { AccountDialog } from "./AccountDialog.js";
+import { CategoriesSection } from "./CategoriesSection.js";
 
 export function sidebarTitle(item: SidebarItem, t: Translate): string {
   switch (item.kind.type) {
@@ -123,6 +124,7 @@ export function Sidebar() {
               </li>
             )}
           </ul>
+          {section.id === "smart" && <CategoriesSection />}
         </section>
       ))}
       <footer className="sidebar-footer">

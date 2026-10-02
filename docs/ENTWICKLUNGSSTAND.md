@@ -535,5 +535,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Messung unverändert (Regeln Kontrollsatz 2: 51,2 %, E2B 90,2 %). **Ungeprüft:** echte Mails des Nutzers (Nexus Mods, PDF-Rechnungen),
   Dauer von „Alles neu prüfen“ mit KI bei vielen Rechnungen, Windows-CI. Bekannte Grenze: „beginnt mit“-Vergleich der
   Namen kann ähnlich benannte Anbieter zusammenlegen (z. B. „Google“ und „Google One“) – Trennen gibt es noch nicht.
-  Als Nächstes: W7.2 Belegordner (oder vorher eigene Kategorien, siehe Frage des Nutzers).
+- **Kategorien-Filter und eigene Kategorien (02.10.2026) – gebaut, lokal geprüft:** Wunsch des Nutzers (vor W7.2).
+  Seitenleiste „Kategorien“ unter „Übersicht“: Filter über alle Konten für eigene und (mit KI) feste Kategorien.
+  Eigene Kategorie = zweites Etikett, feste Einordnung bleibt (Schutz beim Aufräumen, Abos, Tagesüberblick unverändert).
+  Zuordnung: von Hand → gemerkter Absender → Absenderliste der Kategorie → lokales Modell (eigener kurzer Prompt, der
+  gemessene Einordnungs-Prompt bleibt unverändert; neueste 300 Mails + neue, neu prüfen bei geänderten Kategorien).
+  Migration v18. Tests: 6 Unit-Tests (Kern), 1 Store-Test, 1 E2E (anlegen mit Absender, Filter, an der Mail ändern
+  und merken, bearbeiten/löschen). Messung siehe `docs/KI-MESSUNG.md` („Eigene Kategorien“): Messung v1 gegen v2 läuft noch (erster Lauf v1: E2B erkennt alle 20 Mails mit Kategorie, ordnet aber 5 von 10 ohne passende Kategorie trotzdem zu).
+  **Ungeprüft:** echte Postfächer, Dauer des KI-Durchgangs auf schwacher Hardware bei 300 Mails, Windows-CI.
+  Als Nächstes: W7.2 Belegordner.
 

@@ -1,8 +1,9 @@
-import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi, SubscriptionsApi } from "@stinkyma/core";
+import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi, SubscriptionsApi, UserCategoriesApi } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
 import { CleanupDialog } from "./components/CleanupDialog.js";
+import { CategoryDialog } from "./components/CategoryDialog.js";
 import { WebPanelDialog } from "./components/WebPanelDialog.js";
 import { SubscriptionsPanel } from "./components/SubscriptionsPanel.js";
 import { DigestDialog } from "./components/DigestDialog.js";
@@ -33,6 +34,8 @@ export interface AppProps {
   cleanup?: CleanupApi;
   webPanel?: WebPanelHost;
   subscriptions?: SubscriptionsApi;
+  /** Eigene Kategorien */
+  categories?: UserCategoriesApi;
   /** Meldet Statusänderungen der KI (Download-Fortschritt usw.). */
   subscribeAIStatus?: (onStatus: (status: AIStatus) => void) => () => void;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
@@ -43,8 +46,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions]);
+export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
@@ -96,6 +99,7 @@ function Shell() {
       )}
       {state.digest && <DigestDialog />}
       {state.cleanup && <CleanupDialog />}
+      {state.categoryDialog && <CategoryDialog />}
       {state.webPanel && <WebPanelDialog />}
       {state.options && <OptionsDialog suggestion={state.options.suggestion} onClose={() => store.closeOptions()} />}
       {state.error && (

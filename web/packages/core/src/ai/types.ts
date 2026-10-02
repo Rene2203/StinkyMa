@@ -5,7 +5,7 @@
 export type PrivacyClass = "onDevice" | "ownServer" | "cloud";
 
 /** Aufgaben der KI (5.5). Weitere folgen in späteren Phasen. */
-export type AITask = "categorize" | "summarize" | "readImage" | "extractActions" | "parseRule" | "draftReply" | "extractSubscription";
+export type AITask = "categorize" | "summarize" | "readImage" | "extractActions" | "parseRule" | "draftReply" | "extractSubscription" | "userCategory";
 
 /** Bild als Eingabe (Foto, Scan, Bildschirmfoto) – nur für Modelle mit Bild-Baustein. */
 export interface AIImage {

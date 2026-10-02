@@ -12,3 +12,5 @@ export * from "./rules.js";
 export * from "./replies.js";
 export * from "./subscriptions.js";
 export * from "./evalSubscriptions.js";
+export * from "./userCategories.js";
+export * from "./evalUserCategories.js";

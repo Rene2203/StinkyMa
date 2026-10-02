@@ -1,3 +1,6 @@
+import { classifyUserCategory } from "./userCategories.js";
+import { evalUserCategoryCases, evalUserCategoryDefs, evalUserCategoryHoldout, evalUserCategoryHoldoutDefs } from "./evalUserCategories.js";
+import type { UserCategory } from "../userCategories.js";
 import type { Message, MessageCategory } from "../models.js";
 import { evalActionCases, evalHoldoutMails, evalMails, evalRelativeMails, evalReplyCases, evalRuleCases, evalRuleFolders, evalRuleHoldout, evalThreads, type EvalActionCase, type EvalMail, type EvalThread } from "./evalSet.js";
 import { extractActions, ruleActions, type MailAction } from "./actions.js";
@@ -484,6 +487,75 @@ export async function evaluateSubscriptions(provider: AIProvider | null, options
 export function formatSubscriptionsReports(reports: SubscriptionsEvalReport[]): string {
   const lines = ["| Verfahren | Satz | Abos erkannt | Fehlalarme | Angaben richtig | Zeit (Median) |", "|---|---|---|---|---|---|"];
   for (const r of reports) for (const s of r.sets) lines.push(`| ${r.name} | ${s.label} | ${s.detected}/${s.total} | ${s.falsePositives} | ${percent(s.fieldsTotal ? s.fieldsCorrect / s.fieldsTotal : 0)} (von ${s.fieldsTotal}) | ${seconds(r.medianMs)} |`);
+  for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
+  return lines.join("\n");
+}
+
+export interface UserCategoriesEvalReport {
+  name: string;
+  sets: {
+    label: string;
+    /** Richtig (Kategorie oder „keine“) */
+    correct: number;
+    total: number;
+    /** Mails mit Kategorie: richtig erkannt / alle */
+    found: number;
+    withCategory: number;
+    /** Mails ohne Kategorie, die trotzdem eine bekamen */
+    falseAssignments: number;
+    /** Mail mit Kategorie, aber die falsche */
+    wrongCategory: number;
+  }[];
+  medianMs: number;
+  misses: string[];
+}
+
+/** Eigene Kategorien: nur mit Modell (Absenderlisten sind Code und brauchen keine Messung). */
+export async function evaluateUserCategories(
+  provider: AIProvider,
+  options: { promptVersion?: 1 | 2; onProgress?: (done: number, total: number) => void } = {},
+): Promise<UserCategoriesEvalReport> {
+  const router = new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() });
+  const report: UserCategoriesEvalReport = { name: `${provider.displayName} v${options.promptVersion ?? 2}`, sets: [], medianMs: 0, misses: [] };
+  const durations: number[] = [];
+  const all = [
+    ["Testsatz", evalUserCategoryDefs, evalUserCategoryCases],
+    ["Kontrollsatz", evalUserCategoryHoldoutDefs, evalUserCategoryHoldout],
+  ] as const;
+  const totalCases = all.reduce((n, [, , cases]) => n + cases.length, 0);
+  let done = 0;
+  for (const [label, defs, cases] of all) {
+    const categories: UserCategory[] = defs.map((c, i) => ({ ...c, senders: [], color: "blue", sortOrder: i }));
+    const entry = { label, correct: 0, total: 0, found: 0, withCategory: 0, falseAssignments: 0, wrongCategory: 0 };
+    for (const testCase of cases as readonly { mail: Omit<EvalMail, "expected">; expected: string | null }[]) {
+      const result = await classifyUserCategory(router, evalMailToMessage({ ...testCase.mail, expected: "personal" }), categories, { promptVersion: options.promptVersion ?? 2 });
+      if (result.origin !== "rules") durations.push(result.durationMs);
+      const got = result.categoryId;
+      entry.total++;
+      if (testCase.expected) entry.withCategory++;
+      if (got === testCase.expected) {
+        entry.correct++;
+        if (got) entry.found++;
+      } else {
+        if (!testCase.expected) entry.falseAssignments++;
+        else if (got) entry.wrongCategory++;
+        report.misses.push(`${testCase.mail.id}: erwartet ${testCase.expected ?? "keine"}, bekommen ${got ?? "keine"}`);
+      }
+      options.onProgress?.(++done, totalCases);
+    }
+    report.sets.push(entry);
+  }
+  report.medianMs = median(durations);
+  return report;
+}
+
+export function formatUserCategoriesReports(reports: UserCategoriesEvalReport[]): string {
+  const lines = ["| Modell | Satz | Richtig | Kategorie erkannt | Fälschlich zugeordnet | Falsche Kategorie | Zeit (Median) |", "|---|---|---|---|---|---|---|"];
+  for (const r of reports) {
+    for (const s of r.sets) {
+      lines.push(`| ${r.name} | ${s.label} | ${s.correct}/${s.total} (${percent(s.correct / s.total)}) | ${s.found}/${s.withCategory} | ${s.falseAssignments}/${s.total - s.withCategory} | ${s.wrongCategory} | ${seconds(r.medianMs)} |`);
+    }
+  }
   for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
   return lines.join("\n");
 }

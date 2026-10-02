@@ -474,6 +474,32 @@ export const migrations: Migration[] = [
       CREATE INDEX subscription_on_provider ON subscription(accountId, providerKey);
     `,
   },
+  {
+    // Eigene Kategorien: zusätzlich zur festen Einordnung (die bleibt für Schutz beim Aufräumen, Abos, Tagesüberblick).
+    // `userCategoryChecked`: Stand der Kategorien, gegen den das Modell die Mail geprüft hat (ändern sie sich, neu prüfen).
+    name: "v18-user-categories",
+    sql: `
+      CREATE TABLE userCategory (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        senders TEXT NOT NULL DEFAULT '[]',
+        color TEXT NOT NULL,
+        sortOrder INTEGER NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+      ALTER TABLE message ADD COLUMN userCategory TEXT;
+      ALTER TABLE message ADD COLUMN userCategoryOrigin TEXT;
+      ALTER TABLE message ADD COLUMN userCategoryChecked TEXT;
+      CREATE INDEX message_on_userCategory ON message(userCategory);
+      CREATE TABLE senderUserCategory (
+        address TEXT PRIMARY KEY NOT NULL,
+        categoryId TEXT NOT NULL REFERENCES userCategory(id) ON DELETE CASCADE,
+        learnedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

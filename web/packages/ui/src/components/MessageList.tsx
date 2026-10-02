@@ -1,10 +1,13 @@
 import { Archive, Flag, FlagOff, Mail, MailOpen, Paperclip, Search, ShieldAlert, SquarePen, Trash2 } from "lucide-react";
-import { assessPhishing, displayName, isFlagged, isRead, type Message } from "@stinkyma/core";
+import { assessPhishing, displayName, isFlagged, isRead, type Message, type MessageScope } from "@stinkyma/core";
+import type { BrowserState } from "../store.js";
+import type { MessageKey, Translate } from "../i18n.js";
 import { useState, type MouseEvent } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { formatListDate } from "../format.js";
 import { isSearching, showsAccountIndicator, sidebarItem, visibleMessages } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
+import { UserCategoryChip } from "./UserCategoryPicker.js";
 import { ContextMenu, type ContextMenuState } from "./ContextMenu.js";
 import { composeLabels } from "../composeLabels.js";
 import { sidebarTitle } from "./Sidebar.js";
@@ -31,10 +34,10 @@ export function MessageList() {
   };
 
   return (
-    <section className="message-list" aria-label={item ? sidebarTitle(item, t) : undefined}>
+    <section className="message-list" aria-label={item ? sidebarTitle(item, t) : scopeTitle(state, state.selectedScope, t) || undefined}>
       <header className="list-header">
         <div className="list-title-row">
-          <h2 className="list-title">{item ? sidebarTitle(item, t) : ""}</h2>
+          <h2 className="list-title" data-testid="list-title">{item ? sidebarTitle(item, t) : scopeTitle(state, state.selectedScope, t)}</h2>
           <button
             type="button"
             className="icon-button"
@@ -106,6 +109,13 @@ export function MessageList() {
   );
 }
 
+/** Titel für Bereiche ohne Eintrag in den Konto-Abschnitten (Kategorien). */
+function scopeTitle(state: BrowserState, scope: MessageScope, t: Translate): string {
+  if (scope.kind !== "category") return "";
+  if (!scope.category.startsWith("u:")) return t(`category.${scope.category}` as MessageKey);
+  return state.userCategories?.categories.find((c) => c.id === scope.category.slice(2))?.name ?? "";
+}
+
 function MessageRow(props: {
   message: Message;
   selected: boolean;
@@ -116,6 +126,8 @@ function MessageRow(props: {
 }) {
   const { message, selected, accountColor, accountName, folderName } = props;
   const { store, t, locale } = useUi();
+  const state = useBrowserState();
+  const ownCategory = message.userCategory ? state.userCategories?.categories.find((c) => c.id === message.userCategory) : undefined;
   const read = isRead(message);
   const flagged = isFlagged(message);
 
@@ -150,7 +162,12 @@ function MessageRow(props: {
         <div className="row-subject">{message.subject}</div>
         <div className="row-snippet">{message.snippet}</div>
         {folderName && <span className="row-folder" data-testid="row-folder">{folderName}</span>}
-        {message.category && <CategoryChip category={message.category} />}
+        {(message.category || ownCategory) && (
+          <div className="row-chips">
+            {message.category && <CategoryChip category={message.category} />}
+            {ownCategory && <UserCategoryChip category={ownCategory} />}
+          </div>
+        )}
       </div>
       <div className="row-actions" onClick={(e) => e.stopPropagation()}>
         <button type="button" title={read ? t("action.markUnread") : t("action.markRead")} onClick={() => void store.toggleRead(message.id)}>

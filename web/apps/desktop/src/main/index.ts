@@ -11,6 +11,7 @@ import {
   rulesApiMethods,
   cleanupApiMethods,
   subscriptionsApiMethods,
+  userCategoriesApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -32,9 +33,9 @@ import {
   type Message,
 } from "@stinkyma/core";
 import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
-import { AIService, ModelStore, RuntimeStore, SubscriptionService } from "@stinkyma/core/llm";
+import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -64,6 +65,8 @@ let ai: AIService | null = null;
 let rules: RuleService | null = null;
 let cleanup: CleanupService | null = null;
 let subscriptions: SubscriptionService | null = null;
+let userCategories: UserCategoryService | null = null;
+let aiWasReady = false;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
 let tray: Tray | null = null;
@@ -168,6 +171,8 @@ function setUpServices(): void {
       await rules?.arrived(messageIds);
       // Neue Mails gleich nach Abos durchsuchen (Regeln sofort, KI im Hintergrund)
       void subscriptions?.scan().catch(() => undefined);
+      // Eigene Kategorien: Absender/Gelerntes sofort, KI im Hintergrund
+      void userCategories?.refresh().catch(() => undefined);
     },
   });
 
@@ -199,7 +204,12 @@ function setUpServices(): void {
     ownAddresses: async () => (await repository.accounts()).map((account) => account.email),
     settings: { load: () => settingsFile?.ai ?? null, save: (next) => settingsFile?.setAI(next) },
     ramGb: Math.round(totalmem() / 2 ** 30),
-    onStatus: (status) => mainWindow?.webContents.send("ai:status", status),
+    onStatus: (status) => {
+      mainWindow?.webContents.send("ai:status", status);
+      // KI gerade bereit geworden: offene Mails gegen die eigenen Kategorien prüfen
+      if (status.ready && !aiWasReady) void userCategories?.refresh().catch(() => undefined);
+      aiWasReady = status.ready;
+    },
     onCategorized: () => {
       notifyRenderer();
       // Regeln, die auf die Einordnung warten („Newsletter ins Archiv“)
@@ -226,6 +236,14 @@ function setUpServices(): void {
     modelReady: () => aiService.modelReady(),
     onChange: notifyRenderer,
   });
+
+  // Eigene Kategorien: von Hand → gelernt → Absenderliste → lokales Modell (falls bereit, im Hintergrund)
+  userCategories = new UserCategoryService({
+    store: new UserCategoryStore(db, () => randomUUID()),
+    classify: (message, categories) => aiService.classifyUserCategory(message, categories),
+    onChange: notifyRenderer,
+  });
+  void userCategories.refresh().catch(() => undefined);
 }
 
 /** Die Oberfläche lädt neu, wenn sich Daten geändert haben (Abgleich, Aktionen, Konten). Gebündelt, um Flackern zu vermeiden. */
@@ -465,6 +483,7 @@ function registerIpc(): void {
     ["rules", new Set<string>(rulesApiMethods), () => rules],
     ["cleanup", new Set<string>(cleanupApiMethods), () => cleanup],
     ["subscriptions", new Set<string>(subscriptionsApiMethods), () => subscriptions],
+    ["categories", new Set<string>(userCategoriesApiMethods), () => userCategories],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {

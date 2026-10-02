@@ -7,6 +7,10 @@ import {
   type SubscriptionsApi,
   type SubscriptionStatus,
   type SubscriptionsView,
+  type UserCategoriesApi,
+  type UserCategoriesView,
+  type UserCategory,
+  type UserCategoryInput,
   type CleanupGroup,
   type CleanupGroupBy,
   type CleanupMail,
@@ -145,6 +149,12 @@ export interface BrowserState {
   panel: "mail" | "subscriptions";
   /** Verträge & Abos (W7.1) */
   subscriptions: { view: SubscriptionsView | null; selectedId: string | null; busy: boolean; error: string | null } | null;
+  /** Eigene Kategorien (Seitenleiste); null = nicht verfügbar oder noch nicht geladen */
+  userCategories: UserCategoriesView | null;
+  /** Dialog „Kategorie anlegen/bearbeiten“; `category` null = neu */
+  categoryDialog: { category: UserCategory | null; busy: boolean; error: string | null } | null;
+  /** Rückmeldung nach eigener Zuordnung (geöffnete Mail) */
+  userCategoryNote: { messageId: string; categoryId: string | null; remembered: boolean; changed: number } | null;
 }
 
 /** Fremde Seite in einem Fenster innerhalb der App (Windows-App: abgeschottete Webansicht im Main-Prozess). */
@@ -266,6 +276,9 @@ export const initialState: BrowserState = {
   webPanel: null,
   panel: "mail",
   subscriptions: null,
+  userCategories: null,
+  categoryDialog: null,
+  userCategoryNote: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -330,10 +343,11 @@ export class BrowserStore {
   readonly #cleanup: CleanupApi | undefined;
   readonly #webPanel: WebPanelHost | undefined;
   readonly #subscriptions: SubscriptionsApi | undefined;
+  readonly #categories: UserCategoriesApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -345,6 +359,70 @@ export class BrowserStore {
     this.#cleanup = options.cleanup;
     this.#webPanel = options.webPanel;
     this.#subscriptions = options.subscriptions;
+    this.#categories = options.categories;
+  }
+
+  // --- Eigene Kategorien ---
+
+  get canUserCategories(): boolean {
+    return Boolean(this.#categories);
+  }
+
+  async loadUserCategories(): Promise<void> {
+    const api = this.#categories;
+    if (!api) return;
+    await this.#guard(async () => this.#set({ userCategories: await api.list() }));
+  }
+
+  openCategoryDialog(category: UserCategory | null = null): void {
+    this.#set({ categoryDialog: { category, busy: false, error: null } });
+  }
+
+  closeCategoryDialog(): void {
+    this.#set({ categoryDialog: null });
+  }
+
+  async saveUserCategory(input: UserCategoryInput): Promise<void> {
+    const api = this.#categories;
+    const dialog = this.#state.categoryDialog;
+    if (!api || !dialog) return;
+    this.#set({ categoryDialog: { ...dialog, busy: true, error: null } });
+    try {
+      const saved = await api.save(input);
+      this.#set({ categoryDialog: null });
+      await this.loadUserCategories();
+      // Neu angelegt: gleich anzeigen, was schon dazugehört
+      if (!dialog.category) await this.selectScope({ kind: "category", category: `u:${saved.id}` });
+      else await this.reload();
+    } catch (e) {
+      this.#set({ categoryDialog: { ...dialog, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  async removeUserCategory(id: string): Promise<void> {
+    const api = this.#categories;
+    if (!api) return;
+    await this.#guard(async () => {
+      await api.remove(id);
+      this.#set({ categoryDialog: null });
+      if (this.#state.selectedScope.kind === "category" && this.#state.selectedScope.category === `u:${id}`) await this.selectScope({ kind: "unifiedInbox" });
+      await this.reload();
+    });
+  }
+
+  /** Eigene Kategorie einer Mail von Hand setzen (`null`: keine). */
+  async assignUserCategory(messageId: string, categoryId: string | null, remember: boolean): Promise<void> {
+    const api = this.#categories;
+    if (!api) return;
+    await this.#guard(async () => {
+      const { changed } = await api.assign(messageId, categoryId, remember);
+      this.#set({ userCategoryNote: { messageId, categoryId, remembered: remember, changed } });
+      await this.reload();
+    });
+  }
+
+  closeUserCategoryNote(): void {
+    this.#set({ userCategoryNote: null });
   }
 
   // --- Verträge & Abos (W7.1) ---
@@ -1127,6 +1205,7 @@ export class BrowserStore {
       this.#loadAppSettings(),
       this.#loadAI(),
       this.#loadOAuthProviders(),
+      this.loadUserCategories(),
     ]);
   }
 
@@ -1140,6 +1219,7 @@ export class BrowserStore {
       // Aufräumen offen: Schutz der gewählten Gruppe auffrischen (z. B. nach KI-Einordnung)
       this.#state.cleanup?.group?.mails ? this.#loadCleanupMails() : Promise.resolve(),
       this.#state.panel === "subscriptions" ? this.#loadSubscriptions() : Promise.resolve(),
+      this.loadUserCategories(),
     ]);
     const selected = this.#state.selectedMessageId;
     const message = selected ? this.#find(selected) : undefined;
@@ -1467,6 +1547,7 @@ export class BrowserStore {
     if (this.#state.actions?.messageId !== id) this.#set({ actions: null });
     if (this.#state.replies && this.#state.replies.messageId !== id) this.#set({ replies: null });
     if (this.#state.categoryNote && this.#state.categoryNote.messageId !== id) this.#set({ categoryNote: null });
+    if (this.#state.userCategoryNote && this.#state.userCategoryNote.messageId !== id) this.#set({ userCategoryNote: null });
     void this.#loadCachedSummary();
     void this.#loadActions(id);
     void this.loadUnsubscribe(id);

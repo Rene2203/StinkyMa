@@ -20,3 +20,4 @@ export * from "./digest.js";
 export * from "./cleanup.js";
 export * from "./unsubscribe.js";
 export * from "./subscriptions.js";
+export * from "./userCategories.js";

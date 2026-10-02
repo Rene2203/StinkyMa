@@ -352,3 +352,41 @@ describe("BrowserStore", () => {
     expect(sidebarItem(s.getState(), { kind: "screener" })).toBeUndefined();
   });
 });
+
+describe("Eigene Kategorien", () => {
+  it("Kategorie anlegen öffnet ihren Bereich; Zuordnung an der Mail lädt neu; Fehler bleiben im Dialog", async () => {
+    const data = createMockData();
+    const first = data.messages[0]!;
+    first.userCategory = "c1"; // so ordnet der (gedachte) Dienst die Mail beim Anlegen zu
+    const repository = new InMemoryMailRepository(data);
+    const categories: import("@stinkyma/core").UserCategory[] = [];
+    const calls: string[] = [];
+    const api: import("@stinkyma/core").UserCategoriesApi = {
+      list: async () => ({ categories: [...categories], unread: {}, checking: null }),
+      save: async (input) => {
+        if (input.name === "Doppelt") throw new Error("Eine Kategorie mit diesem Namen gibt es schon.");
+        const saved = { id: "c1", name: input.name, description: input.description, senders: input.senders, color: input.color, sortOrder: 0 };
+        categories.push(saved);
+        return saved;
+      },
+      remove: async () => undefined,
+      assign: async (messageId, categoryId) => {
+        calls.push(`${messageId}:${categoryId}`);
+        return { changed: 2 };
+      },
+    };
+    const store = new BrowserStore(repository, { categories: api });
+    await store.start();
+    expect(store.getState().userCategories?.categories).toEqual([]);
+    store.openCategoryDialog(null);
+    await store.saveUserCategory({ name: "Doppelt", description: "", senders: [], color: "green" });
+    expect(store.getState().categoryDialog?.error).toMatch(/gibt es schon/);
+    await store.saveUserCategory({ name: "Gaming", description: "Spiele", senders: [], color: "green" });
+    expect(store.getState().categoryDialog).toBeNull();
+    expect(store.getState().selectedScope).toEqual({ kind: "category", category: "u:c1" });
+    expect(store.getState().messages.map((m) => m.id)).toEqual([first.id]);
+    await store.assignUserCategory(first.id, "c1", true);
+    expect(calls).toEqual([`${first.id}:c1`]);
+    expect(store.getState().userCategoryNote).toMatchObject({ messageId: first.id, changed: 2, remembered: true });
+  });
+});
