@@ -3,7 +3,7 @@
 Laufendes Protokoll des Zwischenstands. Wird nach jedem größeren Arbeitsschritt aktualisiert –
 nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHANGELOG.md`.
 
-**Zuletzt aktualisiert:** 01.10.2026
+**Zuletzt aktualisiert:** 02.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
 **Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft und vom Nutzer unter Windows mit echtem Gmail-Konto getestet – **W6 abgeschlossen**. Danach (Wunsch des Nutzers): Zeitraum „alle Mails“, **Aufräumen**, **Newsletter abbestellen** (Abmelde-Seite im verschiebbaren Fenster in der App) und Umbenennung in **StinkyMail** – gebaut, lokal geprüft. Als Nächstes: Feinabstimmung der Modelle
 
@@ -524,5 +524,16 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Korrekturen 51 %), mit E2B 80,5 % → nach Korrekturen 90,2 %, E4B 87,8 % (vor Korrekturen).
   Tests: Rechnen/Erkennen/Speicher/Suchlauf (Unit), E2E mit der echten App.
   **Ungeprüft:** echte Postfächer (Trefferquote, Dauer des KI-Durchgangs bei vielen Kandidaten), Windows-CI.
-  Als Nächstes: W7.2 Belegordner.
+- **W7.1 nachgebessert nach erstem Test des Nutzers (02.10.2026) – gebaut, lokal geprüft:** Rückmeldung: Werbung als Abo,
+  Abos nur als Rechnung erkannt, Abos im PDF fehlen, Nexus Mods doppelt (Rechnungen aus August und September), kein
+  manueller Suchlauf. Umgesetzt: ein Eintrag je Abo mit allen Mails (Migration v17 `subscriptionMail`), Zuordnung nach
+  Anbietername/Aliasen über Konten und Domains (Zahlungsdienste nur nach Name), Altduplikate werden beim Suchlauf
+  zusammengeführt, von Hand zusammenführen, „Das ist ein Abo“ an der Mail (Knopf + Rechtsklick), PDF-Text in Regeln und
+  KI, Rechnungen gehen immer an die KI, „Durchsuchen“/„Alles neu prüfen“, Hinweis ohne KI, Werbefilter (Newsletter nicht
+  per Regel, KI-Fund bei Werbung ohne eigene Beziehung verworfen), „19 % MwSt.“ nicht mehr als Werbung, englische Beträge
+  in den Regeln. Tests: 5 neue Unit-Tests, neuer E2E (Rechtsklick → Abo, Alles neu prüfen, Zusammenführen, Mail öffnen).
+  Regeln-Messung unverändert (Kontrollsatz 2: 51,2 %). **Ungeprüft:** echte Mails des Nutzers (Nexus Mods, PDF-Rechnungen),
+  Dauer von „Alles neu prüfen“ mit KI bei vielen Rechnungen, Windows-CI. Bekannte Grenze: „beginnt mit“-Vergleich der
+  Namen kann ähnlich benannte Anbieter zusammenlegen (z. B. „Google“ und „Google One“) – Trennen gibt es noch nicht.
+  Als Nächstes: W7.2 Belegordner (oder vorher eigene Kategorien, siehe Frage des Nutzers).
 

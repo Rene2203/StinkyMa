@@ -8,6 +8,23 @@
   Code). Laufende Kosten pro Monat und Jahr, Erinnerung vor dem Kündigungstag (Windows-Benachrichtigung), korrigieren,
   „ist gekündigt“, „kein Abo“, Mail öffnen. Regeln sofort, die lokale KI prüft im Hintergrund nach. Keine Rechtsberatung,
   StinkyMail kündigt nie selbst. Migration `v16-subscriptions`.
+- **Abos nachgebessert (nach erstem Test):**
+  - **Ein Eintrag je Abo, mit allen Mails**: Rechnungen aus mehreren Monaten landen im selben Eintrag; im Detail stehen
+    alle Mails dazu (Datum, Betreff, Betrag, Klick öffnet). Zugeordnet wird nach Anbietername (auch „NexusMods Premium“ ~
+    „Nexus Mods“, auch über Konten hinweg), sonst nach Absender-Domain – außer bei Zahlungsdiensten (Stripe, PayPal,
+    Paddle …), wo nur der Name zählt. Schon doppelt angelegte Einträge werden beim nächsten Suchlauf zusammengeführt.
+  - **Von Hand zusammenführen** („Doppelt? Zusammenführen mit …“): Mails, fehlende Angaben und Erinnerung wandern mit;
+    künftige Mails beider Absender landen im selben Eintrag.
+  - **„Das ist ein Abo“** an jeder Mail (Knopf in der Mail, Rechtsklick in der Liste): übernimmt die Mail – mit KI, falls
+    bereit, sonst mit dem, was sicher drinsteht (Absender, Betrag, Zahlweise); Ausgeblendetes kommt zurück.
+  - **PDF-Rechnungen**: Text aus PDF-Anhängen wird mitgelesen; Mails, die als Rechnung eingeordnet sind, prüft die KI immer.
+  - **Selbst durchsuchen**: „Durchsuchen“ (neue Mails) und „Alles neu prüfen“ (auch schon Geprüftes, KI im Hintergrund).
+    Hinweis, wenn keine KI eingeschaltet ist.
+  - **Weniger Werbung**: Newsletter werden nicht per Regel als Abo erkannt; die KI-Antwort wird verworfen, wenn die Mail
+    nach Werbung aussieht (Rabatt, „jetzt abonnieren“) und nichts auf ein eigenes Abo deutet (Rechnungsnummer, „Ihr Abo“,
+    abgebucht …). „19 % MwSt.“ gilt nicht mehr als Werbung. Englische Beträge („€9.98“) und „will renew … on“ erkennen
+    jetzt auch die Regeln.
+  - Migration `v17-subscription-mails`.
 
 ## Aufräumen und mehr Mails (nach W6)
 

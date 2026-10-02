@@ -222,7 +222,8 @@ function setUpServices(): void {
   // Verträge & Abos (W7.1): Regeln sofort, lokales Modell (falls bereit) im Hintergrund; kündigt nie selbst
   subscriptions = new SubscriptionService({
     store: new SubscriptionStore(db, () => randomUUID()),
-    extract: (message) => aiService.extractSubscription(message),
+    extract: (message, attachmentText) => aiService.extractSubscription(message, attachmentText),
+    modelReady: () => aiService.modelReady(),
     onChange: notifyRenderer,
   });
 }

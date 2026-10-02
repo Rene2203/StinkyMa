@@ -1,4 +1,4 @@
-import { Archive, Flag, FlagOff, Mail, MailOpen, Trash2 } from "lucide-react";
+import { Archive, Flag, FlagOff, Mail, MailOpen, Repeat, Trash2 } from "lucide-react";
 import { isFlagged, isRead, type Message } from "@stinkyma/core";
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import { useUi } from "../context.js";
@@ -56,7 +56,7 @@ export function ContextMenu({ state, onClose }: { state: ContextMenuState; onClo
   };
 
   const left = Math.min(state.x, window.innerWidth - 240);
-  const top = Math.min(state.y, window.innerHeight - 180);
+  const top = Math.min(state.y, window.innerHeight - 220);
 
   return (
     <div ref={ref} className="context-menu" role="menu" style={{ left, top }} onKeyDown={onKeyDown}>
@@ -68,6 +68,12 @@ export function ContextMenu({ state, onClose }: { state: ContextMenuState; onClo
         {isFlagged(message) ? <FlagOff size={15} /> : <Flag size={15} />}
         {isFlagged(message) ? t("action.unflag") : t("action.flag")}
       </button>
+      {store.canSubscriptions && (
+        <button type="button" role="menuitem" data-testid="menu-subscription" onClick={run(() => store.markAsSubscription(message.id))}>
+          <Repeat size={15} />
+          {t("subs.markMail")}
+        </button>
+      )}
       <hr />
       <button type="button" role="menuitem" onClick={run(() => store.archive([message.id]))}>
         <Archive size={15} />

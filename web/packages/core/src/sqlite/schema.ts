@@ -454,6 +454,26 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // Abos nachgebessert: alle Mails je Abo (Rechnungen aus mehreren Monaten), Zusammenführen auch über verschiedene
+    // Absender-Domains (Zahlungsdienste, von Hand zusammengeführt) – deshalb kein eindeutiger Index mehr je Domain.
+    name: "v17-subscription-mails",
+    sql: `
+      CREATE TABLE subscriptionMail (
+        subscriptionId TEXT NOT NULL REFERENCES subscription(id) ON DELETE CASCADE,
+        messageId TEXT NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        amount TEXT,
+        PRIMARY KEY (subscriptionId, messageId)
+      );
+      CREATE INDEX subscriptionMail_on_message ON subscriptionMail(messageId);
+      INSERT INTO subscriptionMail (subscriptionId, messageId, date, amount)
+        SELECT id, sourceMessageId, lastMailDate, amount FROM subscription WHERE sourceMessageId IS NOT NULL;
+      ALTER TABLE subscription ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]';
+      DROP INDEX subscription_on_provider;
+      CREATE INDEX subscription_on_provider ON subscription(accountId, providerKey);
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

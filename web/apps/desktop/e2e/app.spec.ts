@@ -250,6 +250,33 @@ test("Abos & Verträge: Probe-Abo erkannt, Kündigungstag, Erinnerung, gekündig
   await expect(page.getByTestId("thread-subject")).toContainText("Probeabo");
 });
 
+test("Abos: „Das ist ein Abo“ per Rechtsklick, von Hand durchsuchen, zusammenführen mit allen Mails", async () => {
+  await page.getByRole("searchbox").fill("");
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  const other = rows().filter({ hasNotText: "Probeabo" }).first();
+  await other.click({ button: "right" });
+  await page.getByTestId("menu-subscription").click();
+  const panel = page.getByTestId("subscriptions");
+  await expect(panel).toBeVisible();
+  const detail = panel.getByTestId("subs-detail");
+  await expect(detail.getByTestId("subs-origin")).toHaveText("von dir festgelegt");
+  const provider = (await detail.locator("h3").textContent()) ?? "";
+  expect(provider).not.toBe("Streamflix");
+  // Von Hand durchsuchen (auch schon Geprüftes) – der von Hand übernommene Eintrag bleibt
+  await panel.getByTestId("subs-rescan").click();
+  await expect(panel.getByTestId("subs-rescan")).toBeEnabled();
+  await expect(panel.getByTestId("subs-row").filter({ hasText: provider })).toBeVisible();
+  // Zusammenführen: Streamflix geht in diesem Eintrag auf, beide Mails stehen im Detail
+  await panel.getByTestId("subs-row").filter({ hasText: provider }).click();
+  await detail.getByTestId("subs-merge-select").selectOption({ label: (await detail.getByTestId("subs-merge-select").locator("option", { hasText: "Streamflix" }).textContent()) ?? "" });
+  await detail.getByTestId("subs-merge").click();
+  await expect(panel.getByTestId("subs-row").filter({ hasText: "Streamflix" })).toHaveCount(0);
+  await expect(panel.getByTestId("subs-detail").getByTestId("subs-mail")).toHaveCount(2);
+  await shot("32-Abos-zusammengefuehrt");
+  await panel.getByTestId("subs-detail").getByTestId("subs-mail").filter({ hasText: "Probeabo" }).click();
+  await expect(page.getByTestId("thread-subject")).toContainText("Probeabo");
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

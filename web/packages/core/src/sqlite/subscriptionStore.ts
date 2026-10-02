@@ -2,7 +2,7 @@ import type Database from "better-sqlite3";
 import { lastCancelDay, type SubscriptionFinding } from "../ai/subscriptions.js";
 import { registeredDomain } from "../cleanup.js";
 import type { EmailAddress, MessageCategory } from "../models.js";
-import { amountToCents, type StoredSubscription, type SubscriptionEdit, type SubscriptionStatus } from "../subscriptions.js";
+import { amountToCents, isBillingDomain, providerSlug, sameProvider, type StoredSubscription, type SubscriptionEdit, type SubscriptionMailRef, type SubscriptionStatus } from "../subscriptions.js";
 import { archiveDuplicate } from "./repository.js";
 
 type Row = Record<string, unknown>;
@@ -17,6 +17,35 @@ export interface SubscriptionCandidate {
   body: string;
   date: string;
   category: MessageCategory | null;
+  /** Text aus PDF-/Text-Anhängen (z. B. die Rechnung als PDF), gekürzt */
+  attachmentText: string;
+}
+
+const candidateColumns = `message.id, message.accountId, message.fromName, message.fromAddress, message.subject, message.date, message.category,
+  substr(COALESCE(message.bodyText, message.snippet), 1, 4000) AS body,
+  (SELECT substr(group_concat(t.text, char(10)), 1, 3000) FROM attachmentText t JOIN attachment a ON a.id = t.attachmentId
+   WHERE a.messageId = message.id) AS attachmentText`;
+
+function candidateFromRow(r: Row): SubscriptionCandidate {
+  return {
+    id: String(r.id),
+    accountId: String(r.accountId),
+    from: { name: str(r.fromName), address: String(r.fromAddress) },
+    subject: String(r.subject),
+    body: String(r.body ?? ""),
+    date: String(r.date),
+    category: str(r.category) as MessageCategory | null,
+    attachmentText: String(r.attachmentText ?? ""),
+  };
+}
+
+function aliasesOf(r: Row): string[] {
+  try {
+    const parsed = JSON.parse(String(r.aliases ?? "[]")) as unknown;
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
 const reminderKey = (id: string) => `sub:${id}`;
@@ -54,6 +83,7 @@ function fromRow(r: Row): StoredSubscription {
     createdAt: String(r.createdAt),
     updatedAt: String(r.updatedAt),
     reminder: r.reminderId ? { id: String(r.reminderId), dueDate: String(r.reminderDue) } : null,
+    mails: [],
   };
 }
 
@@ -68,8 +98,7 @@ export class SubscriptionStore {
   candidates(limit: number, options: { recheckRules?: boolean } = {}): SubscriptionCandidate[] {
     const rows = this.db
       .prepare(
-        `SELECT message.id, message.accountId, message.fromName, message.fromAddress, message.subject, message.date, message.category,
-                substr(COALESCE(message.bodyText, message.snippet), 1, 4000) AS body
+        `SELECT ${candidateColumns}
          FROM message JOIN mailbox ON mailbox.id = message.mailboxId
          LEFT JOIN subscriptionScan s ON s.messageId = message.id
          WHERE mailbox.role IN ('inbox', 'archive', 'custom') AND NOT ${archiveDuplicate}
@@ -77,15 +106,18 @@ export class SubscriptionStore {
          ORDER BY message.date DESC LIMIT ?`,
       )
       .all(limit) as Row[];
-    return rows.map((r) => ({
-      id: String(r.id),
-      accountId: String(r.accountId),
-      from: { name: str(r.fromName), address: String(r.fromAddress) },
-      subject: String(r.subject),
-      body: String(r.body ?? ""),
-      date: String(r.date),
-      category: str(r.category) as MessageCategory | null,
-    }));
+    return rows.map(candidateFromRow);
+  }
+
+  /** Eine bestimmte Mail (für „Das ist ein Abo“), egal ob schon geprüft. */
+  candidate(messageId: string): SubscriptionCandidate | null {
+    const row = this.db.prepare(`SELECT ${candidateColumns} FROM message WHERE message.id = ?`).get(messageId) as Row | undefined;
+    return row ? candidateFromRow(row) : null;
+  }
+
+  /** Geprüft-Vermerke vergessen (alles neu prüfen). Von Hand zugeordnete Mails bleiben. */
+  resetScans(): void {
+    this.db.prepare("DELETE FROM subscriptionScan WHERE origin != 'user'").run();
   }
 
   markScanned(messageIds: string[], origin: string, promptVersion: number, at: string): void {
@@ -103,8 +135,39 @@ export class SubscriptionStore {
    * Lücken. Vom Nutzer geänderte Einträge bekommen nur noch den Status „gekündigt“. Gibt die ID zurück.
    */
   apply(finding: SubscriptionFinding, mail: { id: string; accountId: string; fromAddress: string; date: string }, origin: StoredSubscription["origin"], now: string): string {
+    const id = this.#applyFinding(finding, mail, origin, now);
+    this.db
+      .prepare("INSERT OR REPLACE INTO subscriptionMail (subscriptionId, messageId, date, amount) VALUES (?, ?, ?, ?)")
+      .run(id, mail.id, mail.date, finding.amount);
+    return id;
+  }
+
+  /**
+   * Passender Eintrag für einen Fund: gleicher Anbietername (auch über Konten und Domains hinweg, inkl. von Hand
+   * zusammengeführter Namen), sonst gleiche Absender-Domain im selben Konto – außer bei Zahlungsdiensten.
+   */
+  #match(provider: string, providerKey: string, accountId: string): Row | undefined {
+    const slug = providerSlug(provider);
+    const rows = this.db.prepare("SELECT * FROM subscription ORDER BY createdAt").all() as Row[];
+    const byName = rows.filter((r) => [providerSlug(String(r.provider)), ...aliasesOf(r)].some((known) => sameProvider(known, slug)));
+    const named = byName.find((r) => r.accountId === accountId) ?? byName[0];
+    if (named) return named;
+    if (isBillingDomain(providerKey)) return undefined;
+    return rows.find((r) => r.accountId === accountId && (r.providerKey === providerKey || aliasesOf(r).includes(providerKey)));
+  }
+
+  #applyFinding(finding: SubscriptionFinding, mail: { id: string; accountId: string; fromAddress: string; date: string }, origin: StoredSubscription["origin"], now: string): string {
     const providerKey = registeredDomain(mail.fromAddress) || mail.fromAddress.toLowerCase();
-    const existing = this.db.prepare("SELECT * FROM subscription WHERE accountId = ? AND providerKey = ?").get(mail.accountId, providerKey) as Row | undefined;
+    const existing = this.#match(finding.provider, providerKey, mail.accountId);
+    if (existing && existing.providerKey !== providerKey && !isBillingDomain(providerKey)) {
+      this.#addAliases(String(existing.id), [providerKey]);
+      // Zuerst nur über einen Zahlungsdienst bekannt: Name und Domain des Anbieters selbst übernehmen
+      if (isBillingDomain(String(existing.providerKey)) && Number(existing.userEdited) === 0) {
+        this.db.prepare("UPDATE subscription SET provider = ?, providerKey = ? WHERE id = ?").run(finding.provider, providerKey, existing.id);
+        existing.provider = finding.provider;
+        existing.providerKey = providerKey;
+      }
+    }
     if (!existing) {
       const id = this.newId();
       this.db
@@ -181,7 +244,88 @@ export class SubscriptionStore {
 
   /** Laut Modell kein Abo: Eintrag löschen, wenn er nur auf dieser Mail beruht und per Regel entstand (nicht vom Nutzer). */
   removeIfOnlyFrom(messageId: string): void {
-    this.db.prepare("DELETE FROM subscription WHERE sourceMessageId = ? AND origin = 'rules' AND userEdited = 0 AND createdAt = updatedAt").run(messageId);
+    this.db
+      .prepare(
+        `DELETE FROM subscription WHERE sourceMessageId = ? AND origin = 'rules' AND userEdited = 0 AND createdAt = updatedAt
+           AND (SELECT count(*) FROM subscriptionMail m WHERE m.subscriptionId = subscription.id AND m.messageId != ?) = 0`,
+      )
+      .run(messageId, messageId);
+    this.db.prepare("DELETE FROM subscriptionMail WHERE messageId = ? AND subscriptionId IN (SELECT id FROM subscription WHERE origin = 'rules' AND userEdited = 0)").run(messageId);
+  }
+
+  #addAliases(id: string, names: string[]): void {
+    const row = this.db.prepare("SELECT aliases FROM subscription WHERE id = ?").get(id) as Row | undefined;
+    if (!row) return;
+    const merged = [...new Set([...aliasesOf(row), ...names.filter(Boolean)])];
+    this.db.prepare("UPDATE subscription SET aliases = ? WHERE id = ?").run(JSON.stringify(merged), id);
+  }
+
+  /**
+   * `sourceId` geht in `targetId` auf: Mails, Namen (für künftige Mails), fehlende Angaben und die Erinnerung
+   * (falls das Ziel keine hat). Neuere Angaben gewinnen, außer das Ziel wurde von Hand korrigiert.
+   */
+  merge(targetId: string, sourceId: string, now: string): void {
+    if (targetId === sourceId) return;
+    const target = this.db.prepare("SELECT * FROM subscription WHERE id = ?").get(targetId) as Row | undefined;
+    const source = this.db.prepare("SELECT * FROM subscription WHERE id = ?").get(sourceId) as Row | undefined;
+    if (!target || !source) throw new Error("Diesen Eintrag gibt es nicht mehr.");
+    this.db.transaction(() => {
+      const t = fromRow(target);
+      const src = fromRow(source);
+      const sourceNewer = !t.userEdited && src.lastMailDate > t.lastMailDate;
+      const pick = <T>(a: T | null, b: T | null): T | null => (sourceNewer ? (b ?? a) : (a ?? b));
+      const fields = {
+        amount: pick(t.amount, src.amount), interval: pick(t.interval, src.interval), startDate: pick(t.startDate, src.startDate),
+        minTermMonths: pick(t.minTermMonths, src.minTermMonths), trialEnd: pick(t.trialEnd, src.trialEnd), termEnd: pick(t.termEnd, src.termEnd),
+        renewalDate: pick(t.renewalDate, src.renewalDate), cancelBy: pick(t.cancelBy, src.cancelBy), notice: pick(t.notice, src.notice),
+      };
+      const computed = lastCancelDay({ ...fields, kind: t.kind, provider: t.provider, cancelled: t.status === "cancelled", quote: "" });
+      this.db
+        .prepare(
+          `UPDATE subscription SET amount = @amount, amountCents = @amountCents, interval = @interval, startDate = @startDate, minTermMonths = @minTermMonths,
+             trialEnd = @trialEnd, termEnd = @termEnd, renewalDate = @renewalDate, cancelBy = @cancelBy, notice = @notice, lastCancelDay = @lastCancelDay,
+             quote = @quote, sourceMessageId = @sourceMessageId, lastMailDate = @lastMailDate, updatedAt = @now WHERE id = @id`,
+        )
+        .run({
+          id: targetId, ...fields, amountCents: amountToCents(fields.amount), notice: fields.notice ? JSON.stringify(fields.notice) : null,
+          lastCancelDay: t.userEdited ? t.lastCancelDay : computed ?? t.lastCancelDay ?? src.lastCancelDay,
+          quote: sourceNewer ? src.quote : t.quote, sourceMessageId: sourceNewer ? src.sourceMessageId : t.sourceMessageId,
+          lastMailDate: sourceNewer ? src.lastMailDate : t.lastMailDate, now,
+        });
+      this.db.prepare("INSERT OR IGNORE INTO subscriptionMail (subscriptionId, messageId, date, amount) SELECT ?, messageId, date, amount FROM subscriptionMail WHERE subscriptionId = ?").run(targetId, sourceId);
+      this.#addAliases(targetId, [providerSlug(src.provider), src.providerKey, ...aliasesOf(source)]);
+      const hasReminder = (sid: string) => this.db.prepare("SELECT 1 FROM reminder WHERE actionId = ? AND status = 'pending'").get(reminderKey(sid)) !== undefined;
+      if (!hasReminder(targetId) && hasReminder(sourceId)) this.db.prepare("UPDATE reminder SET actionId = ? WHERE actionId = ? AND status = 'pending'").run(reminderKey(targetId), reminderKey(sourceId));
+      else this.cancelReminder(sourceId);
+      this.db.prepare("DELETE FROM subscription WHERE id = ?").run(sourceId);
+    })();
+  }
+
+  /** Doppelte Einträge (gleicher Anbietername) zusammenführen – räumt Einträge aus der Zeit vor v17 auf. */
+  mergeDuplicates(now: string): number {
+    const rows = this.db.prepare("SELECT * FROM subscription ORDER BY createdAt").all() as Row[];
+    const kept: Row[] = [];
+    let merged = 0;
+    for (const row of rows) {
+      const slug = providerSlug(String(row.provider));
+      const twin = kept.find((k) => [providerSlug(String(k.provider)), ...aliasesOf(k)].some((known) => sameProvider(known, slug)));
+      if (twin && row.status !== "dismissed" && twin.status !== "dismissed") {
+        this.merge(String(twin.id), String(row.id), now);
+        merged++;
+      } else kept.push(row);
+    }
+    return merged;
+  }
+
+  #mails(id: string): SubscriptionMailRef[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT m.messageId, m.date, m.amount, message.subject FROM subscriptionMail m JOIN message ON message.id = m.messageId
+           WHERE m.subscriptionId = ? ORDER BY m.date DESC`,
+        )
+        .all(id) as Row[]
+    ).map((r) => ({ messageId: String(r.messageId), date: String(r.date), amount: str(r.amount), subject: String(r.subject) }));
   }
 
   list(): StoredSubscription[] {
@@ -194,7 +338,7 @@ export class SubscriptionStore {
                     COALESCE(subscription.lastCancelDay, '9999'), subscription.provider`,
         )
         .all() as Row[]
-    ).map(fromRow);
+    ).map((r) => ({ ...fromRow(r), mails: this.#mails(String(r.id)) }));
   }
 
   get(id: string): StoredSubscription | null {
@@ -204,7 +348,7 @@ export class SubscriptionStore {
          LEFT JOIN reminder r ON r.actionId = 'sub:' || subscription.id AND r.status = 'pending' WHERE subscription.id = ?`,
       )
       .get(id) as Row | undefined;
-    return row ? fromRow(row) : null;
+    return row ? { ...fromRow(row), mails: this.#mails(String(row.id)) } : null;
   }
 
   /** Von Hand korrigieren – danach überschreiben neue Mails die Angaben nicht mehr. */

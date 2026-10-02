@@ -9,7 +9,7 @@ const fileMethods = ["open", "save", "read"];
 const settingsMethods = ["get", "update", "available"];
 const rulesMethods = ["list", "folders", "interpret", "preview", "save", "setEnabled", "remove"];
 const cleanupMethods = ["groups", "groupMails", "trash", "check", "unsubscribeInfo", "unsubscribe"];
-const subscriptionsMethods = ["list", "scan", "update", "setStatus", "remind", "cancelReminder"];
+const subscriptionsMethods = ["list", "scan", "addFromMail", "merge", "update", "setStatus", "remind", "cancelReminder"];
 const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender"];
 
 const bridge = (channel: string, methods: string[]) =>

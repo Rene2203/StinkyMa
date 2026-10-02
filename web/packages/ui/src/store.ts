@@ -359,12 +359,39 @@ export class BrowserStore {
     if (!api) return;
     this.#set({ panel: "subscriptions", subscriptions: { view: this.#state.subscriptions?.view ?? null, selectedId: this.#state.subscriptions?.selectedId ?? null, busy: true, error: null } });
     await this.#loadSubscriptions();
+    await this.scanSubscriptions();
+  }
+
+  /** Von Hand durchsuchen; `recheck`: auch schon geprüfte Mails neu prüfen (mit KI, falls bereit). */
+  async scanSubscriptions(recheck = false): Promise<void> {
+    const api = this.#subscriptions;
+    if (!api) return;
+    this.#patchSubscriptions({ busy: true });
     try {
-      await api.scan();
+      await api.scan({ recheck });
+      this.#patchSubscriptions({ error: null });
     } catch (e) {
       this.#patchSubscriptions({ error: messageOf(e) });
     }
     await this.#loadSubscriptions();
+  }
+
+  /** „Das ist ein Abo“: Mail übernehmen und den Eintrag in „Abos & Verträge“ zeigen. */
+  async markAsSubscription(messageId: string): Promise<void> {
+    const api = this.#subscriptions;
+    if (!api) return;
+    this.#set({ panel: "subscriptions", subscriptions: { view: this.#state.subscriptions?.view ?? null, selectedId: null, busy: true, error: null } });
+    try {
+      const sub = await api.addFromMail(messageId);
+      this.#patchSubscriptions({ selectedId: sub.id, error: null });
+    } catch (e) {
+      this.#patchSubscriptions({ error: messageOf(e) });
+    }
+    await this.#loadSubscriptions();
+  }
+
+  mergeSubscriptions(targetId: string, sourceId: string): Promise<void> {
+    return this.#subscriptionAction((api) => api.merge(targetId, sourceId));
   }
 
   closeSubscriptions(): void {
@@ -421,10 +448,10 @@ export class BrowserStore {
   }
 
   /** Quell-Mail eines Eintrags öffnen (zurück zur Mail-Ansicht). */
-  async openSubscriptionMail(sub: StoredSubscription): Promise<void> {
-    if (!sub.sourceMessageId) return;
+  async openSubscriptionMail(sub: StoredSubscription, messageId = sub.sourceMessageId): Promise<void> {
+    if (!messageId) return;
     this.#set({ panel: "mail" });
-    await this.openMessage(sub.sourceMessageId);
+    await this.openMessage(messageId);
   }
 
   // --- Fremde Seite im Fenster innerhalb der App ---

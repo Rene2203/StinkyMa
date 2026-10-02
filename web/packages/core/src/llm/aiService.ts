@@ -566,10 +566,15 @@ export class AIService implements AIApi {
   }
 
   /** Abo-Erkennung (W7.1) mit dem lokalen Modell; `null`, wenn keins bereit ist (dann gelten die Regeln). */
-  async extractSubscription(message: Message): Promise<SubscriptionResult | null> {
+  async extractSubscription(message: Message, attachmentText?: string): Promise<SubscriptionResult | null> {
     if (!(await this.#modelReady())) return null;
     const { router } = await this.#router();
-    return extractSubscription(router, message);
+    return extractSubscription(router, message, { attachmentText });
+  }
+
+  /** Ist ein lokales Modell eingeschaltet und installiert? */
+  async modelReady(): Promise<boolean> {
+    return this.#modelReady();
   }
 
   async #modelReady(): Promise<boolean> {

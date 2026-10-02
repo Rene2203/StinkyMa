@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountToCents, lastCancelDay, monthlyCents, parseNotice, parseSubscription, ruleSubscription, type Account, type SubscriptionFinding } from "../src/index.js";
+import { amountToCents, lastCancelDay, looksLikeAd, monthlyCents, parseNotice, parseSubscription, providerSlug, ruleSubscription, sameProvider, type Account, type MessageCategory, type SubscriptionFinding } from "../src/index.js";
 import { SubscriptionService } from "../src/llm/index.js";
 import { MailWriter, openDatabase, SubscriptionStore } from "../src/sqlite/index.js";
 
@@ -70,13 +70,15 @@ function setup() {
   writer.insertAccount(account);
   writer.upsertMailbox({ id: "acc/inbox", accountId: "acc", name: "INBOX", role: "inbox" });
   let uid = 0;
-  const add = (from: { name: string; address: string }, subject: string, body: string, date: string) => {
+  const add = (from: { name: string; address: string }, subject: string, body: string, date: string, extra: { category?: MessageCategory; pdf?: string } = {}) => {
     uid += 1;
     const id = `acc/inbox#1:${uid}`;
     writer.insertMessage({
       id, accountId: "acc", mailboxId: "acc/inbox", uid, messageId: `<s${uid}@example.test>`, threadId: `t${uid}`, threadSubject: subject,
-      from, to: [], cc: [], subject, date, snippet: body.slice(0, 100), bodyText: body, bodyHtml: null, flags: 0, attachments: [],
+      from, to: [], cc: [], subject, date, snippet: body.slice(0, 100), bodyText: body, bodyHtml: null, flags: 0, category: extra.category ?? null,
+      attachments: extra.pdf ? [{ filename: "rechnung.pdf", mimeType: "application/pdf", size: 1000, contentId: null, isInline: false }] : [],
     });
+    if (extra.pdf) writer.setAttachmentText(`${id}/a0`, extra.pdf, "pdf");
     return id;
   };
   let ids = 0;
@@ -164,6 +166,103 @@ describe("Abos: Speicher und Suchlauf", () => {
     expect(items.map((s) => [s.provider, s.origin])).toEqual([["Readly Plus", "onDevice"]]);
     expect(calls).toBe(2);
     await service.scan(); // nichts Neues fürs Modell
+    await service.idle();
+    expect(calls).toBe(2);
+  });
+
+  it("Rechnungen mehrerer Monate: ein Eintrag mit allen Mails – auch über Zahlungsdienste und abweichende Namen", async () => {
+    const { add, store } = setup();
+    const nexus = { name: "Nexus Mods", address: "billing@nexusmods.example" };
+    add(nexus, "Your subscription", "Your subscription will renew at €9.98 on Aug 9, 2026.", "2026-07-09T08:00:00.000Z");
+    add(nexus, "Your subscription", "Your subscription will renew at €9.98 on Sep 9, 2026.", "2026-08-09T08:00:00.000Z");
+    // gleicher Anbieter über einen Zahlungsdienst, anderer Name
+    add({ name: "NexusMods Premium", address: "receipts@stripe.com" }, "Receipt", "Your subscription renews monthly. Amount paid: 9,98 €", "2026-09-09T08:00:00.000Z");
+    // anderer Anbieter über denselben Zahlungsdienst: eigener Eintrag
+    add({ name: "Wolkenspeicher", address: "receipts@stripe.com" }, "Receipt", "Your subscription renews monthly. Amount paid: 2,99 €", "2026-09-10T08:00:00.000Z");
+    const service = new SubscriptionService({ store, now: () => new Date("2026-09-30T10:00:00Z") });
+    await service.scan();
+    const items = (await service.list()).items;
+    expect(items.map((s) => s.provider).sort()).toEqual(["Nexus Mods", "Wolkenspeicher"]);
+    const entry = items.find((s) => s.provider === "Nexus Mods")!;
+    expect(entry.mails.map((m) => m.date.slice(0, 7))).toEqual(["2026-09", "2026-08", "2026-07"]);
+    expect(entry.amountCents).toBe(998);
+    expect(sameProvider(providerSlug("Nexus Mods"), providerSlug("NexusMods Premium"))).toBe(true);
+    expect(sameProvider(providerSlug("Sky"), providerSlug("Skyline Fitness"))).toBe(false); // zu kurz für „beginnt mit“
+  });
+
+  it("von Hand zusammenführen: Mails, Erinnerung und künftige Mails des anderen Absenders landen im Ziel", async () => {
+    const { add, store, db } = setup();
+    add({ name: "Fitbox", address: "info@fitbox.example" }, "Mitgliedschaft", "Deine Mitgliedschaft kostet 29,90 € pro Monat.", "2026-08-01T08:00:00.000Z");
+    add({ name: "Studio Nord GmbH", address: "abrechnung@studionord.example" }, "Beitrag", "Dein Mitgliedsbeitrag von 29,90 € pro Monat wird per Lastschrift eingezogen. Die Laufzeit endet am 31.12.2026. Kündigungsfrist: 1 Monat zum Laufzeitende.", "2026-09-01T08:00:00.000Z");
+    const service = new SubscriptionService({ store, now: () => new Date("2026-09-30T10:00:00Z") });
+    await service.scan();
+    let items = (await service.list()).items;
+    expect(items).toHaveLength(2);
+    const target = items.find((s) => s.provider === "Fitbox")!;
+    const source = items.find((s) => s.provider !== "Fitbox")!;
+    await service.remind(source.id, 3);
+    const merged = await service.merge(target.id, source.id);
+    expect(merged.mails).toHaveLength(2);
+    expect(merged).toMatchObject({ termEnd: "2026-12-31", lastCancelDay: "2026-11-30" });
+    expect(merged.reminder).not.toBeNull();
+    expect((await service.list()).items).toHaveLength(1);
+    add({ name: "Studio Nord GmbH", address: "abrechnung@studionord.example" }, "Beitrag", "Dein Mitgliedsbeitrag von 29,90 € pro Monat wird per Lastschrift eingezogen.", "2026-10-01T08:00:00.000Z");
+    await service.scan();
+    items = (await service.list()).items;
+    expect(items).toHaveLength(1);
+    expect(items[0]?.mails).toHaveLength(3);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM reminder WHERE status = 'pending'").get() as { n: number }).n).toBe(1);
+  });
+
+  it("„Das ist ein Abo“: übernimmt die Mail (auch mit Rechnung nur im PDF), holt Ausgeblendetes zurück", async () => {
+    const { add, store } = setup();
+    const id = add({ name: "Spielwelt", address: "noreply@spielwelt.example" }, "Deine Rechnung", "Hallo, deine Rechnung findest du im Anhang.", "2026-09-15T08:00:00.000Z", {
+      category: "invoice",
+      pdf: "Rechnung Nr. 4711 Premium-Zugang 4,99 € monatlich inkl. 19 % MwSt.",
+    });
+    const service = new SubscriptionService({ store, now: () => new Date("2026-09-30T10:00:00Z") });
+    await service.scan();
+    // Regel erkennt hier nichts (kein Abo-Wort) – der Nutzer sagt es
+    expect((await service.list()).items).toHaveLength(0);
+    const sub = await service.addFromMail(id);
+    expect(sub).toMatchObject({ provider: "Spielwelt", amount: "4,99 €", interval: "monthly", origin: "user", status: "active" });
+    await service.setStatus(sub.id, "dismissed");
+    expect((await service.addFromMail(id)).status).toBe("active");
+    await service.scan({ recheck: true });
+    expect((await service.list()).items).toHaveLength(1);
+  });
+
+  it("PDF-Text, MwSt. und Werbung: Regeln lesen den Anhang; Newsletter mit Abo-Werbung nicht", async () => {
+    const { add, store } = setup();
+    add({ name: "Klangraum", address: "billing@klangraum.example" }, "Rechnung", "Danke für deine Zahlung.", "2026-09-15T08:00:00.000Z", {
+      pdf: "Rechnung für dein Abo Klangraum Family 17,99 € pro Monat inkl. 19 % MwSt.",
+    });
+    add({ name: "Lesezeit", address: "news@lesezeit.example" }, "Nur bis Sonntag", "Jetzt abonnieren und 50 % sparen: das Abo für 4,99 € pro Monat!", "2026-09-16T08:00:00.000Z", { category: "newsletter" });
+    const service = new SubscriptionService({ store, now: () => new Date("2026-09-30T10:00:00Z") });
+    await service.scan();
+    expect((await service.list()).items.map((s) => [s.provider, s.amount])).toEqual([["Klangraum", "17,99 €"]]);
+    expect(looksLikeAd("Jetzt abonnieren und 50 % sparen!")).toBe(true);
+    expect(looksLikeAd("Jetzt upgraden! Ihre Rechnungsnummer 123")).toBe(false);
+  });
+
+  it("alles neu prüfen: das Modell sieht schon geprüfte Mails noch einmal, Rechnungen immer", async () => {
+    const { add, store } = setup();
+    add({ name: "Wolke", address: "billing@wolke.example" }, "Rechnung September", "Rechnungsbetrag 2,99 €", "2026-09-15T08:00:00.000Z", { category: "invoice" });
+    let calls = 0;
+    const service = new SubscriptionService({
+      store,
+      extract: async () => {
+        calls++;
+        return { finding: null, origin: "onDevice", providerId: "fake", durationMs: 1 };
+      },
+    });
+    await service.scan();
+    await service.idle();
+    expect(calls).toBe(1); // Rechnung ohne Abo-Wort geht trotzdem ans Modell
+    await service.scan();
+    await service.idle();
+    expect(calls).toBe(1);
+    await service.scan({ recheck: true });
     await service.idle();
     expect(calls).toBe(2);
   });

@@ -1,7 +1,7 @@
 import type { EmailAddress, Message } from "../models.js";
 import { explicitDates, fixYear, relativeDates } from "./actions.js";
 import { amountToCents } from "../subscriptions.js";
-import { cleanMailText } from "./prepare.js";
+import { cleanMailText, truncate } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { extractJson, type ResultOrigin } from "./tasks.js";
 import type { AIMessage, AIRequest, JsonSchema } from "./types.js";
@@ -103,7 +103,15 @@ const trialCue = /(probemonat|probeabo|probe-abo|probezeit|probephase|testphase|
 const subscriptionCue = /([a-zäöüß-]*abos?(?![a-zäöüß])|abonnement|mitgliedschaft|mitgliedsbeitrag|jahresbeitrag|jahresgebühr|vertrag|tarif|versicherung|subscription|renews|verlängert sich|verlängerung|laufzeit|kündigungsfrist|kündbar|grundpreis|abschlag|leseausweis|austritt)/i;
 const cancelledCue = /(bestätigen (die|ihre|deine) kündigung|kündigung (ihres|deines|bestätigt)|ist gekündigt|kündigung wurde bestätigt|subscription (has been |was )?cancell?ed)/i;
 // Werbung, Phishing, kostenlose Newsletter: kein Abo
-const adCue = /(jetzt (abo |das abo )?(abschließen|abonnieren|bestellen|sichern|testen)|prämie sichern|angebot gültig|nur bis|\d+ ?%|statt \d|zum halben preis)/i;
+// „19 % MwSt.“ in Rechnungen ist keine Werbung – Prozente nur mit Rabatt-Wörtern
+const adCue = /(jetzt (abo |das abo )?(abschließen|abonnieren|bestellen|sichern|testen)|prämie sichern|angebot gültig|nur bis|\d+ ?% (rabatt|günstiger|sparen|off|discount)|spare?n? (bis zu )?\d+ ?%|statt \d|zum halben preis|upgrade now|subscribe now|jetzt upgraden)/i;
+// Zeichen einer eigenen Beziehung (Rechnung, Kundennummer, „dein Abo“) – Werbung hat das in der Regel nicht
+const ownRelationCue = /((ihr|ihre|ihres|dein|deine|deines|your)\s+(aktuelle[sn]?\s+)?(abo|abonnement|vertrag|vertrags|mitgliedschaft|tarif|subscription|membership|plan|zahlung|payment)|kundennummer|vertragsnummer|rechnungsnummer|mitgliedsnummer|invoice|receipt|quittung|abgebucht|charged|lastschrift|zahlungseingang|payment (received|confirmation|successful)|zahlungsbestätigung|verlängert sich|renews|will renew)/i;
+
+/** Werbung für ein Abo (statt eines eigenen Abos)? Rabatt-/Kaufaufforderung ohne Zeichen einer eigenen Beziehung. */
+export function looksLikeAd(text: string): boolean {
+  return adCue.test(text) && !ownRelationCue.test(text);
+}
 const phishingCue = /((zahlungsdaten|zahlungsinformationen|kreditkartendaten|zahlungsmethode) .{0,30}(aktualisieren|bestätigen)|aktualisieren sie .{0,40}(zahlungs|konto|kreditkarte)|konto wird gelöscht|innerhalb von \d+ stunden)/i;
 const freeNewsletterCue = /(kostenlosen newsletter|newsletter abonniert)/i;
 
@@ -114,7 +122,15 @@ const intervalCues: [BillingInterval, RegExp][] = [
   ["yearly", /(jährlich|pro jahr|im jahr|je jahr|jahresabo|jahresbeitrag|jahresgebühr|per year|a year|\/year|yearly|annual)/i],
 ];
 
-const amountRe = /(\d{1,3}(?:\.\d{3})*,\d{2})\s?(?:€|eur\b)|€\s?(\d{1,3}(?:\.\d{3})*,\d{2})/gi;
+// Deutsch („12,99 €“, „€ 1.200,00“) und Englisch („€9.98“, „9.98 EUR“)
+const amountRe = /(\d{1,3}(?:\.\d{3})*,\d{2})\s?(?:€|eur\b)|€\s?(\d{1,3}(?:\.\d{3})*,\d{2})|€\s?(\d+\.\d{2})(?!\d)|(\d+\.\d{2})\s?(?:€|eur\b)/gi;
+
+/** Gefundener Betrag einheitlich als „9,98 €“. */
+function amountValue(match: RegExpMatchArray): string {
+  const german = match[1] ?? match[2];
+  if (german) return `${german} €`;
+  return `${(match[3] ?? match[4] ?? "").replace(".", ",")} €`;
+}
 
 function sentences(text: string): string[] {
   // Satzende nach Buchstabe/€ – nicht nach Zahlen („bis 30.11. zum Jahresende“)
@@ -129,6 +145,32 @@ function intervalIn(text: string): BillingInterval | null {
 /** Erstes Datum (fest, sonst relativ) in einem Satz. */
 function dateIn(sentence: string, mailDate: Date): string | null {
   return explicitDates(sentence, mailDate)[0]?.date ?? relativeDates(sentence, mailDate)[0]?.date ?? null;
+}
+
+/**
+ * „Das ist ein Abo“ ohne Fund: Eintrag aus dem, was sicher in der Mail steht (Absender, erster Betrag, Zahlweise).
+ * Der Nutzer kann den Rest korrigieren.
+ */
+export function manualSubscription(subject: string, body: string, from: EmailAddress): SubscriptionFinding {
+  const text = `${subject}\n${body}`;
+  let amount: string | null = null;
+  let interval: BillingInterval | null = null;
+  for (const sentence of sentences(text)) {
+    const match = [...sentence.matchAll(amountRe)][0];
+    if (!match) continue;
+    amount ??= amountValue(match);
+    const found = intervalIn(sentence);
+    if (found) {
+      amount = amountValue(match);
+      interval = found;
+      break;
+    }
+  }
+  return {
+    kind: trialCue.test(text) ? "trial" : "subscription", provider: providerName(from), amount, interval: interval ?? intervalIn(text),
+    startDate: null, minTermMonths: null, trialEnd: null, termEnd: null, renewalDate: null, cancelBy: null, notice: null, cancelled: false,
+    quote: subject.slice(0, 200),
+  };
 }
 
 // Vorfilter für das Modell: bewusst breiter als die Regeln – lieber eine Mail zu viel prüfen als ein Abo übersehen
@@ -162,7 +204,7 @@ export function ruleSubscription(subject: string, body: string, from: EmailAddre
   for (const sentence of parts) {
     const match = [...sentence.matchAll(amountRe)][0];
     if (!match) continue;
-    const value = `${match[1] ?? match[2]} €`;
+    const value = amountValue(match);
     const sentenceInterval = intervalIn(sentence);
     if (sentenceInterval) {
       amount = value;
@@ -170,7 +212,7 @@ export function ruleSubscription(subject: string, body: string, from: EmailAddre
       break;
     }
     if (!amount && subscriptionCue.test(sentence)) amount = value;
-    if (!amount && /(betrag|beitrag|kostet|kosten|preis|charged|abgebucht)/i.test(sentence)) amount = value;
+    if (!amount && /(betrag|beitrag|kostet|kosten|preis|charged|abgebucht|paid|amount|total|summe)/i.test(sentence)) amount = value;
   }
   interval ??= intervalIn(text);
 
@@ -192,7 +234,7 @@ export function ruleSubscription(subject: string, body: string, from: EmailAddre
     // „Austritte sind bis 30.11. möglich“ – direkt hinter „bis“ muss ein Datum stehen (nicht „bis 14 Tage vor …“)
     const by = /(austritte?|kündigung(en)?|kündigen)\s+(sind |ist |muss |bitte )?(bis|spätestens)\s+(zum\s+)?(\d{1,2}\.\s?(\d{1,2}\.(\d{2,4})?|[a-zä]{3,}\.?(\s+\d{4})?))/i.exec(sentence);
     if (!cancelBy && by?.[6]) cancelBy = explicitDates(by[6], mailDate)[0]?.date ?? null;
-    if (!renewalDate && date && /(verlängert sich am|verlängerung (erfolgt )?am|renews on|wird am .{0,20} verlängert)/i.test(sentence)) {
+    if (!renewalDate && date && /(verlängert sich am|verlängerung (erfolgt )?am|renews on|will renew .{0,25}\bon\b|wird am .{0,20} verlängert)/i.test(sentence)) {
       renewalDate = date;
       quote ||= sentence;
     } else if (!termEnd && date && /(läuft (noch )?(bis|am)|endet am|ablauf:?\s|versicherungsjahr endet|bis zum \d)/i.test(sentence) && !/(verlängert sich am)/i.test(sentence)) {
@@ -347,8 +389,19 @@ export interface SubscriptionResult {
 }
 
 /** Abo-Erkennung einer Mail: Modell (mit Belegprüfung) plus Regeln; ohne brauchbare Modell-Antwort nur Regeln. */
-export async function extractSubscription(router: AIRouter, message: Message, options: { signal?: AbortSignal } = {}): Promise<SubscriptionResult> {
-  const body = cleanMailText(message.bodyText ?? message.snippet, 2000);
+/** Mailtext für die Abo-Erkennung: bereinigter Text plus Text aus Anhängen (Rechnung als PDF). */
+export function subscriptionMailText(bodyText: string, attachmentText = ""): string {
+  const extra = attachmentText.replace(/\s+/g, " ").trim();
+  if (!extra) return cleanMailText(bodyText, 2000);
+  return `${cleanMailText(bodyText, 1300)}\n\nAnhang:\n${truncate(extra, 1200)}`;
+}
+
+export async function extractSubscription(
+  router: AIRouter,
+  message: Message,
+  options: { signal?: AbortSignal; attachmentText?: string } = {},
+): Promise<SubscriptionResult> {
+  const body = subscriptionMailText(message.bodyText ?? message.snippet, options.attachmentText);
   const mailDate = new Date(message.date);
   const mail = `Von: ${message.from.name ?? ""} <${message.from.address}>\nBetreff: ${message.subject}\n\n${body}`;
   const rules = ruleSubscription(message.subject, body, message.from, mailDate);
@@ -359,6 +412,10 @@ export async function extractSubscription(router: AIRouter, message: Message, op
     durationMs += response.durationMs;
     const parsed = parseSubscription(response.text, mail, mailDate, message.from);
     if (parsed === "none") return { finding: null, origin: response.privacyClass, providerId: response.providerId, durationMs };
+    // Werbung für ein Abo (Rabatt, Kaufaufforderung, ohne Rechnung/Kundennummer) ist kein eigenes Abo
+    if (parsed && !rules && message.category !== "invoice" && looksLikeAd(`${message.subject}\n${body}`)) {
+      return { finding: null, origin: response.privacyClass, providerId: response.providerId, durationMs };
+    }
     if (parsed) return { finding: mergeFindings(parsed, rules), origin: response.privacyClass, providerId: response.providerId, durationMs };
   }
   return { finding: rules, origin: "rules", providerId: null, durationMs };

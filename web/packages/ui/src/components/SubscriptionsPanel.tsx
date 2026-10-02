@@ -1,4 +1,4 @@
-import { AlarmClock, Cpu, ExternalLink, Repeat, X } from "lucide-react";
+import { AlarmClock, Cpu, ExternalLink, Mail, Merge, RefreshCw, Repeat, X } from "lucide-react";
 import { billingIntervals, countsTowardsCosts, monthlyCents, subscriptionKinds, type BillingInterval, type StoredSubscription, type SubscriptionKind } from "@stinkyma/core";
 import { useEffect, useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -56,11 +56,24 @@ export function SubscriptionsPanel() {
             <Cpu size={13} aria-hidden="true" /> {t("subs.scanning", { done: view.scanning.done, total: view.scanning.total })}
           </span>
         )}
+        <button type="button" disabled={data?.busy} data-testid="subs-scan" title={t("subs.scanHint")} onClick={() => void store.scanSubscriptions(false)}>
+          <RefreshCw size={14} aria-hidden="true" /> {t("subs.scan")}
+        </button>
+        <button
+          type="button"
+          disabled={data?.busy}
+          data-testid="subs-rescan"
+          title={view?.modelReady ? t("subs.rescanHint") : t("subs.rescanHintRules")}
+          onClick={() => void store.scanSubscriptions(true)}
+        >
+          {t("subs.rescan")}
+        </button>
         <button type="button" className="icon-button" title={t("subs.close")} aria-label={t("subs.close")} onClick={() => store.closeSubscriptions()}>
           <X size={16} />
         </button>
       </header>
       {data?.error && <p className="dialog-error" role="alert">{data.error}</p>}
+      {view && !view.modelReady && <p className="muted small subs-hint" data-testid="subs-no-ai">{t("subs.noAi")}</p>}
       <div className="subs-body">
         <div className="subs-list">
           {!view && <p className="muted">{t("subs.busy")}</p>}
@@ -78,7 +91,7 @@ export function SubscriptionsPanel() {
             ),
           )}
         </div>
-        {selected ? <SubscriptionDetail key={selected.id + selected.updatedAt} sub={selected} /> : <div className="subs-detail muted">{items.length ? t("subs.pick") : ""}</div>}
+        {selected ? <SubscriptionDetail key={selected.id + selected.updatedAt} sub={selected} others={items.filter((s) => s.id !== selected.id)} /> : <div className="subs-detail muted">{items.length ? t("subs.pick") : ""}</div>}
       </div>
       <p className="muted small subs-legal">{t("subs.legal")}</p>
     </section>
@@ -116,7 +129,9 @@ function SubscriptionRow({ sub, selected }: { sub: StoredSubscription; selected:
       <button type="button" role="option" aria-selected={selected} className="subs-row" data-testid="subs-row" onClick={() => store.selectSubscription(sub.id)}>
         <span className="subs-row-main">
           <strong>{sub.provider}</strong>
-          <span className="muted small">{[t(`subs.kind.${sub.kind}` as MessageKey), amountLabel(sub, t)].filter(Boolean).join(" · ")}</span>
+          <span className="muted small">
+            {[t(`subs.kind.${sub.kind}` as MessageKey), amountLabel(sub, t), sub.mails.length > 1 ? t("subs.mailCount", { count: sub.mails.length }) : ""].filter(Boolean).join(" · ")}
+          </span>
           <CancelHint sub={sub} />
         </span>
         {sub.reminder && <AlarmClock size={14} aria-label={t("subs.hasReminder")} />}
@@ -125,8 +140,9 @@ function SubscriptionRow({ sub, selected }: { sub: StoredSubscription; selected:
   );
 }
 
-function SubscriptionDetail({ sub }: { sub: StoredSubscription }) {
+function SubscriptionDetail({ sub, others }: { sub: StoredSubscription; others: StoredSubscription[] }) {
   const { store, t } = useUi();
+  const [mergeWith, setMergeWith] = useState("");
   const format = useFormat();
   const [provider, setProvider] = useState(sub.provider);
   const [kind, setKind] = useState<SubscriptionKind>(sub.kind);
@@ -166,10 +182,28 @@ function SubscriptionDetail({ sub }: { sub: StoredSubscription }) {
         ))}
       </dl>
       {sub.quote && <blockquote className="subs-quote">„{sub.quote}“</blockquote>}
-      {sub.sourceMessageId && (
-        <button type="button" className="link" data-testid="subs-open-mail" onClick={() => void store.openSubscriptionMail(sub)}>
-          <ExternalLink size={13} aria-hidden="true" /> {t("subs.openMail")}
-        </button>
+      {sub.mails.length > 1 ? (
+        <div className="subs-mails">
+          <h4>{t("subs.mails", { count: sub.mails.length })}</h4>
+          <ul data-testid="subs-mails">
+            {sub.mails.map((mail) => (
+              <li key={mail.messageId}>
+                <button type="button" className="link" data-testid="subs-mail" onClick={() => void store.openSubscriptionMail(sub, mail.messageId)}>
+                  <Mail size={13} aria-hidden="true" />
+                  <span className="subs-mail-date">{format.date(mail.date.slice(0, 10))}</span>
+                  <span className="subs-mail-subject">{mail.subject}</span>
+                  {mail.amount && <span className="muted">{mail.amount}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        sub.sourceMessageId && (
+          <button type="button" className="link" data-testid="subs-open-mail" onClick={() => void store.openSubscriptionMail(sub)}>
+            <ExternalLink size={13} aria-hidden="true" /> {t("subs.openMail")}
+          </button>
+        )
       )}
 
       {sub.status === "active" && (
@@ -242,6 +276,23 @@ function SubscriptionDetail({ sub }: { sub: StoredSubscription }) {
           </button>
         </div>
       </details>
+
+      {others.length > 0 && (
+        <div className="subs-merge">
+          <label>
+            <span>{t("subs.mergeLabel")}</span>
+            <select value={mergeWith} onChange={(e) => setMergeWith(e.target.value)} data-testid="subs-merge-select">
+              <option value="">–</option>
+              {others.map((o) => (
+                <option key={o.id} value={o.id}>{[o.provider, amountLabel(o, t)].filter(Boolean).join(" · ")}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" disabled={!mergeWith} data-testid="subs-merge" title={t("subs.mergeHint")} onClick={() => void store.mergeSubscriptions(sub.id, mergeWith)}>
+            <Merge size={14} aria-hidden="true" /> {t("subs.merge")}
+          </button>
+        </div>
+      )}
 
       <div className="subs-status">
         {sub.status === "active" ? (

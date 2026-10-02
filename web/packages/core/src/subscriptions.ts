@@ -34,6 +34,16 @@ export interface StoredSubscription {
   updatedAt: string;
   /** Erinnerung vor dem Kündigungstag (falls gesetzt) */
   reminder: { id: string; dueDate: string } | null;
+  /** Alle Mails zu diesem Eintrag (Bestätigung, Rechnungen mehrerer Monate …), neueste zuerst */
+  mails: SubscriptionMailRef[];
+}
+
+export interface SubscriptionMailRef {
+  messageId: string;
+  date: string;
+  subject: string;
+  /** Betrag laut dieser Mail */
+  amount: string | null;
 }
 
 export interface SubscriptionEdit {
@@ -51,12 +61,23 @@ export interface SubscriptionsView {
   yearlyCents: number;
   /** Suchlauf mit KI im Hintergrund */
   scanning: { done: number; total: number } | null;
+  /** Ist das lokale Modell bereit? Sonst erkennen nur die Regeln. */
+  modelReady: boolean;
+}
+
+export interface SubscriptionScanOptions {
+  /** Auch schon geprüfte Mails neu prüfen (z. B. nachdem die KI eingeschaltet wurde). Von Hand Zugeordnetes bleibt. */
+  recheck?: boolean;
 }
 
 export interface SubscriptionsApi {
   list(): Promise<SubscriptionsView>;
   /** Mails nach Abos durchsuchen: Regeln sofort, das lokale Modell danach im Hintergrund (falls bereit). */
-  scan(): Promise<{ found: number }>;
+  scan(options?: SubscriptionScanOptions): Promise<{ found: number }>;
+  /** „Das ist ein Abo“: diese Mail von Hand übernehmen (mit KI, falls bereit; sonst mit dem, was die Regeln finden). */
+  addFromMail(messageId: string): Promise<StoredSubscription>;
+  /** Zwei Einträge zusammenführen: `sourceId` geht in `targetId` auf (Mails, fehlende Angaben, Erinnerung). */
+  merge(targetId: string, sourceId: string): Promise<StoredSubscription>;
   update(id: string, edit: SubscriptionEdit): Promise<StoredSubscription>;
   setStatus(id: string, status: SubscriptionStatus): Promise<void>;
   /** Erinnerung `daysBefore` Tage vor dem letzten Kündigungstag (Windows-Benachrichtigung). */
@@ -64,7 +85,7 @@ export interface SubscriptionsApi {
   cancelReminder(id: string): Promise<StoredSubscription>;
 }
 
-export const subscriptionsApiMethods = ["list", "scan", "update", "setStatus", "remind", "cancelReminder"] as const satisfies readonly (keyof SubscriptionsApi)[];
+export const subscriptionsApiMethods = ["list", "scan", "addFromMail", "merge", "update", "setStatus", "remind", "cancelReminder"] as const satisfies readonly (keyof SubscriptionsApi)[];
 
 /** Betrag in Cent („12,99 €“, „€8.99“, „1.200,00 €“). */
 export function amountToCents(amount: string | null | undefined): number | null {
@@ -86,4 +107,36 @@ export function monthlyCents(sub: Pick<StoredSubscription, "amountCents" | "inte
 /** Zählt zu den laufenden Kosten? */
 export function countsTowardsCosts(sub: Pick<StoredSubscription, "status" | "kind">): boolean {
   return sub.status === "active" && sub.kind !== "trial";
+}
+
+// Bekannte Zahlungsdienste: ihre Domain sagt nichts über den Anbieter (Stripe-Rechnung von Spotify und von Netflix).
+const billingDomains = new Set([
+  "stripe.com", "paypal.com", "paypal.de", "paddle.com", "paddle.net", "fastspring.com", "chargebee.com", "recurly.com",
+  "digitalriver.com", "2checkout.com", "tebex.io", "lemonsqueezy.com", "apple.com", "google.com", "klarna.com", "klarna.de",
+]);
+
+/** Domain eines Zahlungsdienstes (dann zählt nur der Anbietername)? */
+export function isBillingDomain(domain: string): boolean {
+  return billingDomains.has(domain.toLowerCase());
+}
+
+const nameNoise = /\b(gmbh|ag|se|kg|ohg|ug|inc|ltd|llc|co|corp|limited|the|premium|plus|pro|abo|abonnement|subscription|membership|mitgliedschaft|billing|team|service|support|de|com|net|io)\b/g;
+
+/** Vergleichsschlüssel für Anbieternamen: „Nexus Mods“, „NexusMods Premium“ und „nexusmods.com“ → „nexusmods“. */
+export function providerSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\.(com|de|net|org|io|eu|example|test)\b/g, " ")
+    .replace(nameNoise, " ")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/** Gleicher Anbieter? Gleicher Schlüssel oder einer beginnt mit dem anderen (ab 4 Zeichen: „spotify“ ~ „spotifyfamily“). */
+export function sameProvider(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return short.length >= 4 && long.startsWith(short);
 }
