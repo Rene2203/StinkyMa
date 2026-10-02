@@ -254,6 +254,8 @@ gekündigt). Den Kündigungstag rechnet immer der Code (Laufzeitende bzw. Verlä
   mehr unberührt. Nachmessung danach: Regeln Kontrollsatz 2 51,2 %, **Gemma 4 E2B 90,2 %** (8/9, Testsatz und Kontrollsatz
   unverändert 100 %, 13,3 s je Mail). Übrig bei E2B: eine sehr knappe Abo-Mail nicht erkannt (sx05) und die beiden privaten
   Mails (sh09, sx09 – in der App über die Einordnung „Persönlich“ abgefangen). E4B wurde nicht nachgemessen.
+- Nach der Nachbesserung (Werbefilter für KI-Funde, englische Beträge in den Regeln, PDF-Text): Gemma 4 E2B unverändert
+  100 % / 100 % / 90,2 %, Regeln unverändert – der Werbefilter kostet in den Testsätzen keinen echten Fund.
 
 ## Ergebnis und Entscheidung
 

@@ -532,7 +532,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   KI, Rechnungen gehen immer an die KI, „Durchsuchen“/„Alles neu prüfen“, Hinweis ohne KI, Werbefilter (Newsletter nicht
   per Regel, KI-Fund bei Werbung ohne eigene Beziehung verworfen), „19 % MwSt.“ nicht mehr als Werbung, englische Beträge
   in den Regeln. Tests: 5 neue Unit-Tests, neuer E2E (Rechtsklick → Abo, Alles neu prüfen, Zusammenführen, Mail öffnen).
-  Regeln-Messung unverändert (Kontrollsatz 2: 51,2 %). **Ungeprüft:** echte Mails des Nutzers (Nexus Mods, PDF-Rechnungen),
+  Messung unverändert (Regeln Kontrollsatz 2: 51,2 %, E2B 90,2 %). **Ungeprüft:** echte Mails des Nutzers (Nexus Mods, PDF-Rechnungen),
   Dauer von „Alles neu prüfen“ mit KI bei vielen Rechnungen, Windows-CI. Bekannte Grenze: „beginnt mit“-Vergleich der
   Namen kann ähnlich benannte Anbieter zusammenlegen (z. B. „Google“ und „Google One“) – Trennen gibt es noch nicht.
   Als Nächstes: W7.2 Belegordner (oder vorher eigene Kategorien, siehe Frage des Nutzers).
