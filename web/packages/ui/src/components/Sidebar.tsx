@@ -1,4 +1,4 @@
-import { AlertTriangle, Broom, LogIn, Plus, RefreshCw, Send, Settings, Sun, X } from "lucide-react";
+import { AlertTriangle, Broom, LogIn, Plus, RefreshCw, Repeat, Send, Settings, Sun, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -91,7 +91,7 @@ export function Sidebar() {
             {section.items.map((item) => {
               const Icon = sidebarIcon(item.kind);
               const key = scopeKey(item.scope);
-              const selected = key === selectedKey;
+              const selected = key === selectedKey && state.panel === "mail";
               return (
                 <li key={key}>
                   <button
@@ -108,6 +108,20 @@ export function Sidebar() {
                 </li>
               );
             })}
+            {section.id === "smart" && store.canSubscriptions && (
+              <li>
+                <button
+                  type="button"
+                  className={`sidebar-item${state.panel === "subscriptions" ? " selected" : ""}`}
+                  aria-current={state.panel === "subscriptions" ? "page" : undefined}
+                  data-testid="sidebar-subscriptions"
+                  onClick={() => void store.openSubscriptions()}
+                >
+                  <Repeat className="sidebar-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="sidebar-label">{t("subs.sidebar")}</span>
+                </button>
+              </li>
+            )}
           </ul>
         </section>
       ))}

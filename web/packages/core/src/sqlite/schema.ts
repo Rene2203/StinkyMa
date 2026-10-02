@@ -415,6 +415,45 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // Verträge & Abos (W7.1): ein Eintrag je Anbieter (Absender-Domain) und Konto; geprüfte Mails merken.
+    name: "v16-subscriptions",
+    sql: `
+      CREATE TABLE subscription (
+        id TEXT PRIMARY KEY NOT NULL,
+        accountId TEXT NOT NULL REFERENCES account(id) ON DELETE CASCADE,
+        providerKey TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        amount TEXT,
+        amountCents INTEGER,
+        interval TEXT,
+        startDate TEXT,
+        minTermMonths INTEGER,
+        trialEnd TEXT,
+        termEnd TEXT,
+        renewalDate TEXT,
+        cancelBy TEXT,
+        notice TEXT,
+        lastCancelDay TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        sourceMessageId TEXT REFERENCES message(id) ON DELETE SET NULL,
+        lastMailDate TEXT NOT NULL,
+        quote TEXT NOT NULL,
+        origin TEXT NOT NULL,
+        userEdited INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX subscription_on_provider ON subscription(accountId, providerKey);
+      CREATE TABLE subscriptionScan (
+        messageId TEXT PRIMARY KEY NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        origin TEXT NOT NULL,
+        promptVersion INTEGER NOT NULL,
+        scannedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

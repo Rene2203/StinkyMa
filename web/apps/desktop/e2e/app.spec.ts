@@ -227,6 +227,29 @@ test("Aufräumen: größter Absender, Geschütztes bleibt abgewählt, Löschen e
   await page.getByTestId("sidebar-unifiedInbox").click();
 });
 
+test("Abos & Verträge: Probe-Abo erkannt, Kündigungstag, Erinnerung, gekündigt, Mail öffnen", async () => {
+  await page.getByTestId("sidebar-subscriptions").click();
+  const panel = page.getByTestId("subscriptions");
+  await expect(panel).toBeVisible();
+  const row = panel.getByTestId("subs-row").filter({ hasText: "Streamflix" });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("Probe-Abo");
+  await expect(row.getByTestId("subs-cancel")).toContainText("Kündigen bis");
+  await row.click();
+  const detail = panel.getByTestId("subs-detail");
+  await expect(detail).toContainText("12,99 €");
+  await expect(detail.getByTestId("subs-origin")).toHaveText("erkannt ohne KI");
+  await detail.getByTestId("subs-remind").click();
+  await expect(detail.getByTestId("subs-reminder")).toBeVisible();
+  await shot("31-Abos");
+  await detail.getByTestId("subs-mark-cancelled").click();
+  await expect(panel.getByText("Gekündigt", { exact: true })).toBeVisible();
+  await expect(panel.getByTestId("subs-detail").getByTestId("subs-reminder")).toHaveCount(0);
+  await panel.getByTestId("subs-detail").getByTestId("subs-open-mail").click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId("thread-subject")).toContainText("Probeabo");
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

@@ -8,3 +8,4 @@ export * from "./actionStore.js";
 export * from "./ruleStore.js";
 export * from "./digestStore.js";
 export * from "./cleanupStore.js";
+export * from "./subscriptionStore.js";

@@ -1,9 +1,10 @@
-import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi } from "@stinkyma/core";
+import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi, SubscriptionsApi } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
 import { CleanupDialog } from "./components/CleanupDialog.js";
 import { WebPanelDialog } from "./components/WebPanelDialog.js";
+import { SubscriptionsPanel } from "./components/SubscriptionsPanel.js";
 import { DigestDialog } from "./components/DigestDialog.js";
 import { composeLabels } from "./composeLabels.js";
 import { MessageList } from "./components/MessageList.js";
@@ -31,6 +32,7 @@ export interface AppProps {
   rules?: RulesApi;
   cleanup?: CleanupApi;
   webPanel?: WebPanelHost;
+  subscriptions?: SubscriptionsApi;
   /** Meldet Statusänderungen der KI (Download-Fortschritt usw.). */
   subscribeAIStatus?: (onStatus: (status: AIStatus) => void) => () => void;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
@@ -41,8 +43,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel]);
+export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
@@ -74,8 +76,14 @@ function Shell() {
   return (
     <div className="app">
       <Sidebar />
-      <MessageList />
-      <MessageDetail />
+      {state.panel === "subscriptions" ? (
+        <SubscriptionsPanel />
+      ) : (
+        <>
+          <MessageList />
+          <MessageDetail />
+        </>
+      )}
       {state.compose && (
         <Suspense fallback={null}>
           <Composer draft={state.compose} />

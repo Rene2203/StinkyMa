@@ -2,6 +2,11 @@ import {
   MessageFlag,
   groupRuleFrom,
   type CleanupApi,
+  type StoredSubscription,
+  type SubscriptionEdit,
+  type SubscriptionsApi,
+  type SubscriptionStatus,
+  type SubscriptionsView,
   type CleanupGroup,
   type CleanupGroupBy,
   type CleanupMail,
@@ -136,6 +141,10 @@ export interface BrowserState {
   unsubscribes: Record<string, UnsubscribeState>;
   /** Offene fremde Seite im Fenster innerhalb der App; null = zu */
   webPanel: WebPanelState | null;
+  /** Was die beiden rechten Spalten zeigen: Mails oder „Abos & Verträge“ */
+  panel: "mail" | "subscriptions";
+  /** Verträge & Abos (W7.1) */
+  subscriptions: { view: SubscriptionsView | null; selectedId: string | null; busy: boolean; error: string | null } | null;
 }
 
 /** Fremde Seite in einem Fenster innerhalb der App (Windows-App: abgeschottete Webansicht im Main-Prozess). */
@@ -255,6 +264,8 @@ export const initialState: BrowserState = {
   cleanup: null,
   unsubscribes: {},
   webPanel: null,
+  panel: "mail",
+  subscriptions: null,
 };
 
 // --- Abgeleitete Werte ---
@@ -318,10 +329,11 @@ export class BrowserStore {
   readonly #rules: RulesApi | undefined;
   readonly #cleanup: CleanupApi | undefined;
   readonly #webPanel: WebPanelHost | undefined;
+  readonly #subscriptions: SubscriptionsApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -332,6 +344,87 @@ export class BrowserStore {
     this.#rules = options.rules;
     this.#cleanup = options.cleanup;
     this.#webPanel = options.webPanel;
+    this.#subscriptions = options.subscriptions;
+  }
+
+  // --- Verträge & Abos (W7.1) ---
+
+  get canSubscriptions(): boolean {
+    return Boolean(this.#subscriptions);
+  }
+
+  /** Ansicht „Abos & Verträge“ öffnen: sofort anzeigen, dann neue Mails durchsuchen (Regeln sofort, KI im Hintergrund). */
+  async openSubscriptions(): Promise<void> {
+    const api = this.#subscriptions;
+    if (!api) return;
+    this.#set({ panel: "subscriptions", subscriptions: { view: this.#state.subscriptions?.view ?? null, selectedId: this.#state.subscriptions?.selectedId ?? null, busy: true, error: null } });
+    await this.#loadSubscriptions();
+    try {
+      await api.scan();
+    } catch (e) {
+      this.#patchSubscriptions({ error: messageOf(e) });
+    }
+    await this.#loadSubscriptions();
+  }
+
+  closeSubscriptions(): void {
+    this.#set({ panel: "mail" });
+  }
+
+  #patchSubscriptions(patch: Partial<NonNullable<BrowserState["subscriptions"]>>): void {
+    const current = this.#state.subscriptions ?? { view: null, selectedId: null, busy: false, error: null };
+    this.#set({ subscriptions: { ...current, ...patch } });
+  }
+
+  async #loadSubscriptions(): Promise<void> {
+    const api = this.#subscriptions;
+    if (!api) return;
+    try {
+      const view = await api.list();
+      const selectedId = this.#state.subscriptions?.selectedId;
+      this.#patchSubscriptions({ view, busy: false, selectedId: selectedId && view.items.some((s) => s.id === selectedId) ? selectedId : view.items[0]?.id ?? null });
+    } catch (e) {
+      this.#patchSubscriptions({ busy: false, error: messageOf(e) });
+    }
+  }
+
+  selectSubscription(id: string): void {
+    this.#patchSubscriptions({ selectedId: id });
+  }
+
+  async #subscriptionAction(action: (api: SubscriptionsApi) => Promise<unknown>): Promise<void> {
+    const api = this.#subscriptions;
+    if (!api) return;
+    try {
+      await action(api);
+      this.#patchSubscriptions({ error: null });
+    } catch (e) {
+      this.#patchSubscriptions({ error: messageOf(e) });
+    }
+    await this.#loadSubscriptions();
+  }
+
+  updateSubscription(id: string, edit: SubscriptionEdit): Promise<void> {
+    return this.#subscriptionAction((api) => api.update(id, edit));
+  }
+
+  setSubscriptionStatus(id: string, status: SubscriptionStatus): Promise<void> {
+    return this.#subscriptionAction((api) => api.setStatus(id, status));
+  }
+
+  remindSubscription(id: string, daysBefore: number): Promise<void> {
+    return this.#subscriptionAction((api) => api.remind(id, daysBefore));
+  }
+
+  cancelSubscriptionReminder(id: string): Promise<void> {
+    return this.#subscriptionAction((api) => api.cancelReminder(id));
+  }
+
+  /** Quell-Mail eines Eintrags öffnen (zurück zur Mail-Ansicht). */
+  async openSubscriptionMail(sub: StoredSubscription): Promise<void> {
+    if (!sub.sourceMessageId) return;
+    this.#set({ panel: "mail" });
+    await this.openMessage(sub.sourceMessageId);
   }
 
   // --- Fremde Seite im Fenster innerhalb der App ---
@@ -1019,6 +1112,7 @@ export class BrowserStore {
       isSearching(this.#state) ? this.runSearch() : Promise.resolve(),
       // Aufräumen offen: Schutz der gewählten Gruppe auffrischen (z. B. nach KI-Einordnung)
       this.#state.cleanup?.group?.mails ? this.#loadCleanupMails() : Promise.resolve(),
+      this.#state.panel === "subscriptions" ? this.#loadSubscriptions() : Promise.resolve(),
     ]);
     const selected = this.#state.selectedMessageId;
     const message = selected ? this.#find(selected) : undefined;
@@ -1287,10 +1381,14 @@ export class BrowserStore {
   }
 
   async selectScope(scope: MessageScope): Promise<void> {
-    if (scopeKey(scope) === scopeKey(this.#state.selectedScope)) return;
+    if (scopeKey(scope) === scopeKey(this.#state.selectedScope)) {
+      if (this.#state.panel !== "mail") this.#set({ panel: "mail" });
+      return;
+    }
     // Ordnerwechsel beendet eine Suche in allen Ordnern; „nur in diesem Ordner“ sucht im neuen Ordner weiter.
     const keepSearch = isSearching(this.#state) && !this.#state.searchAllFolders;
     this.#set({
+      panel: "mail",
       selectedScope: scope, messageLimit: 0, hasMoreMessages: false, selectedMessageId: null, thread: [], attachmentsByMessageId: {}, summary: null, actions: null, replies: null,
       ...(keepSearch ? {} : { searchText: "", searchResults: null }),
     });

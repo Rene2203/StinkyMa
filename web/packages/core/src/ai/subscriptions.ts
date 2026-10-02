@@ -130,6 +130,14 @@ function dateIn(sentence: string, mailDate: Date): string | null {
   return explicitDates(sentence, mailDate)[0]?.date ?? relativeDates(sentence, mailDate)[0]?.date ?? null;
 }
 
+// Vorfilter für das Modell: bewusst breiter als die Regeln – lieber eine Mail zu viel prüfen als ein Abo übersehen
+const candidateCue = /(subscrib|billed|renew|membership|mitglied|grundgebühr|monatsbeitrag|beitrag|lastschrift|plan\b)/i;
+
+/** Schneller Vorfilter: kann diese Mail überhaupt von einem Abo/Vertrag handeln? (entscheidet, was das Modell prüft) */
+export function mightBeSubscription(text: string): boolean {
+  return trialCue.test(text) || cancelledCue.test(text) || subscriptionCue.test(text) || candidateCue.test(text);
+}
+
 /** Anbieter: Anzeigename ohne Zusätze, sonst die Domain. */
 export function providerName(from: EmailAddress): string {
   const name = (from.name ?? "").replace(/\s*[-–|]?\s*\b(kundenservice|kundendienst|leserservice|service|support|team|billing|noreply)\b\s*$/i, "").trim();

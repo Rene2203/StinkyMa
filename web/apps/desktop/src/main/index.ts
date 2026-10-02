@@ -10,6 +10,7 @@ import {
   localDay,
   rulesApiMethods,
   cleanupApiMethods,
+  subscriptionsApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -31,9 +32,9 @@ import {
   type Message,
 } from "@stinkyma/core";
 import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
-import { AIService, ModelStore, RuntimeStore } from "@stinkyma/core/llm";
+import { AIService, ModelStore, RuntimeStore, SubscriptionService } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, CleanupStore, DigestStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -62,6 +63,7 @@ let service: MailService | null = null;
 let ai: AIService | null = null;
 let rules: RuleService | null = null;
 let cleanup: CleanupService | null = null;
+let subscriptions: SubscriptionService | null = null;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
 let tray: Tray | null = null;
@@ -162,7 +164,11 @@ function setUpServices(): void {
     onChange: notifyRenderer,
     onNewMail: (_accountId, messages) => showNewMailNotification(messages),
     // Regeln (W6.4) laufen vor der Benachrichtigung – Weggeräumtes meldet sich nicht
-    onArrived: (_accountId, messageIds) => rules?.arrived(messageIds),
+    onArrived: async (_accountId, messageIds) => {
+      await rules?.arrived(messageIds);
+      // Neue Mails gleich nach Abos durchsuchen (Regeln sofort, KI im Hintergrund)
+      void subscriptions?.scan().catch(() => undefined);
+    },
   });
 
   // KI: Modelle im Benutzerordner, alles läuft auf diesem Rechner. Ohne gewähltes Modell passiert nichts.
@@ -212,6 +218,13 @@ function setUpServices(): void {
 
   // Aufräumen: große Absender/Domains, löschen nur auf Klick; „KI prüfen“ ordnet die Gruppe vorrangig ein
   cleanup = new CleanupService(new CleanupStore(db), mailService, { categorize: (ids) => aiService.categorizeMessages(ids) });
+
+  // Verträge & Abos (W7.1): Regeln sofort, lokales Modell (falls bereit) im Hintergrund; kündigt nie selbst
+  subscriptions = new SubscriptionService({
+    store: new SubscriptionStore(db, () => randomUUID()),
+    extract: (message) => aiService.extractSubscription(message),
+    onChange: notifyRenderer,
+  });
 }
 
 /** Die Oberfläche lädt neu, wenn sich Daten geändert haben (Abgleich, Aktionen, Konten). Gebündelt, um Flackern zu vermeiden. */
@@ -450,6 +463,7 @@ function registerIpc(): void {
     ["ai", new Set<string>(aiMethods), () => ai],
     ["rules", new Set<string>(rulesApiMethods), () => rules],
     ["cleanup", new Set<string>(cleanupApiMethods), () => cleanup],
+    ["subscriptions", new Set<string>(subscriptionsApiMethods), () => subscriptions],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {

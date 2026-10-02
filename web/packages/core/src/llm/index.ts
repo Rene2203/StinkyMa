@@ -4,3 +4,4 @@ export * from "./llamaProvider.js";
 export * from "./aiService.js";
 export * from "./runtimeStore.js";
 export * from "./llamaServer.js";
+export * from "./subscriptionService.js";

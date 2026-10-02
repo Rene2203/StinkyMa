@@ -10,6 +10,7 @@ import { interpretRule, interpretRuleWithRules, type RuleInterpretation } from "
 import { draftReplies } from "../ai/replies.js";
 import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
+import { extractSubscription, type SubscriptionResult } from "../ai/subscriptions.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
 import { AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse, type AITask } from "../ai/types.js";
 import type { Message, MessageCategory } from "../models.js";
@@ -562,6 +563,13 @@ export class AIService implements AIApi {
       }
       return interpretRuleWithRules(text, folders);
     }
+  }
+
+  /** Abo-Erkennung (W7.1) mit dem lokalen Modell; `null`, wenn keins bereit ist (dann gelten die Regeln). */
+  async extractSubscription(message: Message): Promise<SubscriptionResult | null> {
+    if (!(await this.#modelReady())) return null;
+    const { router } = await this.#router();
+    return extractSubscription(router, message);
   }
 
   async #modelReady(): Promise<boolean> {
