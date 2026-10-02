@@ -283,6 +283,30 @@ Videospiele, Oma). Kontrollsatz (geschrieben nach Lauf v1, **vor** v2/v3): ander
   nur neue). **Ehrlich:** Die Sätze sind klein und von derselben Hand; v3 entstand nach Lauf v1 am Testsatz, der
   Kontrollsatz war für v2/v3 neu. Echte Postfächer sind ungeprüft.
 
+## Belegordner (W7.2, 02.10.2026)
+
+Aufgabe: Ist die Mail ein Beleg, und was steht drin (Händler, Datum, Brutto, Netto/MwSt., Rechnungsnummer, Frist,
+Kategorie)? Testsatz 20 Mails (6 Fallen: Werbung, Angebot, Versandinfo, Phishing-„Rechnung“, private Schulden,
+Kontoauszug), Kontrollsatz 12 (Englisch, Beträge nur im PDF, Storno, Kostenvoranschlag), **Kontrollsatz 2** 10
+(unordentlich: PDF-Tabellen, Beträge ohne €, ISO-Daten, „Subtotal/Tax/Total“; geschrieben nach dem Feinschliff der
+Regeln und danach nicht mehr zum Anpassen genutzt). Angaben richtig = alle erwarteten Felder; Kategorie getrennt.
+
+| Verfahren | Testsatz | Kontrollsatz | Kontrollsatz 2 | Fehlalarme (KS 2) | Zeit (Median) |
+|---|---|---|---|---|---|
+| Regeln (ohne KI) | 14/14 · 100 % | 8/8 · 100 % | 5/6 · 53,8 % | 1 | 0 s |
+| Gemma 4 E2B | 14/14 · 100 % | 8/8 · 100 % | 6/6 · 84,6 % | 1 | 12,2 s |
+| Gemma 4 E4B | 14/14 · 100 % | 8/8 · 100 % | 6/6 · 92,3 % | 0 | 19,9 s |
+
+- **Die 100 % der Regeln sind geschönt** (Sätze und Regeln aus einer Hand; am Kontrollsatz wurde eine Frist-Regel
+  nachgebessert). Kontrollsatz 2 zeigt die Grenzen.
+- Erster KI-Lauf (E2B, vor Korrekturen): Testsatz nur 74 % richtig – das Modell schrieb ins Feld „Händler“ fast immer
+  die Dokumentart („Rechnung“, „Kassenbon“) und als MwSt. den Satz („19 %“). Allgemein behoben, nicht pro Fall:
+  Händler muss im Absender oder Text stehen und darf keine Dokumentart sein; Prozent ist kein Betrag; Netto/MwSt. nur,
+  wenn sie als Betrag im Text stehen; Stichwort-Kategorie vor dem Vorschlag des Modells; sagt das Modell „kein Beleg“,
+  die Regeln aber finden einen klaren Gesamtbetrag, bleibt der Beleg mit „bitte prüfen“. Dazu ISO-Daten (2026-09-28).
+- Übrige Fehler: Belegdatum hinter „Date paid: Sep 21, 2026“ bzw. „Abgebucht am …“ nicht erkannt (Maildatum genommen);
+  die Zahlungserinnerung (rx08) hält E2B für einen Beleg (E4B nicht).
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,

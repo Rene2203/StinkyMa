@@ -192,12 +192,15 @@ export async function extractPromises(
     if (parsed) {
       // Frist: was die Regeln zum selben Satz gerechnet haben, gewinnt bei Abweichung nicht – beide rechnen gleich;
       // fehlt dem Modell die Frist, ergänzt die Regel aus demselben Satz („Bis Sonntag“ im Folgesatz)
+      const same = (a: PromiseFinding, b: PromiseFinding) => normalize(a.quote).includes(normalize(b.quote).slice(0, 30)) || normalize(b.quote).includes(normalize(a.quote).slice(0, 30));
       for (const finding of parsed) {
         if (finding.dueDate) continue;
-        const twin = rules.find((r) => normalize(r.quote).includes(normalize(finding.quote).slice(0, 30)) || normalize(finding.quote).includes(normalize(r.quote).slice(0, 30)));
+        const twin = rules.find((r) => same(r, finding));
         if (twin?.dueDate) finding.dueDate = twin.dueDate;
       }
-      return { findings: parsed, origin: response.privacyClass, durationMs };
+      // Was die Regeln sicher gefunden haben, bleibt – auch wenn das Modell es übersieht (lieber eine Zusage zu viel)
+      const missed = rules.filter((r) => !parsed.some((f) => same(r, f)));
+      return { findings: [...parsed, ...missed], origin: response.privacyClass, durationMs };
     }
   }
   return { findings: rules, origin: "rules", durationMs };

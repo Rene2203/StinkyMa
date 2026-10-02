@@ -554,7 +554,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Kategorien, ausblenden, Erinnerung vor Frist, „Als Beleg übernehmen“, Export ZIP (PDFs ohne AGB + CSV für Excel).
   Testhaken `STINKYMA_TEST_SAVE_DIR` (Export ohne Dialog, nur für E2E). Tests: 8 Unit-Tests (Beträge, Regeln,
   Modell-Prüfung, CSV, ZIP, Speicher/Dienst, Export), E2E (erkannt, korrigiert, Rechtsklick, Export geprüft).
-  Messung: Regeln allein Testsatz und Kontrollsatz 100 % (geschönt, aus einer Hand), unordentlicher Kontrollsatz 2 nur 54 % – Messung mit E2B/E4B läuft.
+  Messung: siehe Eintrag W7.3 unten (Nachmessung nach Korrekturen) und `docs/KI-MESSUNG.md`.
   **Ungeprüft:** echte Postfächer, ZIP mit echten PDFs vom Server (im E2E nur Beispielkonten ohne Dateiinhalt),
   Öffnen des ZIP unter Windows, Windows-CI.
 - **W7.3 Versprechen-Tracker (02.10.2026) – gebaut, lokal geprüft:** „Meine Zusagen“ (gesendete Mails) und „Ich warte auf“
@@ -569,6 +569,7 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Hinweis zur Messung Belege: E2B füllte „Händler“ mit der Dokumentart („Rechnung“) und MwSt. mit dem Satz („19 %“) –
   allgemein behoben (Händler muss im Absender/Text stehen und darf keine Dokumentart sein; Prozent ist kein Betrag;
   Netto/MwSt. nur, wenn im Text; Stichwort-Kategorie vor Modell; „KI sagt kein Beleg“ bei klarem Gesamtbetrag → bleibt
-  mit „bitte prüfen“). Nachmessung läuft.
+  mit „bitte prüfen“). Nachmessung: E2B 100 % / 100 % / 84,6 % (Kontrollsatz 2), E4B 100 % / 100 % / 92,3 %, Regeln 53,8 %
+  auf Kontrollsatz 2. Details `docs/KI-MESSUNG.md`.
   Als Nächstes: Messungen auswerten; danach W8.
 
