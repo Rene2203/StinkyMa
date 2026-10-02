@@ -516,7 +516,7 @@ export async function evaluateUserCategories(
   options: { promptVersion?: 1 | 2 | 3; onProgress?: (done: number, total: number) => void } = {},
 ): Promise<UserCategoriesEvalReport> {
   const router = new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() });
-  const report: UserCategoriesEvalReport = { name: `${provider.displayName} v${options.promptVersion ?? 2}`, sets: [], medianMs: 0, misses: [] };
+  const report: UserCategoriesEvalReport = { name: `${provider.displayName} v${options.promptVersion ?? 3}`, sets: [], medianMs: 0, misses: [] };
   const durations: number[] = [];
   const all = [
     ["Testsatz", evalUserCategoryDefs, evalUserCategoryCases],
@@ -528,7 +528,7 @@ export async function evaluateUserCategories(
     const categories: UserCategory[] = defs.map((c, i) => ({ ...c, senders: [], color: "blue", sortOrder: i }));
     const entry = { label, correct: 0, total: 0, found: 0, withCategory: 0, falseAssignments: 0, wrongCategory: 0 };
     for (const testCase of cases as readonly { mail: Omit<EvalMail, "expected">; expected: string | null }[]) {
-      const result = await classifyUserCategory(router, evalMailToMessage({ ...testCase.mail, expected: "personal" }), categories, { promptVersion: options.promptVersion ?? 2 });
+      const result = await classifyUserCategory(router, evalMailToMessage({ ...testCase.mail, expected: "personal" }), categories, { promptVersion: options.promptVersion ?? 3 });
       if (result.origin !== "rules") durations.push(result.durationMs);
       const got = result.categoryId;
       entry.total++;

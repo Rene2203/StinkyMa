@@ -541,7 +541,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Zuordnung: von Hand → gemerkter Absender → Absenderliste der Kategorie → lokales Modell (eigener kurzer Prompt, der
   gemessene Einordnungs-Prompt bleibt unverändert; neueste 300 Mails + neue, neu prüfen bei geänderten Kategorien).
   Migration v18. Tests: 6 Unit-Tests (Kern), 1 Store-Test, 1 E2E (anlegen mit Absender, Filter, an der Mail ändern
-  und merken, bearbeiten/löschen). Messung siehe `docs/KI-MESSUNG.md` („Eigene Kategorien“): Messung v1 gegen v2 läuft noch (erster Lauf v1: E2B erkennt alle 20 Mails mit Kategorie, ordnet aber 5 von 10 ohne passende Kategorie trotzdem zu).
+  und merken, bearbeiten/löschen). Messung siehe `docs/KI-MESSUNG.md` („Eigene Kategorien“): E2B mit Rückfrage bei Treffern (v3) 30/30 und 20/20, keine
+  Fehlzuordnung, ~8 s je Mail; E4B mit v2 29/30 und 20/20, ~4 s. Ohne Rückfrage ordnete E2B die Hälfte der Mails ohne
+  passende Kategorie trotzdem zu.
   **Ungeprüft:** echte Postfächer, Dauer des KI-Durchgangs auf schwacher Hardware bei 300 Mails, Windows-CI.
   Als Nächstes: W7.2 Belegordner.
 

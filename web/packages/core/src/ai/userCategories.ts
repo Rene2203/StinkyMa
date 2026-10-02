@@ -8,7 +8,15 @@ import type { AIMessage, AIRequest, JsonSchema } from "./types.js";
 // Eigene Kategorien: ein eigener, kurzer Schritt nach der festen Einordnung. Deren Prompt bleibt unverändert (gemessen);
 // hier entscheidet das Modell nur „welche eigene Kategorie passt – oder keine“.
 
-export const userCategoryPromptVersion = 2;
+export const userCategoryPromptVersion = 3;
+
+/**
+ * Welche Variante je Modell (Messung 02.10.2026, docs/KI-MESSUNG.md): Gemma 4 E2B (Standard, schwache Hardware) mit
+ * Rückfrage bei Treffern (v3: keine Fehlzuordnung mehr, ~8 s je Mail); Gemma 4 E4B ohne (v2 ist dort genauer und schneller).
+ */
+export function userCategoryPromptFor(modelId: string | null | undefined): 2 | 3 {
+  return modelId?.startsWith("gemma-4-e4b") ? 2 : 3;
+}
 const none = "keine";
 
 export function userCategorySchema(categories: readonly Pick<UserCategory, "name">[]): JsonSchema {
@@ -85,7 +93,7 @@ export async function classifyUserCategory(
   categories: readonly UserCategory[],
   options: { signal?: AbortSignal; /** nur für Vergleichsmessungen */ promptVersion?: 1 | 2 | 3 } = {},
 ): Promise<UserCategoryResult> {
-  const version = options.promptVersion ?? 2;
+  const version = options.promptVersion ?? 3;
   const mail = mailForModel(message, 1200);
   const request: AIRequest = {
     task: "userCategory",

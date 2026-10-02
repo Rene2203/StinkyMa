@@ -11,7 +11,7 @@ import { draftReplies } from "../ai/replies.js";
 import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
 import { extractSubscription, type SubscriptionResult } from "../ai/subscriptions.js";
-import { classifyUserCategory, type UserCategoryResult } from "../ai/userCategories.js";
+import { classifyUserCategory, userCategoryPromptFor, type UserCategoryResult } from "../ai/userCategories.js";
 import type { UserCategory } from "../userCategories.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
 import { AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse, type AITask } from "../ai/types.js";
@@ -577,8 +577,8 @@ export class AIService implements AIApi {
   /** Eigene Kategorie einer Mail per Modell; `null`, wenn kein Modell bereit ist. */
   async classifyUserCategory(message: Message, categories: readonly UserCategory[]): Promise<UserCategoryResult | null> {
     if (!(await this.#modelReady())) return null;
-    const { router } = await this.#router();
-    return classifyUserCategory(router, message, categories);
+    const { router, model } = await this.#router();
+    return classifyUserCategory(router, message, categories, { promptVersion: userCategoryPromptFor(model.id) });
   }
 
   /** Ist ein lokales Modell eingeschaltet und installiert? */

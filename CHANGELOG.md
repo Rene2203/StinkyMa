@@ -36,7 +36,8 @@
   - **An der Mail ändern** (Auswahl neben der Einordnung), standardmäßig für den Absender gemerkt – seine anderen Mails folgen.
   - Die **lokale KI** prüft in einem eigenen kurzen Schritt („welche eigene Kategorie passt – oder keine“), im
     Hintergrund, die neuesten 300 Mails und alle neuen; ändern sich die Kategorien, prüft sie neu. Der gemessene Prompt
-    der festen Einordnung bleibt unverändert.
+    der festen Einordnung bleibt unverändert. Mit Gemma 4 E2B gibt es bei einem Treffer eine kurze Rückfrage – in der
+    Messung verschwanden damit alle Fehlzuordnungen (siehe `docs/KI-MESSUNG.md`).
   - Migration `v18-user-categories`.
 
 ## Aufräumen und mehr Mails (nach W6)

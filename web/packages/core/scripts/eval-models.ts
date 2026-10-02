@@ -37,8 +37,8 @@ if (summaryV2) args.splice(args.indexOf("--summary-v2"), 1);
 // --user-categories: eigene Kategorien (Beispiel-Kategorien mit Fallen)
 const userCategoriesOnly = args.includes("--user-categories");
 if (userCategoriesOnly) args.splice(args.indexOf("--user-categories"), 1);
-const userCategoriesVersion = args.includes("--v1") ? 1 : args.includes("--v3") ? 3 : 2;
-for (const name of ["--v1", "--v3"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
+const userCategoriesVersion = args.includes("--v1") ? 1 : args.includes("--v2") ? 2 : 3;
+for (const name of ["--v1", "--v2", "--v3"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
 const subscriptionsOnly = args.includes("--subscriptions");
 if (subscriptionsOnly) args.splice(args.indexOf("--subscriptions"), 1);
 const all = args.includes("--all");

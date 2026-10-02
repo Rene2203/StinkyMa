@@ -257,6 +257,32 @@ gekündigt). Den Kündigungstag rechnet immer der Code (Laufzeitende bzw. Verlä
 - Nach der Nachbesserung (Werbefilter für KI-Funde, englische Beträge in den Regeln, PDF-Text): Gemma 4 E2B unverändert
   100 % / 100 % / 90,2 %, Regeln unverändert – der Werbefilter kostet in den Testsätzen keinen echten Fund.
 
+## Eigene Kategorien (02.10.2026)
+
+Aufgabe: Passt eine Mail zu einer der eigenen Kategorien des Nutzers – oder zu keiner? Eigener kurzer Schritt nach der
+festen Einordnung (deren Prompt bleibt unverändert). Testsatz: 3 Beispiel-Kategorien (Gaming, Verein, Schule), 30 Mails,
+davon 10 ohne passende Kategorie mit Fallen (Sportgeschäft-Werbung, Kinderarzt, Bundesliga-Tickets, Streamflix-Doku über
+Videospiele, Oma). Kontrollsatz (geschrieben nach Lauf v1, **vor** v2/v3): andere Kategorien (Auto, Reisen, Garten),
+20 Mails, 8 ohne Kategorie. Gemessen auf 4 CPU-Kernen.
+
+| Modell | Variante | Testsatz richtig | fälschlich zugeordnet | Kontrollsatz richtig | fälschlich zugeordnet | Zeit (Median) |
+|---|---|---|---|---|---|---|
+| Gemma 4 E2B | v1 | 25/30 | 5/10 | 19/20 | 1/8 | 2,4 s |
+| Gemma 4 E2B | v2 | 25/30 | 5/10 | 19/20 | 1/8 | 2,3 s |
+| Gemma 4 E2B | **v3** | **30/30** | **0/10** | **20/20** | **0/8** | 8,1 s |
+| Gemma 4 E4B | v1 | 28/30 | 2/10 | 20/20 | 0/8 | 4,1 s |
+| Gemma 4 E4B | **v2** | **29/30** | **1/10** | **20/20** | **0/8** | 4,0 s |
+| Gemma 4 E4B | v3 | 28/30 (1 übersehen) | 1/10 | 20/20 | 0/8 | 15,4 s |
+
+- Alle Varianten erkennen die Mails, die in eine Kategorie gehören (außer E4B v3: 1 übersehen). Das Problem waren
+  Mails ohne passende Kategorie: E2B ordnete jede zweite trotzdem zu („ähnliches Thema“).
+- v2 (Anweisung „keine ist der Normalfall, nur bei direktem Bezug“) hilft E2B nicht, E4B ein wenig.
+- v3 = v2 plus **Rückfrage nur bei einem Treffer** („gehört diese Mail wirklich in ‚X‘?“). Bei E2B verschwinden alle
+  Fehlzuordnungen in beiden Sätzen, ohne dass etwas übersehen wird – kostet aber eine zweite Anfrage je Treffer.
+- **Entscheidung:** E2B (Standard) mit v3, E4B mit v2. Der KI-Durchgang läuft im Hintergrund (neueste 300 Mails, dann
+  nur neue). **Ehrlich:** Die Sätze sind klein und von derselben Hand; v3 entstand nach Lauf v1 am Testsatz, der
+  Kontrollsatz war für v2/v3 neu. Echte Postfächer sind ungeprüft.
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,

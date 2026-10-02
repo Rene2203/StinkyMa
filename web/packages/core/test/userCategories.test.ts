@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeUserCategory, parseUserCategory, senderMatches, userCategoryPrompt, type Account, type UserCategory } from "../src/index.js";
+import { normalizeUserCategory, parseUserCategory, senderMatches, userCategoryPrompt, userCategoryPromptFor, type Account, type UserCategory } from "../src/index.js";
 import { UserCategoryService } from "../src/llm/index.js";
 import { MailWriter, openDatabase, SqliteMailRepository, UserCategoryStore } from "../src/sqlite/index.js";
 
@@ -53,6 +53,9 @@ describe("Eigene Kategorien: Grundlagen", () => {
     expect(parseUserCategory('{"kategorie": "Sport"}', categories)).toBeNull();
     expect(parseUserCategory("kaputt", categories)).toBeNull();
     expect(userCategoryPrompt("Mail", categories)[0]?.content).toContain("- Gaming");
+    // Standardmodell mit Rückfrage, E4B ohne (Messung)
+    expect(userCategoryPromptFor("gemma-4-e2b-q4")).toBe(3);
+    expect(userCategoryPromptFor("gemma-4-e4b-q4")).toBe(2);
   });
 });
 
