@@ -520,8 +520,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   (Hintergrund, nur Kandidaten; „kein Abo“ entfernt reine Regel-Funde; Spam-Verdacht und „Persönlich“ werden übersprungen).
   Speicher je Konto + Absender-Domain (Migration v16), neuere Mails aktualisieren, Korrekturen des Nutzers bleiben.
   Ansicht „Abos & Verträge“ mit Kosten, Kündigungstag, Erinnerung (nie in der Vergangenheit), Korrigieren, Status.
-  Messung siehe `docs/KI-MESSUNG.md`: Regeln stark auf eigenen Sätzen, auf unordentlichen Mails (Kontrollsatz 2) 44 %,
-  mit E2B 80,5 %, E4B 87,8 %. Tests: Rechnen/Erkennen/Speicher/Suchlauf (Unit), E2E mit der echten App.
+  Messung siehe `docs/KI-MESSUNG.md`: Regeln stark auf eigenen Sätzen, auf unordentlichen Mails (Kontrollsatz 2) 44 % (nach
+  Korrekturen 51 %), mit E2B 80,5 % → nach Korrekturen 90,2 %, E4B 87,8 % (vor Korrekturen).
+  Tests: Rechnen/Erkennen/Speicher/Suchlauf (Unit), E2E mit der echten App.
   **Ungeprüft:** echte Postfächer (Trefferquote, Dauer des KI-Durchgangs bei vielen Kandidaten), Windows-CI.
   Als Nächstes: W7.2 Belegordner.
 

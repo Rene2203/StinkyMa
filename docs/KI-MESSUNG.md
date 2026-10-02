@@ -251,7 +251,9 @@ gekündigt). Den Kündigungstag rechnet immer der Code (Laufzeitende bzw. Verlä
   abbildbar, weil dort keine Einordnung vorliegt).
 - Danach allgemeine Korrekturen: Betragsprüfung in Cent („€8.99“ wurde fälschlich verworfen), „tomorrow“/„today“, Versicherung
   auch am Absendernamen erkennen, genauere Art der Regeln geht vor. **Ehrlich:** gesehen am Kontrollsatz 2 – der ist damit nicht
-  mehr unberührt. Regeln danach: Kontrollsatz 2 51,2 %. (E2B-Nachmessung siehe unten.)
+  mehr unberührt. Nachmessung danach: Regeln Kontrollsatz 2 51,2 %, **Gemma 4 E2B 90,2 %** (8/9, Testsatz und Kontrollsatz
+  unverändert 100 %, 13,3 s je Mail). Übrig bei E2B: eine sehr knappe Abo-Mail nicht erkannt (sx05) und die beiden privaten
+  Mails (sh09, sx09 – in der App über die Einordnung „Persönlich“ abgefangen). E4B wurde nicht nachgemessen.
 
 ## Ergebnis und Entscheidung
 
