@@ -22,6 +22,11 @@
   Danach: „Vorhandene Mails aufräumen“. Migration `v15-unsubscribe`.
 - **Neuer Name: StinkyMail.** Daten, Konten und Einstellungen bleiben beim Update erhalten.
 
+### Feinabstimmung Gemma 4 E2B / E4B
+- Zusammenfassung „wer ist dran“ deutlich zuverlässiger (beide Modelle 90 % statt 60–90 %), Beträge und Daten vollständiger.
+- Termine und Fristen: „am Dienstag um 9:30“, „bis Freitag“, „morgen“, „übermorgen“ werden erkannt – auch ohne KI; Daten ohne
+  Jahreszahl bekommen das richtige Jahr; Öffnungszeiten und Werbung erzeugen keine Termine mehr.
+
 ## W6 – Assistent
 
 ### Neu

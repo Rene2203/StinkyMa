@@ -164,6 +164,67 @@ lesend beurteilen – alle Vorschläge stehen in der Ausgabe des Messlaufs.
 - Ausreißer bei der Zeit (bis 35 s) – bei drei Plätzen schreibt das Modell manchmal lange; Kandidat für die Feinabstimmung
   (maxLength je Platz kürzer).
 
+## Feinabstimmung Gemma 4 E2B / E4B (01./02.10.2026)
+
+4 CPU-Kerne wie oben. Ziel: die offenen Punkte der bisherigen Messungen – „wer ist dran“, Fakten, Jahr ohne Jahreszahl,
+Wochentage, unnötige Aktionen.
+
+### Zusammenfassungen (`eval-models.ts --summaries [--summary-v2]`)
+
+Neu: Kontrollsatz mit 10 Konversationen (`evalHoldoutThreads`), vor der Feinabstimmung geschrieben – u. a. Fälle, in denen
+die letzte Mail von jemand anderem stammt, der Nutzer aber trotzdem wartet („ich melde mich bis Freitag“).
+
+| Fassung | Modell | „Wer ist dran“ Testsatz | Kontrollsatz | zusammen | Fakten (Test/Kontrolle) | Zeit (Median) |
+|---|---|---|---|---|---|---|
+| v2 (bisher) | E2B | 60 % | 90 % | 15/20 | 92,3 % / 100 % | 11,8 s |
+| v2 (bisher) | E4B | 60 % | 80 % | 14/20 | 96,2 % / 100 % | 21,1 s |
+| v3 | E2B | 80 % | 50 % | 13/20 | 100 % / 100 % | 12,6 s |
+| v3 | E4B | 90 % | 80 % | 17/20 | 100 % / 100 % | 24,8 s |
+| **v4 (neu, Standard)** | **E2B** | **90 %** | **90 %** | **18/20** | 96,2 % / 100 % | 13,2 s |
+| **v4 (neu, Standard)** | **E4B** | **90 %** | **90 %** | **18/20** | 96,2 % / 100 % | 26,6 s |
+
+- **v3**: zwei Ja/Nein-Fragen an das Modell („muss der Nutzer handeln?“, „wartet er?“). E4B profitierte, E2B nicht – es
+  verneinte beides gerade dann, wenn der Nutzer zuletzt etwas gefragt hatte.
+- **v4**: Das Modell beurteilt nur noch die **letzte Mail** (fragt/bittet sie? kündigt sie eine Meldung an?). Wer dann dran
+  ist, folgt im Code daraus, wer sie geschrieben hat. Dazu im Prompt: „Übernimm alle Beträge, Mengen, Daten … auch bei
+  Erledigtem“.
+- Verbleibende Fehler: „Anna, dann bitte nur noch Folie 7 und 9 anschauen“ (Bitte nicht erkannt), „Ich melde mich bis
+  Freitag“ von E2B als Frage gewertet, Elternbrief mit Frist von E4B übersehen.
+- **Ehrlich:** Die Fehler von v3 im Kontrollsatz flossen in den Entwurf von v4 ein – der Kontrollsatz ist damit nicht mehr
+  ganz unberührt. Die Verbesserung trägt aber in beiden Sätzen gleich (90 %).
+
+### Aktionen (`eval-models.ts --actions`)
+
+Neu: 14 Fälle mit relativen Angaben („am Dienstag um 9:30“, „bis Freitag“, „morgen“, „übermorgen“, Öffnungszeiten als
+Falle), davon 6 als Kontrollfälle. Insgesamt 60 erwartete Angaben (vorher 43).
+
+| Verfahren | Angaben gefunden | unnötige Aktionen | Zeit (Median) |
+|---|---|---|---|
+| Regeln vorher (ohne Wochentage) | – (relative Fälle: 0 von 13) | 0 | 0 s |
+| **Regeln jetzt** | **95,0 %** | 0 | 0 s |
+| E2B mit Kalender im Prompt (Zwischenstand) | 90,0 % | 9 | 6,8 s |
+| E4B mit Kalender im Prompt (Zwischenstand) | 98,3 % | 6 | 12,1 s |
+| **E2B mit Gegenprobe (Standard)** | **100,0 %** | 3 | 7,2 s |
+| **E4B mit Gegenprobe** | 98,3 % | 3 | 11,9 s |
+
+- **Jahr ohne Jahreszahl** („31. Oktober“): setzt jetzt der Code (nächstes passendes ab Maildatum) – beide Modelle hatten 2027 geraten.
+- **Wochentage, „morgen“, „übermorgen“** in den Regeln (nicht bei „Montag bis Freitag“, „immer dienstags“, Öffnungszeiten).
+- Ein **Kalender der nächsten 7 Tage im Prompt** verwirrte E2B (kopierte das erste Datum, sogar bei „17.10.“) – wieder
+  entfernt. Stattdessen **Gegenprobe**: Belegt der Satz in der Mail ein anderes Datum (fest oder relativ), gilt das; Werbung und
+  Öffnungszeiten aus dem Modell werden verworfen.
+- „Angebot“ allein gilt nicht mehr als Werbung („das Angebot für Hansen muss spätestens am Donnerstag raus“).
+- Ehrlich: Ein Kontrollfall deckte einen Fehler auf („Schalter 3. Bitte“ galt als Datum) – behoben. „Freitagnachmittag“
+  (zusammengesetzt) erkennen die Regeln nicht.
+
+### Antwortvorschläge, Regeln, Einordnung
+
+- **Antwortvorschläge** (unverändert, jetzt auch E4B gemessen): beide 12/12 mit ≥ 2 Vorschlägen und richtiger Anrede;
+  E2B 5,1 s, E4B 16,1 s (Median). Kein Handlungsbedarf.
+- **Regeln in eigenen Worten**: E4B „Modell zuerst“ bringt nichts – 35/36 wie „Regeln zuerst“, aber 36 statt 1 Modellaufruf.
+  Bleibt bei „Regeln zuerst“ für alle Modelle.
+- **Einordnung**: unverändert (98,8 % / 92,9 % bei E2B). Ohne echte Fehlbeispiele aus dem Postfach des Nutzers würde weiteres
+  Feilen nur auf den Testsatz passen.
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,
@@ -175,6 +236,8 @@ lesend beurteilen – alle Vorschläge stehen in der Ausgabe des Messlaufs.
   gut und bei „wer ist dran“ am besten (90 %), auf schwacher Hardware aber mit ~22 s je Mail am langsamsten.
 - Die Phishing-Verbesserung durch v2 trägt auch im Kontrollsatz (Gemma E2B 1/4 → 3/4), ist also keine reine Überanpassung.
 
-**Offen:** „Wer ist dran“ bleibt bei den Gemma-Modellen bei 60 % (v2 half nur Qwen 4B). Fakten in Zusammenfassungen 92 %
+**Nachtrag 02.10.2026:** „Wer ist dran“ mit Prompt v4 bei beiden Gemma-Modellen 90 % (siehe Feinabstimmung oben).
+
+**Offen (Stand vor der Feinabstimmung):** „Wer ist dran“ bleibt bei den Gemma-Modellen bei 60 % (v2 half nur Qwen 4B). Fakten in Zusammenfassungen 92 %
 (Ziel Extraktion ≥ 95 %; fehlende Fakten betreffen meist Details bereits erledigter Vorgänge). Nächster Schritt: Prompt für
 Zusammenfassungen gezielt verbessern (v3) und erneut messen. Messung auf dem N97 und mit Grafikkarte steht aus.

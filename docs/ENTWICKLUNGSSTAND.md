@@ -507,12 +507,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   „funktioniert super“. Welche Punkte im Einzelnen geprüft wurden (Update über alte Installation, „alle Mails“ bei Gmail,
   Trefferquote der Schutz-Regeln), ist nicht genauer gemeldet. Nächster Schritt: W7 (Verträge & Abos, Belegordner,
   Versprechen-Tracker) bzw. Feinabstimmung der Modelle.
-- **Feinabstimmung Gemma E2B/E4B begonnen (Wunsch des Nutzers, 01.10.2026) – in Arbeit:**
-  - Zusammenfassung **Prompt v3**: „wer ist dran“ als zwei Ja/Nein-Fragen; wer die letzte Mail schrieb, bestimmt der Code.
-    Neuer Kontrollsatz mit 10 Konversationen (`evalHoldoutThreads`, vor v3 geschrieben). v2 bleibt für Vergleichsmessungen
-    wählbar (`eval-models.ts --summaries [--summary-v2]`). **Messung läuft noch – Ergebnis offen.**
-  - Aktionen: Jahr bei Daten ohne Jahreszahl setzt der Code (Modelle rieten 2027 für „31. Oktober“); Regeln verstehen
-    Wochentage, „morgen“, „übermorgen“ (nicht bei Öffnungszeiten/„immer dienstags“); Modell bekommt die nächsten 7 Tage als
-    Liste. Regeln ohne KI: 95,0 % von 60 Angaben, 0 unnötige. 14 neue Fälle mit relativen Angaben, davon 6 als
-    Kontrollfälle – einer deckte einen Fehler auf („Schalter 3. Bitte“ galt als Datum), behoben; die Kontrollfälle sind
-    damit nicht mehr ganz unberührt. Modell-Messung der Aktionen steht noch aus.
+- **Feinabstimmung Gemma E2B/E4B (Wunsch des Nutzers, 01./02.10.2026) – fertig, Details in `docs/KI-MESSUNG.md`:**
+  - Zusammenfassung **Prompt v4**: Das Modell beurteilt nur die letzte Mail, „wer ist dran“ folgt im Code. Test- +
+    Kontrollsatz: E2B 15/20 → 18/20, E4B 14/20 → 18/20; Fakten 96–100 %. Gespeicherte Zusammenfassungen werden wegen der
+    neuen Prompt-Version beim nächsten Öffnen neu erstellt.
+  - Aktionen: Jahr ohne Jahreszahl per Code, Wochentage/„morgen“/„übermorgen“ in den Regeln, Gegenprobe der Modell-Daten
+    mit dem Satz aus der Mail. 60 Angaben: Regeln 95 %, E2B 100 % (3 unnötige), E4B 98,3 % (3 unnötige).
+  - Unverändert nach Messung: Antwortvorschläge (beide 12/12), Regeln in eigenen Worten (Regeln zuerst), Einordnung.
+  - **Ehrlich:** Die Kontrollsätze sind nicht mehr ganz unberührt (v3-Fehler flossen in v4 ein; ein Kontrollfall der
+    Aktionen deckte einen Fehler auf). Gemessen nur auf 4 CPU-Kernen im Container; mit echten Mails ungeprüft.
+
