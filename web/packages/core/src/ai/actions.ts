@@ -53,14 +53,6 @@ export const actionsSchema: JsonSchema = {
 
 const weekdays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 
-/** Kleine Modelle rechnen Wochentage schlecht um – die nächsten 7 Tage stehen deshalb ausdrücklich im Prompt. */
-function nextDays(mailDate: Date): string {
-  return Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + i + 1));
-    return `${weekdays[day.getUTCDay()]} = ${day.toISOString().slice(0, 10)}`;
-  }).join(", ");
-}
-
 export function actionsPrompt(mail: string, mailDate: Date): AIMessage[] {
   const iso = mailDate.toISOString().slice(0, 10);
   return [
@@ -72,8 +64,7 @@ export function actionsPrompt(mail: string, mailDate: Date): AIMessage[] {
 - deadline: Frist – etwas muss bis zu einem Datum erledigt sein (einreichen, antworten, anmelden).
 - payment: Betrag, der bezahlt oder abgebucht wird (mit Datum, falls genannt).
 - todo: Bitte an den Empfänger ohne festes Datum.
-Die Mail ist vom ${weekdays[mailDate.getUTCDay()]}, ${iso}. Die nächsten Tage: ${nextDays(mailDate)}.
-Rechne „morgen“, „Dienstag“, „Ende des Monats“ mit dieser Liste in ein Datum um; fehlt das Jahr, nimm das nächste passende.
+Die Mail ist vom ${weekdays[mailDate.getUTCDay()]}, ${iso}. Rechne „morgen“, „Dienstag“, „Ende des Monats“ in ein Datum um; fehlt das Jahr, nimm das nächste passende.
 Nur was wirklich in der Mail steht – nichts erfinden. Werbung, Newsletter und reine Infos ohne Handlung: {"items": []}.`,
     },
     { role: "user", content: mail },
@@ -116,7 +107,14 @@ export function parseActions(text: string, mail: string, mailDate: Date): MailAc
     const quote = typeof item.quote === "string" ? item.quote.trim() : "";
     if (!type || !title || !quoteFound(quote, mail)) continue;
     const modelDate = typeof item.date === "string" ? validDate(item.date.trim(), mailDate) : null;
-    const date = modelDate ? fixYear(modelDate, mail, mailDate) : null;
+    // Gegenprobe mit den Regeln: Belegt die Fundstelle ein anderes Datum („übermorgen“, „17.10.“), gilt das –
+    // kleine Modelle rechnen Wochentage oft falsch. Werbung und Öffnungszeiten sind keine Termine.
+    if (type !== "payment" && (adPattern.test(quote) || isRecurring(quote))) continue;
+    // Ganzer Satz aus der Mail: das Zitat ist oft gekürzt („Termin: Dienstag“ statt „Dienstag, 14.10.“)
+    const at = mail.indexOf(quote);
+    const fromQuote = datesInQuote(at >= 0 ? sentenceOf(mail, at) : quote, mailDate);
+    let date = modelDate ? fixYear(modelDate, mail, mailDate) : null;
+    if (fromQuote.length && (!date || !fromQuote.includes(date))) date = fromQuote[0] ?? date;
     const time = typeof item.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time.trim()) ? item.time.trim() : null;
     const amountRaw = typeof item.amount === "string" ? item.amount.trim() : "";
     // Betrag nur, wenn die Zahl so in der Mail steht
@@ -169,6 +167,51 @@ function isoDate(day: number, month: number, year: number | null, mailDate: Date
   return validDate(value, mailDate);
 }
 
+const dateRe = /\b(\d{1,2})\.\s?(?:(\d{1,2})\.(\d{2,4})?|(januar|februar|märz|maerz|april|mai|juni|juli|august|september|oktober|november|dezember|jan|feb|mär|apr|jun|jul|aug|sept?|okt|nov|dez)\.?(?:\s+(\d{4}))?)/gi;
+const weekdayIndex: Record<string, number> = { sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6 };
+// \b greift nicht vor Umlauten („übermorgen“) – deshalb Buchstaben-Grenzen mit Unicode
+const relativeRe = /(?<!heute |guten |Guten )(?<!\p{L})(übermorgen|morgen|[Mm]ontag|[Dd]ienstag|[Mm]ittwoch|[Dd]onnerstag|[Ff]reitag|[Ss]amstag|[Ss]onntag)(?!\p{L})/gu;
+
+/** Feste Daten im Text („15.10.2026“, „15.10.“, „15. Oktober“) mit Fundstelle. */
+function explicitDates(text: string, mailDate: Date): { date: string; index: number }[] {
+  const out: { date: string; index: number }[] = [];
+  for (const match of text.matchAll(dateRe)) {
+    const day = Number(match[1]);
+    const month = match[2] ? Number(match[2]) : months[(match[4] ?? "").toLowerCase()];
+    const yearText = match[3] ?? match[5];
+    if (!month || month > 12 || day < 1 || day > 31) continue;
+    const date = isoDate(day, month, yearText ? Number(yearText) : null, mailDate);
+    if (date) out.push({ date, index: match.index ?? 0 });
+  }
+  return out;
+}
+
+/** „morgen“, „übermorgen“, Wochentage – als nächstes passendes Datum nach dem Maildatum (gleicher Wochentag: nächste Woche). */
+function relativeDates(text: string, mailDate: Date): { date: string; index: number }[] {
+  const out: { date: string; index: number }[] = [];
+  for (const match of text.matchAll(relativeRe)) {
+    const word = (match[1] ?? "").toLowerCase();
+    const offset = word === "morgen" ? 1 : word === "übermorgen" ? 2 : ((weekdayIndex[word] ?? 0) - mailDate.getUTCDay() + 7) % 7 || 7;
+    out.push({ date: new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + offset)).toISOString().slice(0, 10), index: match.index ?? 0 });
+  }
+  return out;
+}
+
+/** Öffnungszeiten und Wiederkehrendes („Montag bis Freitag“, „immer dienstags“) sind kein Termin. */
+function isRecurring(quote: string): boolean {
+  return /(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\s*(bis|-|–)\s*(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)/i.test(quote) || /(erreichbar|geöffnet|öffnungszeit|sprechzeit|hotline|jeden|immer|montags|dienstags|mittwochs|donnerstags|freitags|samstags|sonntags)/i.test(quote);
+}
+
+/** Werbung („gültig bis“, „nur solange“, „20 %“) ist keine Frist und kein Termin. „Angebot“ allein schon (Geschäftsangebot). */
+const adPattern = /(gültig|solange|angebote\b|angebot gilt|im angebot|rabatt|\d+ ?%|aktion|gutschein|sale)/i;
+
+/** Welche Daten belegt die Fundstelle? Feste Daten zuerst, sonst relative Angaben (ohne Öffnungszeiten). */
+export function datesInQuote(quote: string, mailDate: Date): string[] {
+  const explicit = explicitDates(quote, mailDate).map((d) => d.date);
+  if (explicit.length || isRecurring(quote)) return explicit;
+  return relativeDates(quote, mailDate).map((d) => d.date);
+}
+
 /** Satz um eine Fundstelle – Satzende ist ein Punkt nach einem Buchstaben (nicht „21.10.“) oder ein Zeilenumbruch. */
 const sentenceOf = (text: string, index: number) => {
   const boundary = /(?<=[a-zäöüß)])[.!?]\s|\n/gi;
@@ -194,32 +237,15 @@ export function ruleActions(subject: string, body: string, mailDate: Date): Mail
   // Titel ohne KI: der Betreff (ohne „Re:/AW:/Fwd:“) – aussagekräftiger als nur „Zahlung“
   const subjectTitle = subject.replace(/^\s*((re|aw|wg|fwd?|antw)\s*:\s*)+/i, "").trim().slice(0, 80);
   const result: MailAction[] = [];
-  const dateRe = /\b(\d{1,2})\.\s?(?:(\d{1,2})\.(\d{2,4})?|(januar|februar|märz|maerz|april|mai|juni|juli|august|september|oktober|november|dezember|jan|feb|mär|apr|jun|jul|aug|sept?|okt|nov|dez)\.?(?:\s+(\d{4}))?)/gi;
-  for (const match of text.matchAll(dateRe)) {
-    const day = Number(match[1]);
-    const month = match[2] ? Number(match[2]) : months[(match[4] ?? "").toLowerCase()];
-    const yearText = match[3] ?? match[5];
-    if (!month || month > 12 || day < 1 || day > 31) continue;
-    const date = isoDate(day, month, yearText ? Number(yearText) : null, mailDate);
-    if (!date) continue;
-    const quote = sentenceOf(text, match.index ?? 0);
-    const action = classifyAction(quote, date, subjectTitle);
+  for (const found of explicitDates(text, mailDate)) {
+    const action = classifyAction(sentenceOf(text, found.index), found.date, subjectTitle);
     if (action) result.push(action);
   }
   // Relative Angaben: „morgen um 14 Uhr“, „am Dienstag um 9:30“, „bis Freitag“ – nicht bei Öffnungszeiten („Montag bis Freitag“)
-  const weekdayIndex: Record<string, number> = { sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6 };
-  // \b greift nicht vor Umlauten („übermorgen“) – deshalb Buchstaben-Grenzen mit Unicode
-  const relativeRe = /(?<!heute |guten |Guten )(?<!\p{L})(übermorgen|morgen|[Mm]ontag|[Dd]ienstag|[Mm]ittwoch|[Dd]onnerstag|[Ff]reitag|[Ss]amstag|[Ss]onntag)(?!\p{L})/gu;
-  for (const match of text.matchAll(relativeRe)) {
-    const word = (match[1] ?? "").toLowerCase();
-    const quote = sentenceOf(text, match.index ?? 0);
-    if (/(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\s*(bis|-|–)\s*(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)/i.test(quote)) continue;
-    if (/(erreichbar|geöffnet|öffnungszeit|sprechzeit|hotline|jeden|immer)/i.test(quote)) continue;
-    // Steht im Satz schon ein festes Datum, gilt das (oben)
-    if (/\b\d{1,2}\.\s?(\d{1,2}\.|(januar|februar|märz|april|mai|juni|juli|august|september|oktober|november|dezember|jan|feb|mär|apr|jun|jul|aug|sept?|okt|nov|dez)\b)/i.test(quote)) continue;
-    const offset = word === "morgen" ? 1 : word === "übermorgen" ? 2 : ((weekdayIndex[word] ?? 0) - mailDate.getUTCDay() + 7) % 7 || 7;
-    const date = new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + offset)).toISOString().slice(0, 10);
-    const action = classifyAction(quote, date, subjectTitle);
+  for (const found of relativeDates(text, mailDate)) {
+    const quote = sentenceOf(text, found.index);
+    if (isRecurring(quote) || explicitDates(quote, mailDate).length) continue; // festes Datum im Satz gilt (oben)
+    const action = classifyAction(quote, found.date, subjectTitle);
     if (action && action.type !== "payment") result.push(action);
   }
   // Beträge ohne Datum („Rechnung über 39,99 €“, „bitte 65,00 € überweisen“)
@@ -258,8 +284,7 @@ function classifyAction(quote: string, date: string, subjectTitle: string): Mail
   }
   if (!type) return null;
   // Werbung („gültig bis“, „nur solange“, „20 %“) ist keine Frist und kein Termin
-  // „Angebot“ allein ist oft ein Geschäftsangebot („das Angebot für Hansen muss raus“) – nur Werbeformulierungen zählen
-  if (type !== "payment" && /(gültig|solange|angebote\b|angebot gilt|im angebot|rabatt|\d+ ?%|aktion|gutschein|sale)/i.test(quote)) return null;
+  if (type !== "payment" && adPattern.test(quote)) return null;
   return { type, title, date, time: type === "payment" ? null : time, amount: amountMatch ? amountMatch[0].replace(/\s?eur\b/i, " €") : null, quote };
 }
 

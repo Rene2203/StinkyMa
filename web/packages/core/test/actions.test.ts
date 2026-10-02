@@ -32,8 +32,12 @@ describe("Aktionen – Antwort des Modells prüfen", () => {
     ] });
     expect(parseActions(text, mail, mailDate)).toEqual([
       { type: "payment", title: "Falscher Betrag", date: "2026-10-15", time: null, amount: null, quote: "Der Nachzahlungsbetrag von 84,20 € wird am 15.10.2026 abgebucht." },
-      { type: "deadline", title: "Unmöglich", date: null, time: null, amount: null, quote: "Termin zur Ablesung: Dienstag" },
+      // Fehlt das Datum oder ist es unmöglich, gilt das Datum aus dem Satz der Mail („Dienstag, 14.10.2026“)
+      { type: "appointment", title: "Ohne Datum", date: "2026-10-14", time: "08:30", amount: null, quote: "Termin zur Ablesung" },
+      { type: "deadline", title: "Unmöglich", date: "2026-10-14", time: null, amount: null, quote: "Termin zur Ablesung: Dienstag" },
     ]);
+    // Termin ohne Datum – auch im Satz keins: verworfen
+    expect(parseActions(JSON.stringify({ items: [{ type: "appointment", title: "X", date: "", time: "08:30", amount: "", quote: "Bitte melden Sie sich." }] }), "Bitte melden Sie sich.", mailDate)).toEqual([]);
     expect(parseActions("kein json", mail, mailDate)).toBeNull();
     expect(parseActions('{"items": []}', mail, mailDate)).toEqual([]);
   });
@@ -80,6 +84,15 @@ describe("Aktionen – Feinabstimmung", () => {
     expect(fixYear("2026-10-01", "Bis morgen bitte.", mailDate)).toBe("2026-10-01");
     const parsed = parseActions('{"items":[{"type":"deadline","title":"Kündigen","date":"2027-10-31","time":"","amount":"","quote":"endet am 31. Oktober"}]}', "Ihr Vertrag endet am 31. Oktober.", mailDate);
     expect(parsed?.[0]?.date).toBe("2026-10-31");
+  });
+
+  it("Gegenprobe: falsch umgerechnete Wochentage und Werbung/Öffnungszeiten aus dem Modell werden korrigiert bzw. verworfen", () => {
+    const body = "Die Besichtigung ist übermorgen um 10 Uhr. Unsere Hotline ist Montag bis Freitag von 8 bis 18 Uhr erreichbar.";
+    const items = [
+      { type: "appointment", title: "Besichtigung", date: "2026-10-01", time: "10:00", amount: "", quote: "Die Besichtigung ist übermorgen um 10 Uhr." },
+      { type: "appointment", title: "Hotline", date: "2026-10-05", time: "08:00", amount: "", quote: "Unsere Hotline ist Montag bis Freitag von 8 bis 18 Uhr erreichbar." },
+    ];
+    expect(parseActions(JSON.stringify({ items }), body, mailDate)?.map((a) => [a.title, a.date])).toEqual([["Besichtigung", "2026-10-02"]]);
   });
 
   it("Wochentage, morgen, übermorgen (Mail vom Mittwoch); Öffnungszeiten und Wiederkehrendes zählen nicht", () => {
