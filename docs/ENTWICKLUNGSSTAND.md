@@ -564,12 +564,13 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Folge-Mail im Verlauf → „erledigt?“. Eigene Zusagen: Erinnerung 1 Tag vorher. „Nachhaken“ öffnet Antwort-Entwurf
   (Text ohne KI, freundlich mit Zitat). Migration v20. Tests: 5 Unit-Tests, E2E (Zusage aus gesendeter Mail, erledigt,
   Reiter). Messung: Regeln Testsatz 17/17 (Frist 17/17), Kontrollsatz 9/9 – geschönt (aus einer Hand); unordentlicher
-  Kontrollsatz 2: **0/11** – Regeln versagen bei Umgangssprache, dort muss die KI ran. KI-Messung (E2B/E4B) läuft.
+  Kontrollsatz 2: **0/11** – Regeln versagen bei Umgangssprache. Mit KI (Modell- und Regel-Funde zusammen): E2B 17/17,
+  9/9, 5/11; E4B 17/17, 9/9, 8/11; keine Fehlalarme, Fristen fast alle richtig (Details `docs/KI-MESSUNG.md`).
   **Ungeprüft:** echte Postfächer, wie oft Fehlalarme in echten gesendeten Mails auftauchen, Windows-CI.
   Hinweis zur Messung Belege: E2B füllte „Händler“ mit der Dokumentart („Rechnung“) und MwSt. mit dem Satz („19 %“) –
   allgemein behoben (Händler muss im Absender/Text stehen und darf keine Dokumentart sein; Prozent ist kein Betrag;
   Netto/MwSt. nur, wenn im Text; Stichwort-Kategorie vor Modell; „KI sagt kein Beleg“ bei klarem Gesamtbetrag → bleibt
   mit „bitte prüfen“). Nachmessung: E2B 100 % / 100 % / 84,6 % (Kontrollsatz 2), E4B 100 % / 100 % / 92,3 %, Regeln 53,8 %
   auf Kontrollsatz 2. Details `docs/KI-MESSUNG.md`.
-  Als Nächstes: Messungen auswerten; danach W8.
+  Als Nächstes: W8 (siehe Roadmap) – oder Nachbesserungen nach dem Test des Nutzers.
 

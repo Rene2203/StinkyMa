@@ -307,6 +307,28 @@ Regeln und danach nicht mehr zum Anpassen genutzt). Angaben richtig = alle erwar
 - Übrige Fehler: Belegdatum hinter „Date paid: Sep 21, 2026“ bzw. „Abgebucht am …“ nicht erkannt (Maildatum genommen);
   die Zahlungserinnerung (rx08) hält E2B für einen Beleg (E4B nicht).
 
+## Versprechen-Tracker (W7.3, 02.10.2026)
+
+Aufgabe: Zusagen in gesendeten („Meine Zusagen“) und eingegangenen Mails („Ich warte auf“) finden, Frist per Code aus dem
+Ausdruck rechnen. Testsatz 24 Mails (17 Zusagen; Fallen: Bitten, Fragen, „anbei“, zitierter Text, Paketinfo, Werbung),
+Kontrollsatz 12 (Englisch, „heute noch“, „gleich nachher“), **Kontrollsatz 2** 12 (Umgangssprache, Nebensätze,
+Konjunktiv, Weiterleitung, verschobene Zusage; geschrieben nach dem Feinschliff der Regeln, danach nicht angepasst).
+
+| Verfahren | Testsatz | Kontrollsatz | Kontrollsatz 2 | Frist richtig (gefundene) | Fehlalarme | Zeit (Median) |
+|---|---|---|---|---|---|---|
+| Regeln (ohne KI) | 17/17 | 9/9 | **0/11** | 26/26 | 0 | 0 s |
+| Gemma 4 E2B | 17/17 | 9/9 | 5/11 | 31/31 | 0 | 4,1 s |
+| Gemma 4 E4B | 17/17 | 9/9 | 8/11 | 33/34 | 0 | 7,0 s |
+
+- Die Regeln sind auf den eigenen Sätzen fehlerfrei und versagen bei Umgangssprache völlig („Agenda kommt von mir“,
+  „Schau ich mir an“, „will do – numbers coming your way“). Dort hilft das Modell.
+- Erster KI-Lauf (E2B): Testsatz nur 15/17, Kontrollsatz 6/9 – Antwortete das Modell, galten nur seine Funde; sichere
+  Regel-Treffer gingen verloren. Allgemein geändert: Modell- und Regel-Funde zusammen (Doppelte raus). Danach wie oben.
+- Kein Fehlalarm in allen Sätzen. Übersehen werden vor allem Zusagen in dritter Person („unser Monteur kommt am
+  Dienstag“, „die Versicherung wird sich melden“) und eine verschobene Zusage („Neuer Plan: Montag“).
+- E4B nahm einmal den Anlass als Frist („wegen Samstag“ → Samstag).
+- **Entscheidung:** wie überall E2B als Standard. **Ehrlich:** kleine Sätze aus einer Hand; echte Postfächer ungeprüft.
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,
