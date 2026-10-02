@@ -155,7 +155,7 @@ const months: Record<string, number> = {
   juli: 7, jul: 7, august: 8, aug: 8, september: 9, sep: 9, sept: 9, oktober: 10, okt: 10, november: 11, nov: 11, dezember: 12, dez: 12,
 };
 
-function isoDate(day: number, month: number, year: number | null, mailDate: Date): string | null {
+export function isoDate(day: number, month: number, year: number | null, mailDate: Date): string | null {
   let y = year ?? mailDate.getUTCFullYear();
   if (year !== null && year < 100) y = 2000 + year;
   if (year === null) {
@@ -172,8 +172,11 @@ const weekdayIndex: Record<string, number> = { sonntag: 0, montag: 1, dienstag: 
 // \b greift nicht vor Umlauten („übermorgen“) – deshalb Buchstaben-Grenzen mit Unicode
 const relativeRe = /(?<!heute |guten |Guten )(?<!\p{L})(übermorgen|morgen|[Mm]ontag|[Dd]ienstag|[Mm]ittwoch|[Dd]onnerstag|[Ff]reitag|[Ss]amstag|[Ss]onntag)(?!\p{L})/gu;
 
-/** Feste Daten im Text („15.10.2026“, „15.10.“, „15. Oktober“) mit Fundstelle. */
-function explicitDates(text: string, mailDate: Date): { date: string; index: number }[] {
+const englishMonths: Record<string, number> = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+const englishDateRe = /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?,?(?:\s+(\d{4}))?/gi;
+
+/** Feste Daten im Text („15.10.2026“, „15.10.“, „15. Oktober“, englisch „October 12, 2026“) mit Fundstelle. */
+export function explicitDates(text: string, mailDate: Date): { date: string; index: number }[] {
   const out: { date: string; index: number }[] = [];
   for (const match of text.matchAll(dateRe)) {
     const day = Number(match[1]);
@@ -183,18 +186,33 @@ function explicitDates(text: string, mailDate: Date): { date: string; index: num
     const date = isoDate(day, month, yearText ? Number(yearText) : null, mailDate);
     if (date) out.push({ date, index: match.index ?? 0 });
   }
-  return out;
+  for (const match of text.matchAll(englishDateRe)) {
+    const month = englishMonths[(match[1] ?? "").toLowerCase()];
+    const day = Number(match[2]);
+    if (!month || day < 1 || day > 31) continue;
+    const date = isoDate(day, month, match[3] ? Number(match[3]) : null, mailDate);
+    if (date) out.push({ date, index: match.index ?? 0 });
+  }
+  return out.sort((a, b) => a.index - b.index);
 }
 
 /** „morgen“, „übermorgen“, Wochentage – als nächstes passendes Datum nach dem Maildatum (gleicher Wochentag: nächste Woche). */
-function relativeDates(text: string, mailDate: Date): { date: string; index: number }[] {
+export function relativeDates(text: string, mailDate: Date): { date: string; index: number }[] {
   const out: { date: string; index: number }[] = [];
   for (const match of text.matchAll(relativeRe)) {
     const word = (match[1] ?? "").toLowerCase();
     const offset = word === "morgen" ? 1 : word === "übermorgen" ? 2 : ((weekdayIndex[word] ?? 0) - mailDate.getUTCDay() + 7) % 7 || 7;
     out.push({ date: new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + offset)).toISOString().slice(0, 10), index: match.index ?? 0 });
   }
-  return out;
+  // „in 3 Tagen“, „in zwei Wochen“
+  const numbers: Record<string, number> = { einem: 1, einer: 1, zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, zehn: 10, vierzehn: 14 };
+  for (const match of text.matchAll(/(?<!\p{L})in\s+(\d{1,2}|einem|einer|zwei|drei|vier|fünf|sechs|sieben|zehn|vierzehn)\s+(tagen|tag|wochen|woche)(?!\p{L})/giu)) {
+    const n = Number(match[1]) || numbers[(match[1] ?? "").toLowerCase()] || 0;
+    const days = /woche/i.test(match[2] ?? "") ? n * 7 : n;
+    if (!days) continue;
+    out.push({ date: new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + days)).toISOString().slice(0, 10), index: match.index ?? 0 });
+  }
+  return out.sort((a, b) => a.index - b.index);
 }
 
 /** Öffnungszeiten und Wiederkehrendes („Montag bis Freitag“, „immer dienstags“) sind kein Termin. */

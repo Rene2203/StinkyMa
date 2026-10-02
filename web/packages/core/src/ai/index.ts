@@ -10,3 +10,5 @@ export * from "./api.js";
 export * from "./actions.js";
 export * from "./rules.js";
 export * from "./replies.js";
+export * from "./subscriptions.js";
+export * from "./evalSubscriptions.js";

@@ -11,6 +11,7 @@ const taskKey: Record<AITask, MessageKey> = {
   extractActions: "aiActivity.extractActions",
   parseRule: "aiActivity.parseRule",
   draftReply: "aiActivity.draftReply",
+  extractSubscription: "aiActivity.extractSubscription",
 };
 
 /** Sekunden seit `iso`, jede Sekunde neu – damit man sieht, dass sich etwas tut. */

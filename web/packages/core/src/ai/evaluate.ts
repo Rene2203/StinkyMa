@@ -8,6 +8,8 @@ import { ruleEquals } from "../rules.js";
 import { categories } from "./prompts.js";
 import { AIRouter, GrantPolicy } from "./router.js";
 import { categorizeMessage, summarizeThread } from "./tasks.js";
+import { extractSubscription, lastCancelDay, ruleSubscription, type SubscriptionFinding } from "./subscriptions.js";
+import { evalSubscriptionCases, evalSubscriptionHoldout, evalSubscriptionHoldout2 } from "./evalSubscriptions.js";
 import type { AIProvider } from "./types.js";
 
 // Messlauf (5.7): ein Modell gegen den deutschen Testsatz. Läuft im Messskript und später in der App
@@ -405,5 +407,83 @@ export function formatRepliesReports(reports: RepliesEvalReport[]): string {
   const lines = ["| Modell | ≥ 2 Vorschläge | ≥ 1 Vorschlag | du/Sie richtig | Zeit (Median) |", "|---|---|---|---|---|"];
   for (const r of reports) lines.push(`| ${r.name} | ${r.twoOrMore}/${r.cases} | ${r.atLeastOne}/${r.cases} | ${r.formCorrect}/${r.cases} | ${seconds(r.medianMs)} |`);
   for (const r of reports) lines.push("", `### ${r.name}`, "", ...r.samples);
+  return lines.join("\n");
+}
+
+// --- Verträge & Abos (W7.1) ---
+
+export interface SubscriptionsEvalReport {
+  name: string;
+  sets: { label: string; detected: number; total: number; falsePositives: number; fieldsCorrect: number; fieldsTotal: number }[];
+  medianMs: number;
+  misses: string[];
+}
+
+/** Abo-Messlauf: Erkennung (ja/nein) und Felder (Art, Anbieter, Betrag, Intervall, Probe-Ende, letzter Kündigungstag ±1). */
+export async function evaluateSubscriptions(provider: AIProvider | null, options: { onProgress?: (done: number, total: number) => void } = {}): Promise<SubscriptionsEvalReport> {
+  const router = provider ? new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() }) : null;
+  const durations: number[] = [];
+  const misses: string[] = [];
+  const sets: SubscriptionsEvalReport["sets"] = [];
+  const all = [["Testsatz", evalSubscriptionCases], ["Kontrollsatz", evalSubscriptionHoldout], ["Kontrollsatz 2", evalSubscriptionHoldout2]] as const;
+  const totalCases = all.reduce((n, [, cases]) => n + cases.length, 0);
+  let done = 0;
+  const dayDiff = (a: string, b: string) => Math.abs(new Date(`${a}T12:00:00Z`).getTime() - new Date(`${b}T12:00:00Z`).getTime()) / 86_400_000;
+  for (const [label, cases] of all) {
+    const entry = { label, detected: 0, total: 0, falsePositives: 0, fieldsCorrect: 0, fieldsTotal: 0 };
+    for (const testCase of cases) {
+      const message = evalMailToMessage(testCase.mail);
+      let finding: SubscriptionFinding | null;
+      if (router) {
+        const result = await extractSubscription(router, message);
+        finding = result.finding;
+        if (result.origin !== "rules") durations.push(result.durationMs);
+      } else {
+        finding = ruleSubscription(message.subject, cleanMailText(message.bodyText ?? "", 2000), message.from, new Date(message.date));
+      }
+      const expected = testCase.expected;
+      if (!expected) {
+        if (finding) {
+          entry.falsePositives++;
+          misses.push(`${testCase.mail.id}: kein Abo, erkannt ${finding.kind} ${finding.provider}`);
+        }
+      } else {
+        entry.total++;
+        if (!finding) {
+          misses.push(`${testCase.mail.id}: nicht erkannt`);
+          const fields = Object.keys(expected).length;
+          entry.fieldsTotal += fields;
+        } else {
+          entry.detected++;
+          const wrong: string[] = [];
+          const check = (field: string, ok: boolean, got: unknown) => {
+            entry.fieldsTotal++;
+            if (ok) entry.fieldsCorrect++;
+            else wrong.push(`${field}=${JSON.stringify(got)}`);
+          };
+          check("kind", finding.kind === expected.kind, finding.kind);
+          check("provider", finding.provider.toLowerCase().includes(expected.provider.toLowerCase()), finding.provider);
+          if (expected.amount) check("amount", (finding.amount ?? "").replace(/\D/g, "") === expected.amount.replace(/\D/g, ""), finding.amount);
+          if (expected.interval) check("interval", finding.interval === expected.interval, finding.interval);
+          if (expected.trialEnd) check("trialEnd", finding.trialEnd === expected.trialEnd, finding.trialEnd);
+          if (expected.lastCancelDay) {
+            const got = lastCancelDay(finding);
+            check("lastCancelDay", !!got && dayDiff(got, expected.lastCancelDay) <= 1, got);
+          }
+          if (expected.cancelled) check("cancelled", finding.cancelled, finding.cancelled);
+          if (wrong.length) misses.push(`${testCase.mail.id}: ${wrong.join(", ")}`);
+        }
+      }
+      options.onProgress?.(++done, totalCases);
+    }
+    sets.push(entry);
+  }
+  return { name: provider?.displayName ?? "Regeln (ohne KI)", sets, medianMs: median(durations), misses };
+}
+
+export function formatSubscriptionsReports(reports: SubscriptionsEvalReport[]): string {
+  const lines = ["| Verfahren | Satz | Abos erkannt | Fehlalarme | Angaben richtig | Zeit (Median) |", "|---|---|---|---|---|---|"];
+  for (const r of reports) for (const s of r.sets) lines.push(`| ${r.name} | ${s.label} | ${s.detected}/${s.total} | ${s.falsePositives} | ${percent(s.fieldsTotal ? s.fieldsCorrect / s.fieldsTotal : 0)} (von ${s.fieldsTotal}) | ${seconds(r.medianMs)} |`);
+  for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
   return lines.join("\n");
 }

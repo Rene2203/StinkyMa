@@ -4,7 +4,7 @@
 import { writeFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
-import { evalHoldoutMails, evalHoldoutThreads, evalMails, evalThreads, evaluateActions, evaluateProvider, evaluateReplies, evaluateRules, formatActionsReports, formatEvalReports, formatRepliesReports, formatRulesReports, modelCatalog, type ActionsEvalReport, type EvalReport, type RepliesEvalReport, type RulesEvalReport } from "../src/index.js";
+import { evalHoldoutMails, evalHoldoutThreads, evalMails, evalThreads, evaluateActions, evaluateProvider, evaluateReplies, evaluateRules, formatActionsReports, formatEvalReports, evaluateSubscriptions, formatSubscriptionsReports, type SubscriptionsEvalReport, formatRepliesReports, formatRulesReports, modelCatalog, type ActionsEvalReport, type EvalReport, type RepliesEvalReport, type RulesEvalReport } from "../src/index.js";
 import { fileNameFromUrl, LlamaCppProvider } from "../src/llm/index.js";
 
 const args = process.argv.slice(2);
@@ -33,6 +33,9 @@ if (summariesOnly) args.splice(args.indexOf("--summaries"), 1);
 // --summary-v2: Zusammenfassung mit der älteren Fassung v2 (Vergleich)
 const summaryV2 = args.includes("--summary-v2");
 if (summaryV2) args.splice(args.indexOf("--summary-v2"), 1);
+// --subscriptions: Verträge & Abos (W7.1), Testsatz + Kontrollsatz, mit Vergleichswert „Regeln ohne KI“
+const subscriptionsOnly = args.includes("--subscriptions");
+if (subscriptionsOnly) args.splice(args.indexOf("--subscriptions"), 1);
 const all = args.includes("--all");
 for (const name of ["--holdout", "--all"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
 const mails = holdout ? evalHoldoutMails : all ? [...evalMails, ...evalHoldoutMails] : evalMails;
@@ -94,6 +97,23 @@ if (rulesOnly) {
     }
   }
   console.log(formatRulesReports(reports));
+  process.exit(0);
+}
+
+if (subscriptionsOnly) {
+  const reports: SubscriptionsEvalReport[] = [await evaluateSubscriptions(null)];
+  for (const model of modelCatalog.filter((m) => ids.length === 0 || ids.includes(m.id))) {
+    const provider = new LlamaCppProvider({ id: model.id, displayName: model.name, modelPath: join(directory, fileNameFromUrl(model.url)), gpu: gpu ? "auto" : false, maxThreads: threads, idleUnloadMs: 0 });
+    try {
+      await provider.load();
+      reports.push(await evaluateSubscriptions(provider, { onProgress: (d, t) => process.stderr.write(`\r${model.id}: ${d}/${t}   `) }));
+      process.stderr.write("\n");
+      if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
+    } finally {
+      await provider.dispose();
+    }
+  }
+  console.log(formatSubscriptionsReports(reports));
   process.exit(0);
 }
 
