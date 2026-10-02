@@ -37,8 +37,8 @@ if (summaryV2) args.splice(args.indexOf("--summary-v2"), 1);
 // --user-categories: eigene Kategorien (Beispiel-Kategorien mit Fallen)
 const userCategoriesOnly = args.includes("--user-categories");
 if (userCategoriesOnly) args.splice(args.indexOf("--user-categories"), 1);
-const userCategoriesV1 = args.includes("--v1");
-if (userCategoriesV1) args.splice(args.indexOf("--v1"), 1);
+const userCategoriesVersion = args.includes("--v1") ? 1 : args.includes("--v3") ? 3 : 2;
+for (const name of ["--v1", "--v3"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
 const subscriptionsOnly = args.includes("--subscriptions");
 if (subscriptionsOnly) args.splice(args.indexOf("--subscriptions"), 1);
 const all = args.includes("--all");
@@ -111,7 +111,7 @@ if (userCategoriesOnly) {
     const provider = new LlamaCppProvider({ id: model.id, displayName: model.name, modelPath: join(directory, fileNameFromUrl(model.url)), gpu: gpu ? "auto" : false, maxThreads: threads, idleUnloadMs: 0 });
     try {
       await provider.load();
-      reports.push(await evaluateUserCategories(provider, { promptVersion: userCategoriesV1 ? 1 : 2, onProgress: (d, t) => process.stderr.write(`\r${model.id}: ${d}/${t}   `) }));
+      reports.push(await evaluateUserCategories(provider, { promptVersion: userCategoriesVersion, onProgress: (d, t) => process.stderr.write(`\r${model.id}: ${d}/${t}   `) }));
       process.stderr.write("\n");
       if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
     } finally {

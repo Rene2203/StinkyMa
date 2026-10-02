@@ -42,6 +42,26 @@ Antworte nur mit JSON: {"kategorie": "..."}`,
   ];
 }
 
+const confirmSchema: JsonSchema = {
+  type: "object",
+  properties: { passt: { type: "boolean" } },
+  required: ["passt"],
+  additionalProperties: false,
+};
+
+/** v3: Rückfrage nur bei einem Treffer – kleine Modelle wählen in der Auswahl leicht „irgendwas Ähnliches“. */
+export function userCategoryConfirmPrompt(mail: string, category: Pick<UserCategory, "name" | "description">): AIMessage[] {
+  return [
+    {
+      role: "system",
+      content: `Der Nutzer sammelt in der Kategorie "${category.name}" E-Mails zu: ${category.description || category.name}.
+Gehört diese E-Mail in die Kategorie? Nur ja, wenn sie direkt davon handelt – ein ähnliches Thema, Werbung einer anderen Firma oder eine private Nachricht ohne diesen Bezug gehört nicht hinein.
+Antworte nur mit JSON: {"passt": true} oder {"passt": false}`,
+    },
+    { role: "user", content: mail },
+  ];
+}
+
 /** Antwort lesen: ID der Kategorie, `"none"` für „keine“, `null` bei unbrauchbarer Antwort. */
 export function parseUserCategory(text: string, categories: readonly Pick<UserCategory, "id" | "name">[]): string | "none" | null {
   const value = extractJson(text) as { kategorie?: unknown } | null;
@@ -63,11 +83,13 @@ export async function classifyUserCategory(
   router: AIRouter,
   message: Message,
   categories: readonly UserCategory[],
-  options: { signal?: AbortSignal; /** nur für Vergleichsmessungen */ promptVersion?: 1 | 2 } = {},
+  options: { signal?: AbortSignal; /** nur für Vergleichsmessungen */ promptVersion?: 1 | 2 | 3 } = {},
 ): Promise<UserCategoryResult> {
+  const version = options.promptVersion ?? 2;
+  const mail = mailForModel(message, 1200);
   const request: AIRequest = {
     task: "userCategory",
-    messages: userCategoryPrompt(mailForModel(message, 1200), categories, options.promptVersion ?? 2),
+    messages: userCategoryPrompt(mail, categories, version === 1 ? 1 : 2),
     jsonSchema: userCategorySchema(categories),
     maxTokens: 30,
     temperature: 0,
@@ -77,6 +99,15 @@ export async function classifyUserCategory(
     const response = await router.run(request, { accountIds: [message.accountId] }, options.signal);
     durationMs += response.durationMs;
     const parsed = parseUserCategory(response.text, categories);
+    if (parsed && parsed !== "none" && version === 3) {
+      const category = categories.find((c) => c.id === parsed);
+      if (category) {
+        const check = await router.run({ task: "userCategory", messages: userCategoryConfirmPrompt(mail, category), jsonSchema: confirmSchema, maxTokens: 15, temperature: 0 }, { accountIds: [message.accountId] }, options.signal);
+        durationMs += check.durationMs;
+        const value = extractJson(check.text) as { passt?: unknown } | null;
+        if (value?.passt === false) return { categoryId: null, origin: response.privacyClass, durationMs };
+      }
+    }
     if (parsed) return { categoryId: parsed === "none" ? null : parsed, origin: response.privacyClass, durationMs };
   }
   return { categoryId: null, origin: "rules", durationMs };

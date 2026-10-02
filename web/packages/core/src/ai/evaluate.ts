@@ -513,7 +513,7 @@ export interface UserCategoriesEvalReport {
 /** Eigene Kategorien: nur mit Modell (Absenderlisten sind Code und brauchen keine Messung). */
 export async function evaluateUserCategories(
   provider: AIProvider,
-  options: { promptVersion?: 1 | 2; onProgress?: (done: number, total: number) => void } = {},
+  options: { promptVersion?: 1 | 2 | 3; onProgress?: (done: number, total: number) => void } = {},
 ): Promise<UserCategoriesEvalReport> {
   const router = new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() });
   const report: UserCategoriesEvalReport = { name: `${provider.displayName} v${options.promptVersion ?? 2}`, sets: [], medianMs: 0, misses: [] };
