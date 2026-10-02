@@ -3461,3 +3461,88 @@ dialog.webpanel::backdrop {
 .sidebar-subsection {
   margin-top: 10px;
 }
+
+/* Belegordner */
+
+.rcpt-year select {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.subs-header > button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--fg-on-accent);
+}
+
+.rcpt-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.rcpt-total-chip {
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 3px 10px;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.rcpt-total-chip.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.rcpt-amount {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rcpt-review-icon,
+.rcpt-review {
+  color: var(--orange);
+}
+
+.rcpt-review {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+}
+
+.rcpt-exported {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--green);
+}
+
+.rcpt-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.rcpt-remember {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+}
+
+.rcpt-new-category {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}

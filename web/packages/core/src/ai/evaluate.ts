@@ -1,3 +1,5 @@
+import { extractReceipt, receiptMailText, ruleReceipt, type ReceiptFinding } from "./receipts.js";
+import { evalReceiptCases, evalReceiptHoldout, evalReceiptHoldout2, receiptCategoryDefaults } from "./evalReceipts.js";
 import { classifyUserCategory } from "./userCategories.js";
 import { evalUserCategoryCases, evalUserCategoryDefs, evalUserCategoryHoldout, evalUserCategoryHoldoutDefs } from "./evalUserCategories.js";
 import type { UserCategory } from "../userCategories.js";
@@ -554,6 +556,90 @@ export function formatUserCategoriesReports(reports: UserCategoriesEvalReport[])
   for (const r of reports) {
     for (const s of r.sets) {
       lines.push(`| ${r.name} | ${s.label} | ${s.correct}/${s.total} (${percent(s.correct / s.total)}) | ${s.found}/${s.withCategory} | ${s.falseAssignments}/${s.total - s.withCategory} | ${s.wrongCategory} | ${seconds(r.medianMs)} |`);
+    }
+  }
+  for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
+  return lines.join("\n");
+}
+
+export interface ReceiptsEvalReport {
+  name: string;
+  sets: { label: string; detected: number; total: number; falsePositives: number; fieldsCorrect: number; fieldsTotal: number; categoryCorrect: number; categoryTotal: number; flagged: number }[];
+  medianMs: number;
+  misses: string[];
+}
+
+/** Belegordner: Regeln allein (provider = null) oder Modell + Regeln. Kategorie getrennt gezählt (Vorschlag). */
+export async function evaluateReceipts(provider: AIProvider | null, options: { onProgress?: (done: number, total: number) => void } = {}): Promise<ReceiptsEvalReport> {
+  const router = provider ? new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() }) : null;
+  const report: ReceiptsEvalReport = { name: provider?.displayName ?? "Regeln (ohne KI)", sets: [], medianMs: 0, misses: [] };
+  const durations: number[] = [];
+  const all = [["Testsatz", evalReceiptCases], ["Kontrollsatz", evalReceiptHoldout], ["Kontrollsatz 2", evalReceiptHoldout2]] as const;
+  const totalCases = all.reduce((n, [, cases]) => n + cases.length, 0);
+  let done = 0;
+  for (const [label, cases] of all) {
+    const entry = { label, detected: 0, total: 0, falsePositives: 0, fieldsCorrect: 0, fieldsTotal: 0, categoryCorrect: 0, categoryTotal: 0, flagged: 0 };
+    for (const testCase of cases) {
+      const message = evalMailToMessage({ ...testCase.mail, expected: "invoice" });
+      let finding: ReceiptFinding | null;
+      if (router) {
+        const result = await extractReceipt(router, message, { attachmentText: testCase.attachmentText ?? "", categories: receiptCategoryDefaults });
+        finding = result.finding;
+        if (result.origin !== "rules") durations.push(result.durationMs);
+      } else {
+        finding = ruleReceipt(message.subject, receiptMailText(message.bodyText ?? "", testCase.attachmentText ?? ""), message.from, new Date(message.date));
+      }
+      const expected = testCase.expected;
+      if (!expected) {
+        if (finding) {
+          entry.falsePositives++;
+          report.misses.push(`${testCase.mail.id}: kein Beleg, erkannt ${finding.merchant} ${finding.grossCents ?? "?"}`);
+        }
+      } else {
+        entry.total++;
+        const fields: [string, unknown, unknown][] = [
+          ["merchant", expected.merchant, finding?.merchant],
+          ["date", expected.date, finding?.date],
+          ["gross", expected.grossCents, finding?.grossCents],
+          ...(expected.netCents !== undefined ? [["net", expected.netCents, finding?.netCents] as [string, unknown, unknown]] : []),
+          ...(expected.vatCents !== undefined ? [["vat", expected.vatCents, finding?.vatCents] as [string, unknown, unknown]] : []),
+          ...(expected.invoiceNumber !== undefined ? [["invoiceNumber", expected.invoiceNumber, finding?.invoiceNumber] as [string, unknown, unknown]] : []),
+          ...(expected.dueDate !== undefined ? [["dueDate", expected.dueDate, finding?.dueDate] as [string, unknown, unknown]] : []),
+        ];
+        if (!finding) {
+          entry.fieldsTotal += fields.length;
+          report.misses.push(`${testCase.mail.id}: nicht erkannt`);
+        } else {
+          entry.detected++;
+          if (finding.review.length) entry.flagged++;
+          const wrong: string[] = [];
+          for (const [field, want, got] of fields) {
+            entry.fieldsTotal++;
+            const ok = field === "merchant" ? String(got ?? "").toLowerCase().includes(String(want).toLowerCase()) : got === want;
+            if (ok) entry.fieldsCorrect++;
+            else wrong.push(`${field}=${JSON.stringify(got)} (soll ${JSON.stringify(want)})`);
+          }
+          if (expected.category) {
+            entry.categoryTotal++;
+            if (finding.category === expected.category) entry.categoryCorrect++;
+            else wrong.push(`Kategorie=${JSON.stringify(finding.category)} (soll ${expected.category})`);
+          }
+          if (wrong.length) report.misses.push(`${testCase.mail.id}: ${wrong.join(", ")}${finding.review.length ? ` [prüfen: ${finding.review.join("; ")}]` : ""}`);
+        }
+      }
+      options.onProgress?.(++done, totalCases);
+    }
+    report.sets.push(entry);
+  }
+  report.medianMs = median(durations);
+  return report;
+}
+
+export function formatReceiptsReports(reports: ReceiptsEvalReport[]): string {
+  const lines = ["| Verfahren | Satz | Belege erkannt | Fehlalarme | Angaben richtig | Kategorie richtig | „bitte prüfen“ | Zeit (Median) |", "|---|---|---|---|---|---|---|---|"];
+  for (const r of reports) {
+    for (const s of r.sets) {
+      lines.push(`| ${r.name} | ${s.label} | ${s.detected}/${s.total} | ${s.falsePositives} | ${percent(s.fieldsTotal ? s.fieldsCorrect / s.fieldsTotal : 0)} (von ${s.fieldsTotal}) | ${s.categoryCorrect}/${s.categoryTotal} | ${s.flagged} | ${seconds(r.medianMs)} |`);
     }
   }
   for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));

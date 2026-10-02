@@ -11,6 +11,7 @@ import { draftReplies } from "../ai/replies.js";
 import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
 import { extractSubscription, type SubscriptionResult } from "../ai/subscriptions.js";
+import { extractReceipt, type ReceiptResult } from "../ai/receipts.js";
 import { classifyUserCategory, userCategoryPromptFor, type UserCategoryResult } from "../ai/userCategories.js";
 import type { UserCategory } from "../userCategories.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
@@ -572,6 +573,13 @@ export class AIService implements AIApi {
     if (!(await this.#modelReady())) return null;
     const { router } = await this.#router();
     return extractSubscription(router, message, { attachmentText });
+  }
+
+  /** Beleg einer Mail per Modell (mit Prüfung im Text); `null`, wenn kein Modell bereit ist. */
+  async extractReceipt(message: Message, attachmentText: string, categories: readonly string[]): Promise<ReceiptResult | null> {
+    if (!(await this.#modelReady())) return null;
+    const { router } = await this.#router();
+    return extractReceipt(router, message, { attachmentText, categories });
   }
 
   /** Eigene Kategorie einer Mail per Modell; `null`, wenn kein Modell bereit ist. */

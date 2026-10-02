@@ -8,6 +8,11 @@ import {
   type SubscriptionStatus,
   type SubscriptionsView,
   type UserCategoriesApi,
+  type ReceiptsApi,
+  type ReceiptsView,
+  type ReceiptEdit,
+  type ReceiptStatus,
+  type StoredReceipt,
   type UserCategoriesView,
   type UserCategory,
   type UserCategoryInput,
@@ -146,13 +151,23 @@ export interface BrowserState {
   /** Offene fremde Seite im Fenster innerhalb der App; null = zu */
   webPanel: WebPanelState | null;
   /** Was die beiden rechten Spalten zeigen: Mails oder „Abos & Verträge“ */
-  panel: "mail" | "subscriptions";
+  panel: "mail" | "subscriptions" | "receipts";
   /** Verträge & Abos (W7.1) */
   subscriptions: { view: SubscriptionsView | null; selectedId: string | null; busy: boolean; error: string | null } | null;
   /** Eigene Kategorien (Seitenleiste); null = nicht verfügbar oder noch nicht geladen */
   userCategories: UserCategoriesView | null;
   /** Dialog „Kategorie anlegen/bearbeiten“; `category` null = neu */
   categoryDialog: { category: UserCategory | null; busy: boolean; error: string | null } | null;
+  /** Belegordner (W7.2): gewähltes Jahr (null = alle), Kategorie-Filter, Auswahl, Export-Ergebnis */
+  receipts: {
+    view: ReceiptsView | null;
+    year: number | null;
+    category: string | null;
+    selectedId: string | null;
+    busy: boolean;
+    error: string | null;
+    exported: { count: number; missingFiles: number } | null;
+  } | null;
   /** Rückmeldung nach eigener Zuordnung (geöffnete Mail) */
   userCategoryNote: { messageId: string; categoryId: string | null; remembered: boolean; changed: number } | null;
 }
@@ -277,6 +292,7 @@ export const initialState: BrowserState = {
   panel: "mail",
   subscriptions: null,
   userCategories: null,
+  receipts: null,
   categoryDialog: null,
   userCategoryNote: null,
 };
@@ -344,10 +360,11 @@ export class BrowserStore {
   readonly #webPanel: WebPanelHost | undefined;
   readonly #subscriptions: SubscriptionsApi | undefined;
   readonly #categories: UserCategoriesApi | undefined;
+  readonly #receipts: ReceiptsApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -360,6 +377,147 @@ export class BrowserStore {
     this.#webPanel = options.webPanel;
     this.#subscriptions = options.subscriptions;
     this.#categories = options.categories;
+    this.#receipts = options.receipts;
+  }
+
+  // --- Belegordner (W7.2) ---
+
+  get canReceipts(): boolean {
+    return Boolean(this.#receipts);
+  }
+
+  #patchReceipts(patch: Partial<NonNullable<BrowserState["receipts"]>>): void {
+    const current = this.#state.receipts ?? { view: null, year: new Date().getFullYear(), category: null, selectedId: null, busy: false, error: null, exported: null };
+    this.#set({ receipts: { ...current, ...patch } });
+  }
+
+  /** Belegordner öffnen: sofort anzeigen, dann neue Mails durchsuchen (Regeln sofort, KI im Hintergrund). */
+  async openReceipts(): Promise<void> {
+    if (!this.#receipts) return;
+    this.#set({ panel: "receipts" });
+    this.#patchReceipts({ busy: true, error: null, exported: null });
+    await this.#loadReceipts();
+    await this.scanReceipts(false);
+  }
+
+  async scanReceipts(recheck: boolean): Promise<void> {
+    const api = this.#receipts;
+    if (!api) return;
+    this.#patchReceipts({ busy: true });
+    try {
+      await api.scan({ recheck });
+      this.#patchReceipts({ error: null });
+    } catch (e) {
+      this.#patchReceipts({ error: messageOf(e) });
+    }
+    await this.#loadReceipts();
+  }
+
+  async #loadReceipts(): Promise<void> {
+    const api = this.#receipts;
+    if (!api) return;
+    const current = this.#state.receipts;
+    let year = current?.year ?? new Date().getFullYear();
+    try {
+      let view = await api.list(year);
+      // Im gewählten Jahr nichts, aber in anderen: das neueste Jahr mit Belegen zeigen
+      if (view.items.length === 0 && year !== null && view.years.length > 0 && !view.years.includes(year) && !current?.view) {
+        year = view.years[0] ?? year;
+        view = await api.list(year);
+      }
+      const selectedId = this.#state.receipts?.selectedId;
+      const filter = this.#state.receipts?.category ?? null;
+      const visible = view.items.filter((r) => filter === null || (r.category ?? "") === filter);
+      this.#patchReceipts({ view, year, busy: false, selectedId: selectedId && view.items.some((r) => r.id === selectedId) ? selectedId : visible[0]?.id ?? null });
+    } catch (e) {
+      this.#patchReceipts({ busy: false, error: messageOf(e) });
+    }
+  }
+
+  async selectReceiptYear(year: number | null): Promise<void> {
+    this.#patchReceipts({ year, selectedId: null, category: null, exported: null });
+    await this.#loadReceipts();
+  }
+
+  selectReceiptCategory(category: string | null): void {
+    this.#patchReceipts({ category });
+  }
+
+  selectReceipt(id: string): void {
+    this.#patchReceipts({ selectedId: id });
+  }
+
+  closeReceipts(): void {
+    this.#set({ panel: "mail" });
+  }
+
+  async #receiptAction(action: (api: ReceiptsApi) => Promise<unknown>): Promise<void> {
+    const api = this.#receipts;
+    if (!api) return;
+    try {
+      await action(api);
+      this.#patchReceipts({ error: null });
+    } catch (e) {
+      this.#patchReceipts({ error: messageOf(e) });
+    }
+    await this.#loadReceipts();
+  }
+
+  updateReceipt(id: string, edit: ReceiptEdit): Promise<void> {
+    return this.#receiptAction((api) => api.update(id, edit));
+  }
+
+  setReceiptStatus(id: string, status: ReceiptStatus): Promise<void> {
+    return this.#receiptAction((api) => api.setStatus(id, status));
+  }
+
+  addReceiptCategory(name: string): Promise<void> {
+    return this.#receiptAction((api) => api.addCategory(name));
+  }
+
+  removeReceiptCategory(name: string): Promise<void> {
+    return this.#receiptAction((api) => api.removeCategory(name));
+  }
+
+  remindReceipt(id: string, daysBefore: number): Promise<void> {
+    return this.#receiptAction((api) => api.remind(id, daysBefore));
+  }
+
+  cancelReceiptReminder(id: string): Promise<void> {
+    return this.#receiptAction((api) => api.cancelReminder(id));
+  }
+
+  async exportReceipts(): Promise<void> {
+    const api = this.#receipts;
+    if (!api) return;
+    this.#patchReceipts({ busy: true, exported: null });
+    try {
+      const result = await api.export(this.#state.receipts?.year ?? null);
+      this.#patchReceipts({ busy: false, error: null, exported: result.saved ? { count: result.count, missingFiles: result.missingFiles } : null });
+    } catch (e) {
+      this.#patchReceipts({ busy: false, error: messageOf(e) });
+    }
+  }
+
+  /** „Als Beleg übernehmen“: Mail übernehmen und im Belegordner zeigen. */
+  async markAsReceipt(messageId: string): Promise<void> {
+    const api = this.#receipts;
+    if (!api) return;
+    this.#set({ panel: "receipts" });
+    this.#patchReceipts({ busy: true, error: null, exported: null, category: null });
+    try {
+      const receipt = await api.addFromMail(messageId);
+      this.#patchReceipts({ year: Number(receipt.date.slice(0, 4)), selectedId: receipt.id });
+    } catch (e) {
+      this.#patchReceipts({ error: messageOf(e) });
+    }
+    await this.#loadReceipts();
+  }
+
+  async openReceiptMail(receipt: StoredReceipt): Promise<void> {
+    if (!receipt.messageId) return;
+    this.#set({ panel: "mail" });
+    await this.openMessage(receipt.messageId);
   }
 
   // --- Eigene Kategorien ---
@@ -1219,6 +1377,7 @@ export class BrowserStore {
       // Aufräumen offen: Schutz der gewählten Gruppe auffrischen (z. B. nach KI-Einordnung)
       this.#state.cleanup?.group?.mails ? this.#loadCleanupMails() : Promise.resolve(),
       this.#state.panel === "subscriptions" ? this.#loadSubscriptions() : Promise.resolve(),
+      this.#state.panel === "receipts" ? this.#loadReceipts() : Promise.resolve(),
       this.loadUserCategories(),
     ]);
     const selected = this.#state.selectedMessageId;

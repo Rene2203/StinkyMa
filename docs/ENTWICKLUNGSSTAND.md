@@ -545,5 +545,17 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Fehlzuordnung, ~8 s je Mail; E4B mit v2 29/30 und 20/20, ~4 s. Ohne Rückfrage ordnete E2B die Hälfte der Mails ohne
   passende Kategorie trotzdem zu.
   **Ungeprüft:** echte Postfächer, Dauer des KI-Durchgangs auf schwacher Hardware bei 300 Mails, Windows-CI.
-  Als Nächstes: W7.2 Belegordner.
+  Vom Nutzer getestet (02.10.2026): „nicht alles richtig, aber einiges – damit kann ich leben“.
+- **W7.2 Belegordner (02.10.2026) – gebaut, lokal geprüft:** Erkennung per Regeln (sofort; Beträge in deutscher und
+  englischer Schreibweise, Netto/MwSt. nur wenn dastehend, Rechnungsdatum hinter Stichworten und nie in der Zukunft,
+  Frist inkl. „innerhalb von N Tagen“, Rechnungsnummer, Kategorie per Stichwort) und lokalem Modell (Hintergrund, nur
+  Kandidaten; Beträge/Daten müssen im Text stehen, sonst „bitte prüfen“). Migration v19, Belege überleben die Mail.
+  Ansicht „Belege“: Jahr, Summen je Kategorie als Filter, korrigieren mit gemerkter Kategorie je Händler, eigene
+  Kategorien, ausblenden, Erinnerung vor Frist, „Als Beleg übernehmen“, Export ZIP (PDFs ohne AGB + CSV für Excel).
+  Testhaken `STINKYMA_TEST_SAVE_DIR` (Export ohne Dialog, nur für E2E). Tests: 8 Unit-Tests (Beträge, Regeln,
+  Modell-Prüfung, CSV, ZIP, Speicher/Dienst, Export), E2E (erkannt, korrigiert, Rechtsklick, Export geprüft).
+  Messung: Regeln allein Testsatz und Kontrollsatz 100 % (geschönt, aus einer Hand), unordentlicher Kontrollsatz 2 nur 54 % – Messung mit E2B/E4B läuft.
+  **Ungeprüft:** echte Postfächer, ZIP mit echten PDFs vom Server (im E2E nur Beispielkonten ohne Dateiinhalt),
+  Öffnen des ZIP unter Windows, Windows-CI.
+  Als Nächstes: W7.3 Versprechen-Tracker.
 

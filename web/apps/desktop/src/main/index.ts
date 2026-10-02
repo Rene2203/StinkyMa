@@ -12,6 +12,7 @@ import {
   cleanupApiMethods,
   subscriptionsApiMethods,
   userCategoriesApiMethods,
+  receiptsApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -33,9 +34,9 @@ import {
   type Message,
 } from "@stinkyma/core";
 import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
-import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService } from "@stinkyma/core/llm";
+import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -66,6 +67,7 @@ let rules: RuleService | null = null;
 let cleanup: CleanupService | null = null;
 let subscriptions: SubscriptionService | null = null;
 let userCategories: UserCategoryService | null = null;
+let receipts: ReceiptService | null = null;
 let aiWasReady = false;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
@@ -173,6 +175,8 @@ function setUpServices(): void {
       void subscriptions?.scan().catch(() => undefined);
       // Eigene Kategorien: Absender/Gelerntes sofort, KI im Hintergrund
       void userCategories?.refresh().catch(() => undefined);
+      // Belegordner: Regeln sofort, KI im Hintergrund
+      void receipts?.scan().catch(() => undefined);
     },
   });
 
@@ -244,6 +248,31 @@ function setUpServices(): void {
     onChange: notifyRenderer,
   });
   void userCategories.refresh().catch(() => undefined);
+
+  // Belegordner (W7.2): Regeln sofort, lokales Modell im Hintergrund; Export als ZIP (PDFs + CSV) nur auf Klick
+  receipts = new ReceiptService({
+    store: new ReceiptStore(db, () => randomUUID()),
+    extract: (message, attachmentText, categories) => aiService.extractReceipt(message, attachmentText, categories),
+    modelReady: () => aiService.modelReady(),
+    attachmentContent: async (attachmentId) => {
+      const file = await mailService.attachmentContent(attachmentId);
+      return { filename: file.filename, content: file.content };
+    },
+    saveFile: async (defaultName, data) => {
+      // Nur für die E2E-Tests: ohne Dialog in einen vorgegebenen Ordner (den Windows-Dialog kann der Test nicht bedienen)
+      const testDir = process.env.STINKYMA_TEST_SAVE_DIR;
+      if (testDir) {
+        writeFileSync(join(testDir, defaultName), data);
+        return true;
+      }
+      const options = { defaultPath: join(app.getPath("documents"), defaultName), filters: [{ name: "ZIP", extensions: ["zip"] }] };
+      const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+      if (result.canceled || !result.filePath) return false;
+      writeFileSync(result.filePath, data);
+      return true;
+    },
+    onChange: notifyRenderer,
+  });
 }
 
 /** Die Oberfläche lädt neu, wenn sich Daten geändert haben (Abgleich, Aktionen, Konten). Gebündelt, um Flackern zu vermeiden. */
@@ -484,6 +513,7 @@ function registerIpc(): void {
     ["cleanup", new Set<string>(cleanupApiMethods), () => cleanup],
     ["subscriptions", new Set<string>(subscriptionsApiMethods), () => subscriptions],
     ["categories", new Set<string>(userCategoriesApiMethods), () => userCategories],
+    ["receipts", new Set<string>(receiptsApiMethods), () => receipts],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {

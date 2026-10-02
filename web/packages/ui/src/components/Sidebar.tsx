@@ -1,4 +1,4 @@
-import { AlertTriangle, Broom, LogIn, Plus, RefreshCw, Repeat, Send, Settings, Sun, X } from "lucide-react";
+import { AlertTriangle, Broom, LogIn, Plus, ReceiptText, RefreshCw, Repeat, Send, Settings, Sun, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -120,6 +120,20 @@ export function Sidebar() {
                 >
                   <Repeat className="sidebar-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
                   <span className="sidebar-label">{t("subs.sidebar")}</span>
+                </button>
+              </li>
+            )}
+            {section.id === "smart" && store.canReceipts && (
+              <li>
+                <button
+                  type="button"
+                  className={`sidebar-item${state.panel === "receipts" ? " selected" : ""}`}
+                  aria-current={state.panel === "receipts" ? "page" : undefined}
+                  data-testid="sidebar-receipts"
+                  onClick={() => void store.openReceipts()}
+                >
+                  <ReceiptText className="sidebar-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="sidebar-label">{t("rcpt.sidebar")}</span>
                 </button>
               </li>
             )}

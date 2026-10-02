@@ -1,4 +1,4 @@
-import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, MessageSquareReply, Pencil, Repeat, Reply, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
+import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, MessageSquareReply, Pencil, ReceiptText, Repeat, Reply, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import { assessPhishing, displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -87,6 +87,11 @@ export function MessageDetail() {
             {store.canSubscriptions && (
               <button type="button" title={t("subs.markMailHint")} aria-label={t("subs.markMail")} data-testid="action-subscription" onClick={() => void store.markAsSubscription(message.id)}>
                 <Repeat size={17} />
+              </button>
+            )}
+            {store.canReceipts && (
+              <button type="button" title={t("rcpt.markMailHint")} aria-label={t("rcpt.markMail")} data-testid="action-receipt" onClick={() => void store.markAsReceipt(message.id)}>
+                <ReceiptText size={17} />
               </button>
             )}
             <span className="toolbar-gap" aria-hidden="true" />

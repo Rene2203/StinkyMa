@@ -500,6 +500,63 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // Belegordner (W7.2): ein Beleg je Mail. Bleibt erhalten, auch wenn die Mail aus StinkyMail verschwindet
+    // (kürzerer Zeitraum) – deshalb keine Fremdschlüssel-Löschung, Absender/Betreff/Datum als Kopie.
+    name: "v19-receipts",
+    sql: `
+      CREATE TABLE receipt (
+        id TEXT PRIMARY KEY NOT NULL,
+        accountId TEXT NOT NULL,
+        messageId TEXT,
+        merchant TEXT NOT NULL,
+        date TEXT NOT NULL,
+        grossCents INTEGER,
+        netCents INTEGER,
+        vatCents INTEGER,
+        currency TEXT NOT NULL DEFAULT 'EUR',
+        invoiceNumber TEXT,
+        dueDate TEXT,
+        category TEXT,
+        quote TEXT NOT NULL DEFAULT '',
+        review TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT 'active',
+        origin TEXT NOT NULL,
+        userEdited INTEGER NOT NULL DEFAULT 0,
+        mailSubject TEXT NOT NULL,
+        mailFrom TEXT NOT NULL,
+        mailDate TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX receipt_on_messageId ON receipt(messageId);
+      CREATE INDEX receipt_on_date ON receipt(date);
+      CREATE TABLE receiptScan (
+        messageId TEXT PRIMARY KEY NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        origin TEXT NOT NULL,
+        promptVersion INTEGER NOT NULL,
+        scannedAt TEXT NOT NULL
+      );
+      CREATE TABLE receiptCategory (
+        name TEXT PRIMARY KEY NOT NULL,
+        sortOrder INTEGER NOT NULL
+      );
+      INSERT INTO receiptCategory (name, sortOrder) VALUES
+        ('Arbeitsmittel', 0),
+        ('Handwerker & Dienstleistungen', 1),
+        ('Spenden', 2),
+        ('Versicherungen', 3),
+        ('Gesundheit', 4),
+        ('Haushalt & Einkauf', 5),
+        ('Fahrtkosten & Reisen', 6),
+        ('Sonstiges', 7);
+      CREATE TABLE receiptMerchantCategory (
+        merchantKey TEXT PRIMARY KEY NOT NULL,
+        category TEXT NOT NULL,
+        learnedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

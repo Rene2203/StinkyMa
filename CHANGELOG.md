@@ -39,6 +39,22 @@
     der festen Einordnung bleibt unverändert. Mit Gemma 4 E2B gibt es bei einem Treffer eine kurze Rückfrage – in der
     Messung verschwanden damit alle Fehlzuordnungen (siehe `docs/KI-MESSUNG.md`).
   - Migration `v18-user-categories`.
+- **Belegordner** (W7.2, Seitenleiste „Belege“): sammelt Rechnungen, Quittungen, Kassenbons, Bestell-, Zahlungs- und
+  Spendenbestätigungen aus Mail-Text und PDF-Anhängen.
+  - Liest Händler, Datum (Rechnungs-/Belegdatum, sonst Maildatum), Betrag brutto, Netto und MwSt. (falls angegeben),
+    Rechnungsnummer und Zahlungsfrist („zahlbar innerhalb von 14 Tagen“ rechnet der Code aus).
+  - **Code prüft**: Beträge und Daten der KI müssen im Text stehen; sonst bleibt der Beleg, wird aber als **„bitte
+    prüfen“** markiert (auch, wenn Netto + MwSt. nicht den Gesamtbetrag ergeben). Erfundene Fristen fallen weg.
+  - **Kategorien** (Arbeitsmittel, Handwerker & Dienstleistungen, Spenden, Versicherungen, Gesundheit, Haushalt &
+    Einkauf, Fahrtkosten & Reisen, Sonstiges) – eigene hinzufügen, entfernen; Vorschlag per Regel/KI, beim Korrigieren
+    „Kategorie für diesen Händler merken“.
+  - Jahr wählen, **Summen je Kategorie** (anklickbar als Filter), korrigieren, ausblenden, Mail und PDF öffnen,
+    Erinnerung vor der Zahlungsfrist, „Durchsuchen“/„Alles neu prüfen“.
+  - **„Als Beleg übernehmen“** an jeder Mail (Knopf + Rechtsklick).
+  - **Export pro Jahr**: ZIP mit allen Beleg-PDFs (sprechende Dateinamen „2026-09-28 Händler – Rechnung.pdf“, ohne AGB
+    und Datenschutz) und `belege.csv` (Semikolon, deutsches Zahlenformat, öffnet direkt in Excel). Fehlt eine Datei, steht
+    der Beleg trotzdem in der CSV. Belege bleiben erhalten, auch wenn die Mail aus StinkyMail verschwindet.
+  - Migration `v19-receipts`.
 
 ## Aufräumen und mehr Mails (nach W6)
 

@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expectScrollable, removeQuietly } from "./helpers";
@@ -11,17 +11,20 @@ const screenshotDir = join(__dirname, "..", "test-results", "screenshots");
 let app: ElectronApplication;
 let page: Page;
 let dataDir: string;
+let exportDir: string;
 
 test.beforeAll(async () => {
   mkdirSync(screenshotDir, { recursive: true });
   dataDir = mkdtempSync(join(tmpdir(), "stinkyma-e2e-"));
+  exportDir = join(dataDir, "export");
+  mkdirSync(exportDir);
   // Deutsche Oberfläche unabhängig von der Sprache des Test-Rechners.
   const args = [join(__dirname, ".."), "--lang=de-DE"];
   // Im Linux-Container läuft alles als root; dort braucht Chromium --no-sandbox. Unter Windows nicht nötig.
   if (process.platform === "linux") args.push("--no-sandbox");
   app = await electron.launch({
     args,
-    env: { ...process.env, STINKYMA_DB: join(dataDir, "e2e.sqlite"), STINKYMA_USER_DATA: dataDir, LANG: "de_DE.UTF-8" },
+    env: { ...process.env, STINKYMA_DB: join(dataDir, "e2e.sqlite"), STINKYMA_USER_DATA: dataDir, STINKYMA_TEST_SAVE_DIR: exportDir, LANG: "de_DE.UTF-8" },
   });
   page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
@@ -308,6 +311,43 @@ test("Eigene Kategorie: anlegen mit Absender, Filter in der Seitenleiste, an der
   await page.getByTestId("ucat-remove").click();
   await expect(page.getByTestId("sidebar-ucat-Verein")).toHaveCount(0);
   await expect(page.getByTestId("list-title")).toHaveText("Alle Posteingänge");
+});
+
+test("Belegordner: Rechnung erkannt, korrigieren mit gemerkter Kategorie, „Als Beleg übernehmen“, Export als ZIP mit CSV", async () => {
+  await page.getByTestId("sidebar-receipts").click();
+  const panel = page.getByTestId("receipts");
+  await expect(panel).toBeVisible();
+  const row = panel.getByTestId("rcpt-row").filter({ hasText: "Stadtwerke" });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("86,00");
+  await row.click();
+  const detail = panel.getByTestId("rcpt-detail");
+  await expect(detail.getByTestId("rcpt-origin")).toHaveText("erkannt ohne KI");
+  await detail.locator("summary").click();
+  await detail.getByTestId("rcpt-category").selectOption("Haushalt & Einkauf");
+  await detail.getByTestId("rcpt-save").click();
+  await expect(panel.getByTestId("rcpt-detail").getByTestId("rcpt-origin")).toHaveText("von dir festgelegt");
+  await expect(panel.getByTestId("rcpt-total-chip").filter({ hasText: "Haushalt" })).toContainText("86,00");
+  await shot("34-Belegordner");
+
+  // Andere Mail von Hand übernehmen (Rechtsklick)
+  await panel.getByRole("button", { name: "Zurück zu den Mails" }).click();
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  const other = rows().filter({ hasNotText: "Stadtwerke" }).first();
+  await other.click({ button: "right" });
+  await page.getByTestId("menu-receipt").click();
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId("rcpt-detail").getByTestId("rcpt-origin")).toHaveText("von dir festgelegt");
+
+  // Export: ZIP mit CSV (Beispielkonten haben keine echten PDF-Inhalte → fehlen, Belege stehen trotzdem in der CSV)
+  await panel.getByTestId("rcpt-export").click();
+  await expect(panel.getByTestId("rcpt-exported")).toContainText("Belege exportiert");
+  const zipFile = readdirSync(exportDir).find((f) => f.endsWith(".zip"));
+  expect(zipFile).toBeTruthy();
+  const zip = readFileSync(join(exportDir, zipFile!));
+  expect(zip.readUInt32LE(0)).toBe(0x04034b50);
+  expect(zip.toString("utf8")).toContain("Stadtwerke Musterstadt");
+  await panel.getByRole("button", { name: "Zurück zu den Mails" }).click();
 });
 
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {

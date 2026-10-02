@@ -4,7 +4,7 @@
 import { writeFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
-import { evalHoldoutMails, evalHoldoutThreads, evalMails, evalThreads, evaluateActions, evaluateProvider, evaluateReplies, evaluateRules, formatActionsReports, formatEvalReports, evaluateSubscriptions, formatSubscriptionsReports, type SubscriptionsEvalReport, evaluateUserCategories, formatUserCategoriesReports, type UserCategoriesEvalReport, formatRepliesReports, formatRulesReports, modelCatalog, type ActionsEvalReport, type EvalReport, type RepliesEvalReport, type RulesEvalReport } from "../src/index.js";
+import { evalHoldoutMails, evalHoldoutThreads, evalMails, evalThreads, evaluateActions, evaluateProvider, evaluateReplies, evaluateRules, formatActionsReports, formatEvalReports, evaluateSubscriptions, formatSubscriptionsReports, type SubscriptionsEvalReport, evaluateUserCategories, formatUserCategoriesReports, type UserCategoriesEvalReport, evaluateReceipts, formatReceiptsReports, type ReceiptsEvalReport, formatRepliesReports, formatRulesReports, modelCatalog, type ActionsEvalReport, type EvalReport, type RepliesEvalReport, type RulesEvalReport } from "../src/index.js";
 import { fileNameFromUrl, LlamaCppProvider } from "../src/llm/index.js";
 
 const args = process.argv.slice(2);
@@ -39,6 +39,9 @@ const userCategoriesOnly = args.includes("--user-categories");
 if (userCategoriesOnly) args.splice(args.indexOf("--user-categories"), 1);
 const userCategoriesVersion = args.includes("--v1") ? 1 : args.includes("--v2") ? 2 : 3;
 for (const name of ["--v1", "--v2", "--v3"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
+// --receipts: Belegordner (W7.2), Regeln + Modelle
+const receiptsOnly = args.includes("--receipts");
+if (receiptsOnly) args.splice(args.indexOf("--receipts"), 1);
 const subscriptionsOnly = args.includes("--subscriptions");
 if (subscriptionsOnly) args.splice(args.indexOf("--subscriptions"), 1);
 const all = args.includes("--all");
@@ -102,6 +105,23 @@ if (rulesOnly) {
     }
   }
   console.log(formatRulesReports(reports));
+  process.exit(0);
+}
+
+if (receiptsOnly) {
+  const reports: ReceiptsEvalReport[] = [await evaluateReceipts(null)];
+  for (const model of modelCatalog.filter((m) => ids.length === 0 || ids.includes(m.id))) {
+    const provider = new LlamaCppProvider({ id: model.id, displayName: model.name, modelPath: join(directory, fileNameFromUrl(model.url)), gpu: gpu ? "auto" : false, maxThreads: threads, idleUnloadMs: 0 });
+    try {
+      await provider.load();
+      reports.push(await evaluateReceipts(provider, { onProgress: (d, t) => process.stderr.write(`\r${model.id}: ${d}/${t}   `) }));
+      process.stderr.write("\n");
+      if (out) writeFileSync(out, JSON.stringify(reports, null, 2));
+    } finally {
+      await provider.dispose();
+    }
+  }
+  console.log(formatReceiptsReports(reports));
   process.exit(0);
 }
 

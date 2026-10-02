@@ -259,6 +259,7 @@ export class MailWriter {
       const subscriptionMails = this.db.prepare("SELECT * FROM subscriptionMail WHERE messageId = ?").all(id) as Row[];
       const subscriptionScan = this.db.prepare("SELECT * FROM subscriptionScan WHERE messageId = ?").get(id) as Row | undefined;
       const subscriptionIds = (this.db.prepare("SELECT id FROM subscription WHERE sourceMessageId = ?").all(id) as { id: string }[]).map((r) => r.id);
+      const receiptScan = this.db.prepare("SELECT * FROM receiptScan WHERE messageId = ?").get(id) as Row | undefined;
       this.db.prepare("DELETE FROM message WHERE id = ?").run(id);
       const columns = Object.keys(row).map((c) => `"${c}"`).join(", ");
       const params = Object.keys(row).map((c) => `@${c}`).join(", ");
@@ -289,6 +290,8 @@ export class MailWriter {
       reinsert("subscriptionMail", subscriptionMails, (r) => ({ ...r, messageId: target.newId }));
       if (subscriptionScan) reinsert("subscriptionScan", [subscriptionScan], (r) => ({ ...r, messageId: target.newId }));
       for (const subscriptionId of subscriptionIds) this.db.prepare("UPDATE subscription SET sourceMessageId = ? WHERE id = ?").run(target.newId, subscriptionId);
+      if (receiptScan) reinsert("receiptScan", [receiptScan], (r) => ({ ...r, messageId: target.newId }));
+      this.db.prepare("UPDATE receipt SET messageId = ? WHERE messageId = ?").run(target.newId, id);
     });
   }
 
