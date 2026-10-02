@@ -350,6 +350,23 @@ test("Belegordner: Rechnung erkannt, korrigieren mit gemerkter Kategorie, „Als
   await panel.getByRole("button", { name: "Zurück zu den Mails" }).click();
 });
 
+test("Zusagen: eigene Zusage aus gesendeter Mail mit Frist, Erinnerung, erledigt; „Ich warte auf“", async () => {
+  await page.getByTestId("sidebar-promises").click();
+  const panel = page.getByTestId("promises");
+  await expect(panel).toBeVisible();
+  const card = panel.getByTestId("prom-card").filter({ hasText: "Angebot" });
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("an Petra Schulz");
+  await expect(card.getByTestId("prom-due")).not.toBeEmpty();
+  await shot("35-Zusagen");
+  await card.getByTestId("prom-done").click();
+  await expect(panel.getByText("Erledigt (letzte 30 Tage)")).toBeVisible();
+  await expect(panel.getByTestId("prom-card").filter({ hasText: "Angebot" })).toContainText("erledigt");
+  await panel.getByTestId("prom-tab-theirs").click();
+  await expect(panel.getByTestId("prom-tab-theirs")).toHaveAttribute("aria-selected", "true");
+  await panel.getByRole("button", { name: "Zurück zu den Mails" }).click();
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

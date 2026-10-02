@@ -11,3 +11,4 @@ export * from "./cleanupStore.js";
 export * from "./subscriptionStore.js";
 export * from "./userCategoryStore.js";
 export * from "./receiptStore.js";
+export * from "./promiseStore.js";

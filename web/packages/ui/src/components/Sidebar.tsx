@@ -1,4 +1,4 @@
-import { AlertTriangle, Broom, LogIn, Plus, ReceiptText, RefreshCw, Repeat, Send, Settings, Sun, X } from "lucide-react";
+import { AlertTriangle, Broom, Handshake, LogIn, Plus, ReceiptText, RefreshCw, Repeat, Send, Settings, Sun, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -120,6 +120,20 @@ export function Sidebar() {
                 >
                   <Repeat className="sidebar-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
                   <span className="sidebar-label">{t("subs.sidebar")}</span>
+                </button>
+              </li>
+            )}
+            {section.id === "smart" && store.canPromises && (
+              <li>
+                <button
+                  type="button"
+                  className={`sidebar-item${state.panel === "promises" ? " selected" : ""}`}
+                  aria-current={state.panel === "promises" ? "page" : undefined}
+                  data-testid="sidebar-promises"
+                  onClick={() => void store.openPromises()}
+                >
+                  <Handshake className="sidebar-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="sidebar-label">{t("prom.sidebar")}</span>
                 </button>
               </li>
             )}

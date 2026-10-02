@@ -9,6 +9,10 @@ import {
   type SubscriptionsView,
   type UserCategoriesApi,
   type ReceiptsApi,
+  type PromisesApi,
+  type PromisesView,
+  type PromiseStatus,
+  type StoredPromise,
   type ReceiptsView,
   type ReceiptEdit,
   type ReceiptStatus,
@@ -151,7 +155,7 @@ export interface BrowserState {
   /** Offene fremde Seite im Fenster innerhalb der App; null = zu */
   webPanel: WebPanelState | null;
   /** Was die beiden rechten Spalten zeigen: Mails oder „Abos & Verträge“ */
-  panel: "mail" | "subscriptions" | "receipts";
+  panel: "mail" | "subscriptions" | "receipts" | "promises";
   /** Verträge & Abos (W7.1) */
   subscriptions: { view: SubscriptionsView | null; selectedId: string | null; busy: boolean; error: string | null } | null;
   /** Eigene Kategorien (Seitenleiste); null = nicht verfügbar oder noch nicht geladen */
@@ -168,6 +172,8 @@ export interface BrowserState {
     error: string | null;
     exported: { count: number; missingFiles: number } | null;
   } | null;
+  /** Versprechen-Tracker (W7.3): welche Liste, Daten */
+  promises: { view: PromisesView | null; tab: "mine" | "theirs"; busy: boolean; error: string | null } | null;
   /** Rückmeldung nach eigener Zuordnung (geöffnete Mail) */
   userCategoryNote: { messageId: string; categoryId: string | null; remembered: boolean; changed: number } | null;
 }
@@ -293,6 +299,7 @@ export const initialState: BrowserState = {
   subscriptions: null,
   userCategories: null,
   receipts: null,
+  promises: null,
   categoryDialog: null,
   userCategoryNote: null,
 };
@@ -361,10 +368,11 @@ export class BrowserStore {
   readonly #subscriptions: SubscriptionsApi | undefined;
   readonly #categories: UserCategoriesApi | undefined;
   readonly #receipts: ReceiptsApi | undefined;
+  readonly #promises: PromisesApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi; promises?: PromisesApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -378,6 +386,105 @@ export class BrowserStore {
     this.#subscriptions = options.subscriptions;
     this.#categories = options.categories;
     this.#receipts = options.receipts;
+    this.#promises = options.promises;
+  }
+
+  // --- Versprechen-Tracker (W7.3) ---
+
+  get canPromises(): boolean {
+    return Boolean(this.#promises);
+  }
+
+  #patchPromises(patch: Partial<NonNullable<BrowserState["promises"]>>): void {
+    const current = this.#state.promises ?? { view: null, tab: "mine" as const, busy: false, error: null };
+    this.#set({ promises: { ...current, ...patch } });
+  }
+
+  async openPromises(tab?: "mine" | "theirs"): Promise<void> {
+    if (!this.#promises) return;
+    this.#set({ panel: "promises" });
+    this.#patchPromises({ busy: true, error: null, ...(tab ? { tab } : {}) });
+    await this.#loadPromises();
+    await this.scanPromises(false);
+  }
+
+  closePromises(): void {
+    this.#set({ panel: "mail" });
+  }
+
+  selectPromiseTab(tab: "mine" | "theirs"): void {
+    this.#patchPromises({ tab });
+  }
+
+  async scanPromises(recheck: boolean): Promise<void> {
+    const api = this.#promises;
+    if (!api) return;
+    this.#patchPromises({ busy: true });
+    try {
+      await api.scan({ recheck });
+      this.#patchPromises({ error: null });
+    } catch (e) {
+      this.#patchPromises({ error: messageOf(e) });
+    }
+    await this.#loadPromises();
+  }
+
+  async #loadPromises(): Promise<void> {
+    const api = this.#promises;
+    if (!api) return;
+    try {
+      this.#patchPromises({ view: await api.list(), busy: false });
+    } catch (e) {
+      this.#patchPromises({ busy: false, error: messageOf(e) });
+    }
+  }
+
+  async #promiseAction(action: (api: PromisesApi) => Promise<unknown>): Promise<void> {
+    const api = this.#promises;
+    if (!api) return;
+    try {
+      await action(api);
+      this.#patchPromises({ error: null });
+    } catch (e) {
+      this.#patchPromises({ error: messageOf(e) });
+    }
+    await this.#loadPromises();
+  }
+
+  setPromiseStatus(id: string, status: PromiseStatus): Promise<void> {
+    return this.#promiseAction((api) => api.setStatus(id, status));
+  }
+
+  setPromiseDueDate(id: string, dueDate: string): Promise<void> {
+    return this.#promiseAction((api) => api.setDueDate(id, dueDate));
+  }
+
+  remindPromise(id: string, daysBefore: number): Promise<void> {
+    return this.#promiseAction((api) => api.remind(id, daysBefore));
+  }
+
+  cancelPromiseReminder(id: string): Promise<void> {
+    return this.#promiseAction((api) => api.cancelReminder(id));
+  }
+
+  async openPromiseMail(promise: StoredPromise, messageId = promise.messageId): Promise<void> {
+    if (!messageId) return;
+    this.#set({ panel: "mail" });
+    await this.openMessage(messageId);
+  }
+
+  /** Nachhaken: Mail öffnen und eine Antwort mit vorbereitetem Text – abgeschickt wird nur, was der Nutzer abschickt. */
+  async followUpPromise(promise: StoredPromise, labels: ComposeLabels): Promise<void> {
+    const api = this.#promises;
+    if (!api || !promise.messageId) return;
+    try {
+      const draft = await api.followUpDraft(promise.id);
+      this.#set({ panel: "mail" });
+      await this.openMessage(promise.messageId);
+      this.openCompose("reply", labels, draft.body);
+    } catch (e) {
+      this.#patchPromises({ error: messageOf(e) });
+    }
   }
 
   // --- Belegordner (W7.2) ---
@@ -1378,6 +1485,7 @@ export class BrowserStore {
       this.#state.cleanup?.group?.mails ? this.#loadCleanupMails() : Promise.resolve(),
       this.#state.panel === "subscriptions" ? this.#loadSubscriptions() : Promise.resolve(),
       this.#state.panel === "receipts" ? this.#loadReceipts() : Promise.resolve(),
+      this.#state.panel === "promises" ? this.#loadPromises() : Promise.resolve(),
       this.loadUserCategories(),
     ]);
     const selected = this.#state.selectedMessageId;

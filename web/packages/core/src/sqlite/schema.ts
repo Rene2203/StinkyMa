@@ -557,6 +557,41 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // Versprechen-Tracker (W7.3): Zusagen aus gesendeten („mine“) und eingegangenen („theirs“) Mails. `followUpMessageId`:
+    // spätere Mail im selben Verlauf, die die Zusage vermutlich erfüllt (die App schlägt „erledigt“ vor).
+    name: "v20-promises",
+    sql: `
+      CREATE TABLE promise (
+        id TEXT PRIMARY KEY NOT NULL,
+        accountId TEXT NOT NULL,
+        messageId TEXT,
+        threadId TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        counterpartName TEXT,
+        counterpartAddress TEXT NOT NULL,
+        text TEXT NOT NULL,
+        quote TEXT NOT NULL,
+        dueDate TEXT NOT NULL,
+        dueStated INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        followUpMessageId TEXT,
+        origin TEXT NOT NULL,
+        mailSubject TEXT NOT NULL,
+        mailDate TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+      CREATE INDEX promise_on_messageId ON promise(messageId);
+      CREATE INDEX promise_open_on_dueDate ON promise(dueDate) WHERE status = 'open';
+      CREATE TABLE promiseScan (
+        messageId TEXT PRIMARY KEY NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        origin TEXT NOT NULL,
+        promptVersion INTEGER NOT NULL,
+        scannedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

@@ -55,6 +55,18 @@
     und Datenschutz) und `belege.csv` (Semikolon, deutsches Zahlenformat, öffnet direkt in Excel). Fehlt eine Datei, steht
     der Beleg trotzdem in der CSV. Belege bleiben erhalten, auch wenn die Mail aus StinkyMail verschwindet.
   - Migration `v19-receipts`.
+- **Versprechen-Tracker** (W7.3, Seitenleiste „Zusagen“): zwei Listen.
+  - **Meine Zusagen**: Sätze wie „Ich schicke dir das bis Freitag“, „Melde mich nächste Woche“ aus gesendeten Mails –
+    mit Empfänger und Frist. Den Zeitausdruck rechnet der Code ab dem Sendedatum in ein Datum („bis Freitag“, „Ende der
+    Woche“, „nächste Woche“, „Anfang nächster Woche“, „Ende des Monats“, „in 3 Tagen“, „heute Abend“, „next Tuesday“);
+    ohne Frist gilt eine Standardfrist von 3 Tagen. Erinnerung automatisch einen Tag vorher (abschaltbar).
+  - **Ich warte auf**: Zusagen anderer in eingegangenen Mails („Sie erhalten das Angebot bis Montag“). Ist die Frist
+    vorbei, „Nachhaken“: öffnet eine Antwort mit freundlicher Nachfrage – abgeschickt wird nur, was du abschickst.
+  - **Folge-Mail erkannt**: Antwortest du im selben Verlauf (bzw. kommt die Antwort der anderen Person), schlägt die App
+    „erledigt?“ vor. Überfällige Zusagen sind rot markiert und werden an den Reitern gezählt.
+  - Nicht als Zusage: Bitten und Fragen, schon Erledigtes („anbei“, „habe geschickt“), zitierter Text, Werbung und
+    automatische Absender (noreply, Newsletter). Die KI muss ein Zitat aus der Mail liefern, das der Code wiederfindet.
+  - Migration `v20-promises`.
 
 ## Aufräumen und mehr Mails (nach W6)
 

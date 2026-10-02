@@ -557,5 +557,18 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Messung: Regeln allein Testsatz und Kontrollsatz 100 % (geschönt, aus einer Hand), unordentlicher Kontrollsatz 2 nur 54 % – Messung mit E2B/E4B läuft.
   **Ungeprüft:** echte Postfächer, ZIP mit echten PDFs vom Server (im E2E nur Beispielkonten ohne Dateiinhalt),
   Öffnen des ZIP unter Windows, Windows-CI.
-  Als Nächstes: W7.3 Versprechen-Tracker.
+- **W7.3 Versprechen-Tracker (02.10.2026) – gebaut, lokal geprüft:** „Meine Zusagen“ (gesendete Mails) und „Ich warte auf“
+  (eingegangene). Regeln: Zusage in erster Person bzw. vom Absender, ohne Fragen/Bitten/Erledigtes/Zitate/Werbung/
+  automatische Absender; Frist per Code aus dem Ausdruck (Wochentage, Ende der Woche, nächste Woche, Monatsende, in N Tagen,
+  heute, Englisch), Anlass („wegen Samstag“) ist keine Frist; ohne Frist 3 Tage. Modell: Zitat muss in der Mail stehen.
+  Folge-Mail im Verlauf → „erledigt?“. Eigene Zusagen: Erinnerung 1 Tag vorher. „Nachhaken“ öffnet Antwort-Entwurf
+  (Text ohne KI, freundlich mit Zitat). Migration v20. Tests: 5 Unit-Tests, E2E (Zusage aus gesendeter Mail, erledigt,
+  Reiter). Messung: Regeln Testsatz 17/17 (Frist 17/17), Kontrollsatz 9/9 – geschönt (aus einer Hand); unordentlicher
+  Kontrollsatz 2: **0/11** – Regeln versagen bei Umgangssprache, dort muss die KI ran. KI-Messung (E2B/E4B) läuft.
+  **Ungeprüft:** echte Postfächer, wie oft Fehlalarme in echten gesendeten Mails auftauchen, Windows-CI.
+  Hinweis zur Messung Belege: E2B füllte „Händler“ mit der Dokumentart („Rechnung“) und MwSt. mit dem Satz („19 %“) –
+  allgemein behoben (Händler muss im Absender/Text stehen und darf keine Dokumentart sein; Prozent ist kein Betrag;
+  Netto/MwSt. nur, wenn im Text; Stichwort-Kategorie vor Modell; „KI sagt kein Beleg“ bei klarem Gesamtbetrag → bleibt
+  mit „bitte prüfen“). Nachmessung läuft.
+  Als Nächstes: Messungen auswerten; danach W8.
 

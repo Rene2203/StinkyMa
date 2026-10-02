@@ -110,6 +110,11 @@ export function receiptAmounts(text: string): { gross: number | null; net: numbe
 /** „23/09/2026“ (englische Rechnungen) zusätzlich zu den deutschen/englischen Schreibweisen der Aktionen. */
 function datesIn(text: string, mailDate: Date): { date: string; index: number }[] {
   const out = explicitDates(text, mailDate);
+  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) {
+    const month = Number(m[2]);
+    const dayOfMonth = Number(m[3]);
+    if (month >= 1 && month <= 12 && dayOfMonth >= 1 && dayOfMonth <= 31) out.push({ date: `${m[1]}-${m[2]}-${m[3]}`, index: m.index ?? 0 });
+  }
   for (const m of text.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g)) {
     const day = Number(m[1]);
     const month = Number(m[2]);
@@ -247,6 +252,8 @@ Antworte nur mit JSON.`,
   ];
 }
 
+const documentWord = /^(die |eine? )?(rechnung|quittung|kassenbon|kassenbeleg|beleg|bestellbestätigung|zahlungsbestätigung|spendenbestätigung|zuwendungsbestätigung|beitragsrechnung|beitragsbestätigung|fahrtquittung|abrechnung|receipt|invoice|order)\b/i;
+
 function isoOrNull(value: unknown): string | null {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim() : null;
 }
@@ -261,15 +268,20 @@ export function parseReceipt(text: string, mail: string, mailDate: Date, from: E
   if (!value.istBeleg) return "none";
   const review: string[] = [];
   const money = (field: unknown, label: string): number | null => {
-    if (typeof field !== "string" || !field.trim()) return null;
+    if (typeof field !== "string" || !field.trim() || /%/.test(field)) return null; // „19 %“ ist ein Satz, kein Betrag
     const cents = amountsIn(field)[0]?.cents ?? parseAmount(field.replace(/[^\d.,]/g, ""));
     if (cents === null || cents === 0) return null;
     if (!amountInText(cents, mail)) review.push(`${label} steht so nicht in der Mail`);
     return cents;
   };
   const gross = money(value.brutto, "Betrag");
-  const net = money(value.netto, "Netto");
-  const vat = money(value.mwst, "MwSt.");
+  // Netto und MwSt. nur, wenn sie als Betrag dastehen – ausgerechnete Werte fallen weg (statt „bitte prüfen“)
+  const inText = (field: unknown) => {
+    const cents = typeof field === "string" && !/%/.test(field) ? (amountsIn(field)[0]?.cents ?? parseAmount(field.replace(/[^\d.,]/g, ""))) : null;
+    return cents && amountInText(cents, mail) ? cents : null;
+  };
+  const net = inText(value.netto);
+  const vat = inText(value.mwst);
   const dateText = (d: string) => datesIn(mail, mailDate).some((x) => x.date === d);
   let date = isoOrNull(value.datum);
   if (date && !dateText(date) && date !== iso(mailDate)) {
@@ -278,7 +290,10 @@ export function parseReceipt(text: string, mail: string, mailDate: Date, from: E
   date ??= iso(mailDate);
   let due = isoOrNull(value.zahlungsfrist);
   if (due && !dateText(due)) due = null; // ausgedachte Frist: weglassen (die Regeln rechnen „innerhalb von 14 Tagen“)
-  const merchant = typeof value.haendler === "string" && value.haendler.trim() ? value.haendler.trim().slice(0, 60) : providerName(from);
+  // Händler: muss im Absender oder in der Mail stehen und darf keine Dokumentart sein („Rechnung“, „Kassenbon“)
+  const named = typeof value.haendler === "string" ? value.haendler.trim().slice(0, 60) : "";
+  const plausible = named.length >= 2 && !documentWord.test(named) && `${from.name ?? ""} ${from.address} ${mail}`.toLowerCase().includes(named.toLowerCase());
+  const merchant = plausible ? named : providerName(from);
   const number = typeof value.rechnungsnummer === "string" && value.rechnungsnummer.trim() && mail.includes(value.rechnungsnummer.trim()) ? value.rechnungsnummer.trim() : null;
   const category = typeof value.kategorie === "string" && categories.includes(value.kategorie) ? value.kategorie : null;
   if (gross === null) review.push("Kein Betrag gefunden");
@@ -301,7 +316,7 @@ export function mergeReceipts(model: ReceiptFinding, rules: ReceiptFinding | nul
     vatCents: rules.vatCents ?? model.vatCents,
     invoiceNumber: rules.invoiceNumber ?? model.invoiceNumber,
     dueDate: rules.dueDate ?? model.dueDate,
-    category: model.category ?? rules.category,
+    category: rules.category ?? model.category,
     quote: rules.quote || model.quote,
     review: [],
   };
@@ -346,7 +361,11 @@ export async function extractReceipt(
     const response = await router.run(request, { accountIds: [message.accountId] }, options.signal);
     durationMs += response.durationMs;
     const parsed = parseReceipt(response.text, mail, mailDate, message.from, categories);
-    if (parsed === "none") return { finding: null, origin: response.privacyClass, durationMs };
+    if (parsed === "none") {
+      // Regeln sind sich sicher (Beleg-Wort und klarer Gesamtbetrag): lieber behalten und prüfen lassen als verlieren
+      if (rules && strong) return { finding: { ...rules, review: [...rules.review, "Die KI hält das für keinen Beleg"] }, origin: response.privacyClass, durationMs };
+      return { finding: null, origin: response.privacyClass, durationMs };
+    }
     if (parsed) return { finding: mergeReceipts(parsed, rules, strong, iso(mailDate)), origin: response.privacyClass, durationMs };
   }
   return { finding: rules, origin: "rules", durationMs };

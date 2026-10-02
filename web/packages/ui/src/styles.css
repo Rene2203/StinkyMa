@@ -3546,3 +3546,192 @@ dialog.webpanel::backdrop {
   gap: 8px;
   margin-top: 10px;
 }
+
+/* Versprechen-Tracker */
+
+.prom-tabs {
+  align-self: flex-start;
+  margin: 0 0 10px;
+}
+
+.prom-tabs .badge,
+.prom-overdue-badge {
+  margin-left: 6px;
+  background: var(--danger);
+  color: #fff;
+}
+
+.prom-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.prom-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prom-card {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+}
+
+.prom-card.past {
+  border-left-color: var(--danger);
+}
+
+.prom-card.soon {
+  border-left-color: var(--orange);
+}
+
+.prom-card.done {
+  opacity: 0.65;
+}
+
+.prom-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.prom-who {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.prom-quote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.prom-due {
+  font-size: 12px;
+}
+
+.prom-due.past {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.prom-due.soon {
+  color: var(--orange);
+}
+
+.prom-followup {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--green);
+}
+
+.prom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  align-content: flex-start;
+  flex: 0 1 auto;
+}
+
+.prom-actions button:not(.link) {
+  font: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+
+.prom-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--fg-on-accent);
+}
+
+.prom-actions .link {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.prom-actions .link.muted {
+  color: var(--fg-muted);
+}
+
+.prom-due-edit {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.prom-due-edit input {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.prom-done-heading {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 16px 0 6px;
+}
+
+.prom-tabs {
+  display: inline-flex;
+}
+
+.prom-tabs button {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 5px 14px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.prom-tabs button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.prom-tabs button:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: 0;
+}
+
+.prom-tabs button.selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}

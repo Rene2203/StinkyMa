@@ -14,6 +14,7 @@ const taskKey: Record<AITask, MessageKey> = {
   extractSubscription: "aiActivity.extractSubscription",
   userCategory: "aiActivity.userCategory",
   extractReceipt: "aiActivity.extractReceipt",
+  extractPromises: "aiActivity.extractPromises",
 };
 
 /** Sekunden seit `iso`, jede Sekunde neu – damit man sieht, dass sich etwas tut. */

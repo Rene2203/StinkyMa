@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { accountsApiMethods, aiMethods, appSettingsMethods, attachmentFilesMethods, mailRepositoryMethods, rulesApiMethods, cleanupApiMethods, subscriptionsApiMethods, userCategoriesApiMethods, receiptsApiMethods } from "@stinkyma/core";
+import { accountsApiMethods, aiMethods, appSettingsMethods, attachmentFilesMethods, mailRepositoryMethods, rulesApiMethods, cleanupApiMethods, subscriptionsApiMethods, userCategoriesApiMethods, receiptsApiMethods, promisesApiMethods } from "@stinkyma/core";
 
 // Der Preload listet die erlaubten Methoden fest auf (er soll den Kern nicht einbündeln).
 // Dieser Test sorgt dafür, dass die Liste nicht von den Schnittstellen abweicht.
@@ -47,6 +47,10 @@ describe("Preload-Brücke", () => {
 
   it("reicht genau die Methoden für den Belegordner durch", () => {
     expect(listed("receiptsMethods").sort()).toEqual([...receiptsApiMethods].sort());
+  });
+
+  it("reicht genau die Methoden für den Versprechen-Tracker durch", () => {
+    expect(listed("promisesMethods").sort()).toEqual([...promisesApiMethods].sort());
   });
 
   it("reicht genau die Methoden fürs Aufräumen durch", () => {

@@ -1,3 +1,5 @@
+import { extractPromises, rulePromises, type PromiseFinding } from "./promises.js";
+import { evalPromiseCases, evalPromiseHoldout, evalPromiseHoldout2, ownAddress, type EvalPromiseCase } from "./evalPromises.js";
 import { extractReceipt, receiptMailText, ruleReceipt, type ReceiptFinding } from "./receipts.js";
 import { evalReceiptCases, evalReceiptHoldout, evalReceiptHoldout2, receiptCategoryDefaults } from "./evalReceipts.js";
 import { classifyUserCategory } from "./userCategories.js";
@@ -642,6 +644,75 @@ export function formatReceiptsReports(reports: ReceiptsEvalReport[]): string {
       lines.push(`| ${r.name} | ${s.label} | ${s.detected}/${s.total} | ${s.falsePositives} | ${percent(s.fieldsTotal ? s.fieldsCorrect / s.fieldsTotal : 0)} (von ${s.fieldsTotal}) | ${s.categoryCorrect}/${s.categoryTotal} | ${s.flagged} | ${seconds(r.medianMs)} |`);
     }
   }
+  for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
+  return lines.join("\n");
+}
+
+export interface PromisesEvalReport {
+  name: string;
+  sets: { label: string; found: number; total: number; dueCorrect: number; falsePositives: number }[];
+  medianMs: number;
+  misses: string[];
+}
+
+function promiseMessage(c: EvalPromiseCase): Message {
+  const anna = { name: "Anna Beispiel", address: ownAddress };
+  return {
+    id: c.id, accountId: evalAccount, mailboxId: c.sent ? "sent" : "inbox", threadId: c.id,
+    from: c.sent ? anna : c.other, to: [c.sent ? c.other : anna], cc: [], subject: c.subject, date: "2026-09-30T08:00:00Z",
+    snippet: c.body.slice(0, 120), bodyText: c.body, flags: 0, hasAttachments: false,
+  };
+}
+
+/** Versprechen-Tracker: Regeln allein (provider = null) oder Modell. */
+export async function evaluatePromises(provider: AIProvider | null, options: { onProgress?: (done: number, total: number) => void } = {}): Promise<PromisesEvalReport> {
+  const router = provider ? new AIRouter({ providerFor: () => provider, policy: new GrantPolicy() }) : null;
+  const report: PromisesEvalReport = { name: provider?.displayName ?? "Regeln (ohne KI)", sets: [], medianMs: 0, misses: [] };
+  const durations: number[] = [];
+  const all = [["Testsatz", evalPromiseCases], ["Kontrollsatz", evalPromiseHoldout], ["Kontrollsatz 2", evalPromiseHoldout2]] as const;
+  const totalCases = all.reduce((n, [, cases]) => n + cases.length, 0);
+  let done = 0;
+  for (const [label, cases] of all) {
+    const entry = { label, found: 0, total: 0, dueCorrect: 0, falsePositives: 0 };
+    for (const c of cases) {
+      const message = promiseMessage(c);
+      const direction = c.sent ? "mine" : "theirs";
+      let findings: PromiseFinding[];
+      if (router) {
+        const result = await extractPromises(router, message, direction);
+        findings = result.findings;
+        if (result.origin !== "rules") durations.push(result.durationMs);
+      } else {
+        findings = rulePromises(c.body, new Date(message.date), direction, message.from);
+      }
+      const used = new Set<PromiseFinding>();
+      for (const expected of c.expected) {
+        entry.total++;
+        const match = findings.find((f) => !used.has(f) && `${f.quote} ${f.text}`.toLowerCase().includes(expected.about.toLowerCase()));
+        if (!match) {
+          report.misses.push(`${c.id}: nicht erkannt („${expected.about}“)`);
+          continue;
+        }
+        used.add(match);
+        entry.found++;
+        if (match.dueDate === expected.dueDate) entry.dueCorrect++;
+        else report.misses.push(`${c.id}: Frist ${match.dueDate ?? "keine"} (soll ${expected.dueDate ?? "keine"})`);
+      }
+      for (const extra of findings.filter((f) => !used.has(f))) {
+        entry.falsePositives++;
+        report.misses.push(`${c.id}: Fehlalarm „${extra.quote.slice(0, 70)}“`);
+      }
+      options.onProgress?.(++done, totalCases);
+    }
+    report.sets.push(entry);
+  }
+  report.medianMs = median(durations);
+  return report;
+}
+
+export function formatPromisesReports(reports: PromisesEvalReport[]): string {
+  const lines = ["| Verfahren | Satz | Zusagen erkannt | Frist richtig | Fehlalarme | Zeit (Median) |", "|---|---|---|---|---|---|"];
+  for (const r of reports) for (const s of r.sets) lines.push(`| ${r.name} | ${s.label} | ${s.found}/${s.total} | ${s.dueCorrect}/${s.found} | ${s.falsePositives} | ${seconds(r.medianMs)} |`);
   for (const r of reports) if (r.misses.length) lines.push("", `**${r.name}** – Abweichungen:`, ...r.misses.map((m) => `- ${m}`));
   return lines.join("\n");
 }

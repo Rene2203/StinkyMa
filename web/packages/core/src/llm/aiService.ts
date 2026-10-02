@@ -12,6 +12,7 @@ import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
 import { extractSubscription, type SubscriptionResult } from "../ai/subscriptions.js";
 import { extractReceipt, type ReceiptResult } from "../ai/receipts.js";
+import { extractPromises, type PromiseDirection, type PromiseResult } from "../ai/promises.js";
 import { classifyUserCategory, userCategoryPromptFor, type UserCategoryResult } from "../ai/userCategories.js";
 import type { UserCategory } from "../userCategories.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
@@ -573,6 +574,13 @@ export class AIService implements AIApi {
     if (!(await this.#modelReady())) return null;
     const { router } = await this.#router();
     return extractSubscription(router, message, { attachmentText });
+  }
+
+  /** Zusagen einer Mail per Modell (Zitat geprüft, Frist per Code); `null`, wenn kein Modell bereit ist. */
+  async extractPromises(message: Message, direction: PromiseDirection): Promise<PromiseResult | null> {
+    if (!(await this.#modelReady())) return null;
+    const { router } = await this.#router();
+    return extractPromises(router, message, direction);
   }
 
   /** Beleg einer Mail per Modell (mit Prüfung im Text); `null`, wenn kein Modell bereit ist. */

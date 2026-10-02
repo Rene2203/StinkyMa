@@ -13,6 +13,7 @@ import {
   subscriptionsApiMethods,
   userCategoriesApiMethods,
   receiptsApiMethods,
+  promisesApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -34,9 +35,9 @@ import {
   type Message,
 } from "@stinkyma/core";
 import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
-import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService } from "@stinkyma/core/llm";
+import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService, PromiseService } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, PromiseStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -68,6 +69,7 @@ let cleanup: CleanupService | null = null;
 let subscriptions: SubscriptionService | null = null;
 let userCategories: UserCategoryService | null = null;
 let receipts: ReceiptService | null = null;
+let promises: PromiseService | null = null;
 let aiWasReady = false;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
@@ -177,6 +179,8 @@ function setUpServices(): void {
       void userCategories?.refresh().catch(() => undefined);
       // Belegordner: Regeln sofort, KI im Hintergrund
       void receipts?.scan().catch(() => undefined);
+      // Versprechen-Tracker: neue gesendete/eingegangene Mails, Folge-Mails erkennen
+      void promises?.scan().catch(() => undefined);
     },
   });
 
@@ -248,6 +252,15 @@ function setUpServices(): void {
     onChange: notifyRenderer,
   });
   void userCategories.refresh().catch(() => undefined);
+
+  // Versprechen-Tracker (W7.3): Regeln sofort, lokales Modell im Hintergrund; sendet nie etwas
+  promises = new PromiseService({
+    store: new PromiseStore(db, () => randomUUID()),
+    extract: (message, direction) => aiService.extractPromises(message, direction),
+    modelReady: () => aiService.modelReady(),
+    onChange: notifyRenderer,
+    locale: app.getLocale().startsWith("de") ? "de" : "en",
+  });
 
   // Belegordner (W7.2): Regeln sofort, lokales Modell im Hintergrund; Export als ZIP (PDFs + CSV) nur auf Klick
   receipts = new ReceiptService({
@@ -514,6 +527,7 @@ function registerIpc(): void {
     ["subscriptions", new Set<string>(subscriptionsApiMethods), () => subscriptions],
     ["categories", new Set<string>(userCategoriesApiMethods), () => userCategories],
     ["receipts", new Set<string>(receiptsApiMethods), () => receipts],
+    ["promises", new Set<string>(promisesApiMethods), () => promises],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {

@@ -1,4 +1,4 @@
-import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi, SubscriptionsApi, UserCategoriesApi, ReceiptsApi } from "@stinkyma/core";
+import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi, SubscriptionsApi, UserCategoriesApi, ReceiptsApi, PromisesApi } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
@@ -7,6 +7,7 @@ import { CategoryDialog } from "./components/CategoryDialog.js";
 import { WebPanelDialog } from "./components/WebPanelDialog.js";
 import { SubscriptionsPanel } from "./components/SubscriptionsPanel.js";
 import { ReceiptsPanel } from "./components/ReceiptsPanel.js";
+import { PromisesPanel } from "./components/PromisesPanel.js";
 import { DigestDialog } from "./components/DigestDialog.js";
 import { composeLabels } from "./composeLabels.js";
 import { MessageList } from "./components/MessageList.js";
@@ -39,6 +40,8 @@ export interface AppProps {
   categories?: UserCategoriesApi;
   /** Belegordner */
   receipts?: ReceiptsApi;
+  /** Versprechen-Tracker */
+  promises?: PromisesApi;
   /** Meldet Statusänderungen der KI (Download-Fortschritt usw.). */
   subscribeAIStatus?: (onStatus: (status: AIStatus) => void) => () => void;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
@@ -49,8 +52,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts]);
+export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
@@ -86,6 +89,8 @@ function Shell() {
         <SubscriptionsPanel />
       ) : state.panel === "receipts" ? (
         <ReceiptsPanel />
+      ) : state.panel === "promises" ? (
+        <PromisesPanel />
       ) : (
         <>
           <MessageList />
