@@ -1,5 +1,6 @@
 import type { EmailAddress, Message } from "../models.js";
 import { explicitDates, fixYear, relativeDates } from "./actions.js";
+import { amountToCents } from "../subscriptions.js";
 import { cleanMailText } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { extractJson, type ResultOrigin } from "./tasks.js";
@@ -212,7 +213,7 @@ export function ruleSubscription(subject: string, body: string, from: EmailAddre
 
   const kind: SubscriptionKind =
     isTrial && !cancelled && (trialEnd || /(probe|test|gratis|trial)/i.test(text)) ? "trial"
-    : /(versicherung|insurance)/i.test(text) ? "insurance"
+    : /(versicherung|insurance)/i.test(`${text} ${from.name ?? ""}`) ? "insurance"
     : /(mitglied|verein|leseausweis|club)/i.test(`${text} ${from.name ?? ""}`) ? "membership"
     : /(vertrag|tarif|liefer|dsl)/i.test(text) && !/[a-zäöüß-]*abos?(?![a-zäöüß])|abonnement|subscription/i.test(text) ? "contract"
     : "subscription";
@@ -291,8 +292,10 @@ export function parseSubscription(text: string, mail: string, mailDate: Date, fr
   if (!value.isSubscription) return "none";
   const kind = (subscriptionKinds as readonly string[]).includes(String(value.kind)) ? (value.kind as SubscriptionKind) : "subscription";
   const amountRaw = typeof value.amount === "string" ? value.amount.trim() : "";
-  const digits = amountRaw.replace(/[^\d,]/g, "");
-  const amount = digits && mail.replace(/(\d)\.(\d{3})/g, "$1$2").replace(/[^\d,]/g, " ").split(" ").includes(digits.replace(/\./g, "")) ? amountRaw : null;
+  // Betrag nur, wenn er so in der Mail steht – verglichen in Cent („8,99 €“ = „€8.99“)
+  const cents = amountToCents(amountRaw);
+  const inMail = new Set([...mail.matchAll(/\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2})?(?!\d)/g)].map((m) => amountToCents(m[0])));
+  const amount = amountRaw && cents !== null && inMail.has(cents) ? amountRaw : null;
   const interval = (billingIntervals as readonly string[]).includes(String(value.interval)) ? (value.interval as BillingInterval) : null;
   const minTerm = typeof value.minTermMonths === "number" && value.minTermMonths > 0 && mail.includes(String(value.minTermMonths)) ? value.minTermMonths : null;
   const finding: SubscriptionFinding = {
@@ -319,7 +322,8 @@ export function parseSubscription(text: string, mail: string, mailDate: Date, fr
 export function mergeFindings(model: SubscriptionFinding, rules: SubscriptionFinding | null): SubscriptionFinding {
   if (!rules) return model;
   return {
-    kind: model.kind === "trial" || rules.kind === "trial" ? (model.cancelled || rules.cancelled ? rules.kind : "trial") : model.kind,
+    // Art: Probe-Abo, wenn eins von beiden es sagt; sonst die genauere Art der Regeln (Versicherung, Mitgliedschaft …)
+    kind: model.kind === "trial" || rules.kind === "trial" ? (model.cancelled || rules.cancelled ? rules.kind : "trial") : rules.kind !== "subscription" ? rules.kind : model.kind,
     provider: rules.provider || model.provider,
     amount: rules.amount ?? model.amount,
     interval: rules.interval ?? model.interval,

@@ -204,6 +204,11 @@ export function relativeDates(text: string, mailDate: Date): { date: string; ind
     const offset = word === "morgen" ? 1 : word === "übermorgen" ? 2 : ((weekdayIndex[word] ?? 0) - mailDate.getUTCDay() + 7) % 7 || 7;
     out.push({ date: new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + offset)).toISOString().slice(0, 10), index: match.index ?? 0 });
   }
+  // Englisch: „tomorrow“, „today“
+  for (const match of text.matchAll(/\b(tomorrow|today)\b/gi)) {
+    const offset = (match[1] ?? "").toLowerCase() === "tomorrow" ? 1 : 0;
+    out.push({ date: new Date(Date.UTC(mailDate.getUTCFullYear(), mailDate.getUTCMonth(), mailDate.getUTCDate() + offset)).toISOString().slice(0, 10), index: match.index ?? 0 });
+  }
   // „in 3 Tagen“, „in zwei Wochen“
   const numbers: Record<string, number> = { einem: 1, einer: 1, zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, zehn: 10, vierzehn: 14 };
   for (const match of text.matchAll(/(?<!\p{L})in\s+(\d{1,2}|einem|einer|zwei|drei|vier|fünf|sechs|sieben|zehn|vierzehn)\s+(tagen|tag|wochen|woche)(?!\p{L})/giu)) {

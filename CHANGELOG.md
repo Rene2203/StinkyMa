@@ -1,5 +1,14 @@
 # Changelog
 
+## W7 – Alleinstellungsmerkmale I (in Arbeit)
+
+### Neu
+- **Abos & Verträge** (Seitenleiste): erkennt Abos, Verträge, Mitgliedschaften, Versicherungen und Probe-Abos aus den Mails –
+  mit Betrag, Zahlweise, Probe-/Laufzeitende, Verlängerung, Kündigungsfrist und dem **letzten Kündigungstag** (rechnet der
+  Code). Laufende Kosten pro Monat und Jahr, Erinnerung vor dem Kündigungstag (Windows-Benachrichtigung), korrigieren,
+  „ist gekündigt“, „kein Abo“, Mail öffnen. Regeln sofort, die lokale KI prüft im Hintergrund nach. Keine Rechtsberatung,
+  StinkyMail kündigt nie selbst. Migration `v16-subscriptions`.
+
 ## Aufräumen und mehr Mails (nach W6)
 
 ### Neu

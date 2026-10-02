@@ -71,7 +71,8 @@ export class SubscriptionService implements SubscriptionsApi {
     let found = 0;
     for (const c of candidates) {
       const text = `${c.subject}\n${c.body}`;
-      if (c.category === "spam_suspect" || !mightBeSubscription(text)) continue;
+      // Spam-Verdacht und persönliche Mails („ich hab mein Abo gekündigt“) sind keine eigenen Abos
+      if (c.category === "spam_suspect" || c.category === "personal" || !mightBeSubscription(text)) continue;
       const finding = ruleSubscription(c.subject, cleanMailText(c.body, 2000), c.from, new Date(c.date));
       if (!finding) continue;
       store.apply(finding, { id: c.id, accountId: c.accountId, fromAddress: c.from.address, date: c.date }, "rules", now);
@@ -97,7 +98,7 @@ export class SubscriptionService implements SubscriptionsApi {
     // Nur Kandidaten (Vorfilter), die bisher nur mit Regeln geprüft wurden; kein Spam-Verdacht
     const candidates = store
       .candidates(this.options.ruleLimit ?? 20_000, { recheckRules: true })
-      .filter((c) => c.category !== "spam_suspect" && mightBeSubscription(`${c.subject}\n${c.body}`))
+      .filter((c) => c.category !== "spam_suspect" && c.category !== "personal" && mightBeSubscription(`${c.subject}\n${c.body}`))
       .slice(0, this.options.modelLimit ?? 500);
     if (candidates.length === 0) return;
     this.#scanning = { done: 0, total: candidates.length };

@@ -225,6 +225,34 @@ Falle), davon 6 als Kontrollfälle. Insgesamt 60 erwartete Angaben (vorher 43).
 - **Einordnung**: unverändert (98,8 % / 92,9 % bei E2B). Ohne echte Fehlbeispiele aus dem Postfach des Nutzers würde weiteres
   Feilen nur auf den Testsatz passen.
 
+## Verträge & Abos (W7.1, 02.10.2026)
+
+`eval-models.ts --subscriptions`, 4 CPU-Kerne. Drei Sätze, alle erfunden, Mails vom 30.09.2026:
+- **Testsatz** (22 Mails: 16 Abos/Verträge – Probe-Abos, Mindestlaufzeit, Kündigungsfrist, Preisänderung, Kündigungsbestätigung,
+  Englisch – und 6 Fallen: Werbung „jetzt abonnieren“, Einzelkauf, kostenloser Newsletter, Phishing, private Mail, Bahnticket).
+- **Kontrollsatz** (10 Mails, vor der Erkennung geschrieben).
+- **Kontrollsatz 2** (12 Mails, absichtlich unordentlich, geschrieben *nachdem* die Regeln am Testsatz 100 % erreichten:
+  Englisch, „€8.99“, „ends tomorrow“, Rechnungen statt Bestätigungen, Fallen wie „bis zu 300 € sparen“ oder „kannst du mir die
+  9,99 € fürs Abo überweisen?“).
+
+Gezählt: Abo erkannt (ja/nein), Fehlalarme, Angaben (Art, Anbieter, Betrag, Zahlweise, Probe-Ende, letzter Kündigungstag ±1 Tag,
+gekündigt). Den Kündigungstag rechnet immer der Code (Laufzeitende bzw. Verlängerung minus Frist).
+
+| Verfahren | Testsatz | Kontrollsatz | Kontrollsatz 2 | Zeit (Median) |
+|---|---|---|---|---|
+| Regeln (ohne KI) | 16/16 · 100 % · 0 Fehlalarme | 7/7 · 100 % · 0 | 5/9 · 43,9 % · 1 | 0 s |
+| Gemma 4 E2B | 16/16 · 100 % · 0 | 7/7 · 100 % · 1 | 8/9 · 80,5 % · 1 | 13,7 s |
+| Gemma 4 E4B | 16/16 · 100 % · 0 | 7/7 · 100 % · 1 | 9/9 · 87,8 % · 1 | 23,1 s |
+
+- **Die 100 % der Regeln sind geschönt**: Testsatz, Kontrollsatz und Regeln stammen aus einer Hand. Kontrollsatz 2 zeigt die
+  Grenzen (44 %). Genau dort holt das Modell viel heraus – deshalb: Regeln sofort, Modell im Hintergrund.
+- Beide Modelle hielten **private Mails über Abos** für Abos („ich hab mein Tonwelle-Abo gekündigt“, „überweis mir die 9,99 €
+  fürs Abo“). In der App werden als „Persönlich“ eingeordnete Mails deshalb nicht nach Abos durchsucht (im Messlauf nicht
+  abbildbar, weil dort keine Einordnung vorliegt).
+- Danach allgemeine Korrekturen: Betragsprüfung in Cent („€8.99“ wurde fälschlich verworfen), „tomorrow“/„today“, Versicherung
+  auch am Absendernamen erkennen, genauere Art der Regeln geht vor. **Ehrlich:** gesehen am Kontrollsatz 2 – der ist damit nicht
+  mehr unberührt. Regeln danach: Kontrollsatz 2 51,2 %. (E2B-Nachmessung siehe unten.)
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,

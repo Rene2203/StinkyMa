@@ -516,4 +516,12 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   - Unverändert nach Messung: Antwortvorschläge (beide 12/12), Regeln in eigenen Worten (Regeln zuerst), Einordnung.
   - **Ehrlich:** Die Kontrollsätze sind nicht mehr ganz unberührt (v3-Fehler flossen in v4 ein; ein Kontrollfall der
     Aktionen deckte einen Fehler auf). Gemessen nur auf 4 CPU-Kernen im Container; mit echten Mails ungeprüft.
+- **W7.1 Verträge & Abos (02.10.2026) – gebaut, lokal geprüft:** Erkennung per Regeln (sofort, alle Mails) und lokalem Modell
+  (Hintergrund, nur Kandidaten; „kein Abo“ entfernt reine Regel-Funde; Spam-Verdacht und „Persönlich“ werden übersprungen).
+  Speicher je Konto + Absender-Domain (Migration v16), neuere Mails aktualisieren, Korrekturen des Nutzers bleiben.
+  Ansicht „Abos & Verträge“ mit Kosten, Kündigungstag, Erinnerung (nie in der Vergangenheit), Korrigieren, Status.
+  Messung siehe `docs/KI-MESSUNG.md`: Regeln stark auf eigenen Sätzen, auf unordentlichen Mails (Kontrollsatz 2) 44 %,
+  mit E2B 80,5 %, E4B 87,8 %. Tests: Rechnen/Erkennen/Speicher/Suchlauf (Unit), E2E mit der echten App.
+  **Ungeprüft:** echte Postfächer (Trefferquote, Dauer des KI-Durchgangs bei vielen Kandidaten), Windows-CI.
+  Als Nächstes: W7.2 Belegordner.
 
