@@ -20,6 +20,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import { Placeholder } from "@tiptap/extensions";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useUi } from "../context.js";
+import { GhostText, type Suggest } from "./ghostText.js";
 
 /** Schriften, die auch beim Empfänger vorhanden sind (sonst fällt das Mailprogramm auf die nächste zurück). */
 export const fontFamilies: { label: string; value: string }[] = [
@@ -56,6 +57,8 @@ export function RichTextEditor({
   testId = "compose-body",
   placeholder,
   label,
+  suggest,
+  cancelSuggest,
 }: {
   initialHtml: string;
   testId?: string;
@@ -65,8 +68,16 @@ export function RichTextEditor({
   focus: "start" | null;
   onChange: (value: RichTextValue) => void;
   onReady?: (editor: Editor) => void;
+  /** Autovervollständigung (W8.5): Vorschlag holen; fehlt sie, gibt es keine Vorschläge. */
+  suggest?: Suggest | undefined;
+  cancelSuggest?: (() => void) | undefined;
 }) {
   const { t } = useUi();
+  // Die Erweiterung entsteht einmal mit dem Editor – darum über Refs immer die aktuelle Funktion aufrufen
+  const suggestRef = useRef(suggest);
+  suggestRef.current = suggest;
+  const cancelRef = useRef(cancelSuggest);
+  cancelRef.current = cancelSuggest;
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -82,6 +93,10 @@ export function RichTextEditor({
       Color,
       TextAlign.configure({ types: ["paragraph"] }),
       Placeholder.configure({ placeholder: placeholder ?? t("compose.body") }),
+      GhostText.configure({
+        suggest: (before, after) => suggestRef.current?.(before, after) ?? Promise.resolve(null),
+        cancel: () => cancelRef.current?.(),
+      }),
     ],
     content: initialHtml,
     editorProps: {

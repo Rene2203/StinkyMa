@@ -4057,3 +4057,11 @@ dialog.webpanel::backdrop {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Autovervollständigung (W8.5): Vorschlag hinter dem Cursor */
+.ghost-text {
+  color: var(--fg-muted);
+  opacity: 0.75;
+  pointer-events: none;
+  user-select: none;
+}

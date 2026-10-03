@@ -5,7 +5,7 @@
 export type PrivacyClass = "onDevice" | "ownServer" | "cloud";
 
 /** Aufgaben der KI (5.5). Weitere folgen in späteren Phasen. */
-export type AITask = "categorize" | "summarize" | "readImage" | "extractActions" | "parseRule" | "draftReply" | "extractSubscription" | "userCategory" | "extractReceipt" | "extractPromises" | "ask";
+export type AITask = "categorize" | "summarize" | "readImage" | "extractActions" | "parseRule" | "draftReply" | "extractSubscription" | "userCategory" | "extractReceipt" | "extractPromises" | "ask" | "complete";
 
 /** Bild als Eingabe (Foto, Scan, Bildschirmfoto) – nur für Modelle mit Bild-Baustein. */
 export interface AIImage {
@@ -79,5 +79,13 @@ export class AITimeoutError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "AITimeoutError";
+  }
+}
+
+/** Anfrage wurde abgebrochen, bevor das Modell sie bearbeitet hat. */
+export class AIAbortedError extends Error {
+  constructor() {
+    super("Abgebrochen.");
+    this.name = "AbortError";
   }
 }

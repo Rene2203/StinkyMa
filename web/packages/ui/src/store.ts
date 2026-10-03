@@ -14,6 +14,7 @@ import {
   type AskApi,
   type ContactsApi,
   type PersonalApi,
+  type CompletionInput,
   type PersonalOverview,
   type ContactProfile,
   type AskResult,
@@ -1361,6 +1362,27 @@ export class BrowserStore {
   }
 
   /** Antwortvorschläge zur geöffneten Mail (W6.5) – nur auf Klick, mit dem lokalen Modell. */
+  /** Autovervollständigung (W8.5) möglich? KI an, Modell bereit, Einstellung an, nicht zu langsam. */
+  get canAutocomplete(): boolean {
+    const ai = this.#state.ai;
+    return Boolean(this.#ai && ai?.ready && ai.settings.autocomplete && !ai.autocompleteSlow);
+  }
+
+  /** Vorschlag für die Fortsetzung des Satzes – nie eine Fehlermeldung, im Zweifel kein Vorschlag. */
+  async completeText(input: CompletionInput): Promise<string | null> {
+    const ai = this.#ai;
+    if (!ai || !this.canAutocomplete) return null;
+    try {
+      return (await ai.complete(input))?.text ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  cancelCompletion(): void {
+    if (this.#ai && this.canAutocomplete) void this.#ai.cancelCompletion().catch(() => undefined);
+  }
+
   async loadReplyDrafts(): Promise<void> {
     const ai = this.#ai;
     const message = selectedMessage(this.#state);

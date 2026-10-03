@@ -304,6 +304,8 @@ export default function Composer({ draft }: { draft: ComposeDraft }) {
           initialHtml={initialHtml}
           focus={isReply ? "start" : null}
           onChange={setBody}
+          suggest={(before, after) => store.completeText({ before, after, subject, to: lenientAddresses(to).map((a) => a.address), accountId })}
+          cancelSuggest={() => store.cancelCompletion()}
         />
 
         {draft.forwardedHtml && (

@@ -94,6 +94,34 @@ test("KI: Modelle in den Optionen, Zusammenfassung auf diesem Gerät", async () 
     await expect(page.getByTestId("compose-send")).toHaveCount(0);
   });
 
+  await test.step("Autovervollständigung: grauer Vorschlag nach Tipppause, Tab übernimmt, Esc verwirft", async () => {
+    await page.getByTestId("compose-new").click();
+    const body = page.getByTestId("compose-body");
+    await body.click();
+    await page.keyboard.type("Hallo Tom,");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("vielen Dank für deine Einladung zum Grillabend. Ich komme ");
+    const ghost = page.getByTestId("ghost-text");
+    // Das winzige Testmodell liefert oft nichts Brauchbares – dann gibt es eben keinen Vorschlag
+    const shown = await ghost.waitFor({ timeout: 120_000 }).then(() => true, () => false);
+    if (!tinyModel) expect(shown).toBe(true);
+    if (shown) {
+      const suggestion = (await ghost.textContent()) ?? "";
+      await page.screenshot({ path: join(screenshotDir, "39-Autovervollstaendigung.png") });
+      await page.keyboard.press("Tab");
+      await expect(ghost).toHaveCount(0);
+      await expect(body).toContainText(`Ich komme ${suggestion.trim()}`);
+      // Weitertippen verwirft einen neuen Vorschlag sofort
+      await page.keyboard.type(" ");
+      await page.keyboard.type("x");
+      await expect(ghost).toHaveCount(0);
+    }
+    await page.getByTestId("compose-discard").click();
+    const confirm = page.getByTestId("compose-confirm-discard");
+    if (await confirm.isVisible()) await confirm.click();
+    await expect(page.getByTestId("compose-send")).toHaveCount(0);
+  });
+
   if (tinyModel) return;
   await test.step("Gespeichert: beim erneuten Öffnen sofort da", async () => {
     await page.getByTestId("message-row").nth(1).click();

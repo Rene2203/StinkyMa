@@ -53,7 +53,8 @@ Die Phasen folgen der Spezifikation (Abschnitt 9), angepasst an Windows. ★ = V
 | **W4 – Suche & Sync** | FTS5-Suche in der Oberfläche, IDLE, Sync im Hintergrund (Infobereich/Tray), Autostart, Anhang-Reader (PDF.js), Textextraktion | ✅ umgesetzt (mit echten Konten ungeprüft) |
 | **W5 – KI-Basis** | `AIProvider`/`AIRouter` mit Datenschutz-Prüfung in TypeScript, lokales **3B-Modell als Standard** (llama.cpp, läuft auch nur auf der CPU), optional Ollama/größere Modelle; Test-Set, gemessen mit 3B; Zusammenfassung, Kategorisierung | offen |
 | **S1 – Server & Browser** | `apps/server`: HTTP-API + gleiche Oberfläche im Browser, Login, Docker Compose, Zugriff nur im Heimnetz/VPN | offen |
-| danach | Spezifikation Phasen 6–15 (eigene Modelle, Assistent, Alleinstellungsmerkmale …) für Windows & Server | offen |
+| W6–W8 | Assistent (Zu tun, Phishing, Türsteher, Regeln, Antworten, Tagesüberblick), Alleinstellungsmerkmale I (Abos, Belege, Zusagen, eigene Kategorien) und II/Personalisierung (Frag dein Postfach, Steckbrief, Wichtig, Stilprofil, Transparenz, Autovervollständigung) | ✅ umgesetzt (Stand 03.10.2026, Details in `docs/ENTWICKLUNGSSTAND.md`) |
+| danach | übrige Phasen der Spezifikation für Windows & Server | offen |
 
 ## Hardware des Nutzers (Stand 30.09.2026)
 

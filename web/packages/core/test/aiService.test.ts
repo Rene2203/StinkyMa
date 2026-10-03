@@ -36,6 +36,8 @@ class FakeProvider implements ManagedProvider {
   hangWhen: ((request: AIRequest) => boolean) | null = null;
   /** Rechenzeit (wie ein echtes Modell) */
   delayMs = 0;
+  /** Gemeldete Rechenzeit */
+  reportedMs = 3;
   constructor(readonly id: string) {
     this.displayName = id;
   }
@@ -47,10 +49,12 @@ class FakeProvider implements ManagedProvider {
       await new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("abgebrochen"))));
     }
     this.requests.push(request);
-    const text = request.task === "categorize"
+    const text = request.task === "complete"
+      ? "gern dabei. Bis dann!"
+      : request.task === "categorize"
       ? '{"category": "work", "confidence": 0.7}'
       : '{"summary": "Es geht um den Grillabend.", "openPoints": ["Salat mitbringen"], "waitingOn": "me"}';
-    return { text, providerId: this.id, privacyClass: this.privacyClass, durationMs: 3 };
+    return { text, providerId: this.id, privacyClass: this.privacyClass, durationMs: this.reportedMs };
   }
   async unload() {}
   async dispose() {
@@ -128,7 +132,7 @@ describe("AIService", () => {
     install("klein");
     const status = await service.update({ enabled: true, modelId: "klein", autoCategorize: false });
     expect(status.ready).toBe(true);
-    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true, vision: false, categorizeRange: { kind: "recent" } });
+    expect(saved()).toEqual({ enabled: true, modelId: "klein", autoCategorize: false, useGpu: true, vision: false, categorizeRange: { kind: "recent" }, autocomplete: true });
     await expect(service.update({ modelId: "gibt-es-nicht" })).rejects.toThrow(/Unbekanntes Modell/);
   });
 
@@ -346,5 +350,59 @@ describe("AIResultStore", () => {
     db.prepare("DELETE FROM message WHERE threadId = ?").run(threadId);
     db.prepare("DELETE FROM thread WHERE id = ?").run(threadId);
     expect(results.summary(threadId)).toBeNull();
+  });
+});
+
+describe("AIService – Autovervollständigung (W8.5)", () => {
+  it("ergänzt den Satz, nur nach einem fertigen Wort, nur mit Konto; aus = kein Vorschlag", async () => {
+    const { service, install, providers } = setup({ enabled: true, modelId: "klein", autoCategorize: false });
+    install("klein");
+    const input = { before: "Hallo Tom,\nich bin ", after: "> Kommst du am Samstag?", subject: "Grillabend", to: ["tom@example.test"], accountId: "acc" };
+    expect(await service.complete(input)).toMatchObject({ text: "gern dabei." });
+    expect(providers[0]?.requests.at(-1)?.task).toBe("complete");
+    expect(await service.complete({ ...input, before: "Hallo Tom,\nich bi" })).toBeNull();
+    expect(await service.complete({ ...input, accountId: null })).toBeNull();
+    await service.update({ autocomplete: false });
+    expect(await service.complete(input)).toBeNull();
+  });
+
+  it("Vordergrund vor Hintergrund: ein Klick wartet nicht hinter der Einordnung aller Mails", async () => {
+    const { service, install, providers, repository } = setup({ enabled: true, modelId: "klein", autoCategorize: true }, { configure: (p) => (p.delayMs = 15) });
+    install("klein");
+    service.categorizeInBackground();
+    await until(() => (providers[0]?.requests.length ?? 0) >= 1);
+    const [first] = await repository.messages({ kind: "unifiedInbox" }, 1);
+    await service.summarize(first?.threadId ?? "", { full: true });
+    const tasks = providers[0]?.requests.map((r) => r.task) ?? [];
+    // Höchstens die gerade laufende Einordnung kam noch davor
+    expect(tasks.indexOf("summarize")).toBeLessThanOrEqual(2);
+    expect(tasks.filter((t) => t === "categorize").length).toBeLessThan(5);
+  });
+
+  it("schaltet sich auf zu langsamen Rechnern aus, bis es wieder eingeschaltet wird", async () => {
+    const { service, install } = setup({ enabled: true, modelId: "klein", autoCategorize: false }, { configure: (p) => (p.reportedMs = 9000) });
+    install("klein");
+    const input = { before: "Vielen Dank für ", accountId: "acc" };
+    for (let i = 0; i < 3; i++) await service.complete(input);
+    expect((await service.status()).autocompleteSlow).toBe(true);
+    expect(await service.complete(input)).toBeNull();
+    await service.update({ autocomplete: true });
+    expect((await service.status()).autocompleteSlow).toBe(false);
+  });
+
+  it("stellt sich höchstens hinter eine laufende KI-Anfrage an", async () => {
+    const { service, install, repository } = setup({ enabled: true, modelId: "klein", autoCategorize: false }, { configure: (p) => (p.delayMs = 80) });
+    install("klein");
+    const [first] = await repository.messages({ kind: "unifiedInbox" }, 1);
+    // Eine laufende Anfrage: Vorschlag kommt danach; laufen schon zwei (eine wartet), gibt es keinen
+    const one = service.summarize(first?.threadId ?? "", { full: true });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await service.complete({ before: "Vielen Dank für ", accountId: "acc" })).toMatchObject({ text: "gern dabei." });
+    await one;
+    const a = service.summarize(first?.threadId ?? "", { full: true });
+    const b = service.summarize(first?.threadId ?? "", { full: true });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await service.complete({ before: "Vielen Dank für ", accountId: "acc" })).toBeNull();
+    await Promise.all([a, b]);
   });
 });

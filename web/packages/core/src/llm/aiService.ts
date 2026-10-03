@@ -8,6 +8,7 @@ import { promptVersions } from "../ai/prompts.js";
 import { AIRouter, GrantPolicy } from "../ai/router.js";
 import { interpretRule, interpretRuleWithRules, type RuleInterpretation } from "../ai/rules.js";
 import { draftReplies } from "../ai/replies.js";
+import { completionRequest, parseCompletion, shouldComplete, type CompletionInput, type CompletionView } from "../ai/complete.js";
 import type { ReplyStyle } from "../personal.js";
 import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
@@ -18,7 +19,7 @@ import { answerQuestion, type AskContextSource } from "../ai/ask.js";
 import { classifyUserCategory, userCategoryPromptFor, type UserCategoryResult } from "../ai/userCategories.js";
 import type { UserCategory } from "../userCategories.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
-import { AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse, type AITask } from "../ai/types.js";
+import { AIAbortedError, AIBlockedError, AINotConfiguredError, AITimeoutError, type AIImage, type AIProvider, type AIRequest, type AIResponse, type AITask } from "../ai/types.js";
 import type { Message, MessageCategory } from "../models.js";
 import type { AIResultStore, StoredReading, StoredSummary } from "../sqlite/aiStore.js";
 import { LlamaCppProvider } from "./llamaProvider.js";
@@ -75,7 +76,9 @@ export class AIService implements AIApi {
   #vision: { key: string; provider: ManagedProvider } | null = null;
   /** Welches Modell gerade im Speicher sein darf – Text- und Bild-Laufzeit nie gleichzeitig (schwache Rechner). */
   #active: ManagedProvider | null = null;
-  #engine: Promise<unknown> = Promise.resolve();
+  /** Wartende Modell-Anfragen; was der Nutzer angeklickt hat, steht vor der Hintergrundarbeit. */
+  #queue: { foreground: boolean; start: () => void }[] = [];
+  #running = false;
   #download: { kind: "model" | "vision"; modelId: string; receivedBytes: number; totalBytes: number; controller: AbortController } | null = null;
   #categorizing: { remaining: number; done: number; total: number } | null = null;
   #activity: { task: AITask; startedAt: string } | null = null;
@@ -139,6 +142,7 @@ export class AIService implements AIApi {
       activity,
       backlog,
       error: this.#error,
+      autocompleteSlow: this.#completionSlow,
     };
   }
 
@@ -146,6 +150,11 @@ export class AIService implements AIApi {
     const next = normalizeAISettings({ ...this.#settings, ...patch });
     if (next.modelId && !this.#model(next.modelId)) throw new Error("Unbekanntes Modell.");
     const providerChanged = next.modelId !== this.#settings.modelId || next.useGpu !== this.#settings.useGpu || !next.enabled;
+    // Autovervollständigung von Hand (wieder) eingeschaltet: neue Chance auf diesem Rechner
+    if (patch.autocomplete !== undefined) {
+      this.#completionSlow = false;
+      this.#completionTimes = [];
+    }
     this.#settings = next;
     this.options.settings.save(next);
     this.#error = null;
@@ -391,9 +400,9 @@ export class AIService implements AIApi {
       contextWindow: provider.contextWindow,
       acceptsImages: provider.acceptsImages,
       generate: (request: AIRequest, signal?: AbortSignal) => {
-        this.#waiting++;
-        const run = this.#engine.then(async () => {
-          this.#waiting = Math.max(0, this.#waiting - 1);
+        const run = this.#enqueue(isForegroundTask(request.task), async () => {
+          // Während des Wartens abgebrochen (z. B. weitergetippt): gar nicht erst rechnen
+          if (signal?.aborted) throw new AIAbortedError();
           this.#activity = { task: request.task, startedAt: (this.options.now?.() ?? new Date()).toISOString() };
           this.#emitQuietly();
           try {
@@ -405,10 +414,47 @@ export class AIService implements AIApi {
             this.#emitQuietly();
           }
         });
-        this.#engine = run.catch(() => undefined);
         return run;
       },
     };
+  }
+
+  /**
+   * Eine Anfrage nach der anderen. Vordergrund-Aufgaben (Zusammenfassen, Antworten, Fragen, Vorschläge beim Tippen …)
+   * werden vor wartender Hintergrundarbeit (Einordnung, Abos, Belege, Zusagen …) eingereiht – sonst wartet ein Klick
+   * minutenlang. Untereinander bleibt die Reihenfolge erhalten.
+   */
+  #enqueue<T>(foreground: boolean, job: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const entry = {
+        foreground,
+        start: () => {
+          job()
+            .then(resolve, reject)
+            .finally(() => {
+              this.#running = false;
+              this.#next();
+            });
+        },
+      };
+      if (foreground) {
+        const firstBackground = this.#queue.findIndex((e) => !e.foreground);
+        this.#queue.splice(firstBackground === -1 ? this.#queue.length : firstBackground, 0, entry);
+      } else {
+        this.#queue.push(entry);
+      }
+      this.#waiting = this.#queue.length;
+      this.#next();
+    });
+  }
+
+  #next(): void {
+    if (this.#running) return;
+    const entry = this.#queue.shift();
+    this.#waiting = this.#queue.length;
+    if (!entry) return;
+    this.#running = true;
+    entry.start();
   }
 
   /**
@@ -589,6 +635,57 @@ export class AIService implements AIApi {
   }
 
   /** „Frag dein Postfach“: Antwort aus den gefundenen Stellen; `null`, wenn kein Modell bereit ist. */
+  // --- Autovervollständigung (W8.5) ---
+
+  #completion: AbortController | null = null;
+  #completionTimes: number[] = [];
+  #completionSlow = false;
+
+  /** Ab dieser Dauer (Median der letzten Vorschläge) schaltet sich die Autovervollständigung auf diesem Rechner aus. */
+  static readonly completionSlowMs = 6000;
+
+  async complete(input: CompletionInput): Promise<CompletionView | null> {
+    this.#completion?.abort();
+    this.#completion = null;
+    if (!this.#settings.enabled || !this.#settings.autocomplete || this.#completionSlow) return null;
+    if (!input.accountId || !shouldComplete(input.before)) return null;
+    // Höchstens hinter die eine laufende Anfrage anstellen (Hintergrund-Aufgaben kommen nacheinander) – warten schon
+    // weitere, gibt es eben keinen Vorschlag
+    if (this.#queue.some((e) => e.foreground)) return null;
+    if (!(await this.#modelReady())) return null;
+    const controller = new AbortController();
+    this.#completion = controller;
+    const form = input.to?.[0] ? (this.options.replyStyle?.(input.to[0])?.recipient?.form ?? null) : null;
+    try {
+      const { router } = await this.#router();
+      const response = await router.run(completionRequest(input, form), { accountIds: [input.accountId] }, controller.signal);
+      if (controller.signal.aborted) return null;
+      this.#noteCompletionTime(response.durationMs);
+      const text = parseCompletion(response.text, input);
+      return text ? { text, durationMs: response.durationMs } : null;
+    } catch {
+      // Abgebrochen oder Fehler: Vorschläge sind Beiwerk, nie eine Fehlermeldung
+      return null;
+    } finally {
+      if (this.#completion === controller) this.#completion = null;
+    }
+  }
+
+  async cancelCompletion(): Promise<void> {
+    this.#completion?.abort();
+    this.#completion = null;
+  }
+
+  #noteCompletionTime(ms: number): void {
+    this.#completionTimes = [...this.#completionTimes, ms].slice(-5);
+    if (this.#completionTimes.length < 3) return;
+    const sorted = [...this.#completionTimes].sort((a, b) => a - b);
+    if ((sorted[Math.floor(sorted.length / 2)] ?? 0) > AIService.completionSlowMs) {
+      this.#completionSlow = true;
+      this.#emitQuietly();
+    }
+  }
+
   async answerQuestion(question: string, sources: AskContextSource[], accountIds: string[]) {
     if (!(await this.#modelReady())) return null;
     const { router } = await this.#router();
@@ -889,4 +986,9 @@ export function validatePageImages(images: AIImage[]): AIImage[] {
     }
     return { mimeType: image.mimeType, base64: image.base64 };
   });
+}
+
+/** Aufgaben, auf die der Nutzer gerade wartet (Klick, Tippen) – gehen vor Hintergrundarbeit. */
+export function isForegroundTask(task: AITask): boolean {
+  return task === "summarize" || task === "draftReply" || task === "ask" || task === "readImage" || task === "parseRule" || task === "complete";
 }

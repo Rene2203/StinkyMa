@@ -6,7 +6,7 @@ import { BrowserStore, selectedMessage } from "../src/store.js";
 
 function status(overrides: Partial<AIStatus> = {}): AIStatus {
   return {
-    settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeRange: { kind: "recent" } },
+    settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeRange: { kind: "recent" }, autocomplete: true },
     models: [],
     vision: { state: "ready", missingBytes: 0 },
     ramGb: 8,
@@ -27,7 +27,7 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     status: async () => status({ ready: options.ready ?? true }),
     update: async (patch) => {
       calls.push(`update:${JSON.stringify(patch)}`);
-      return status({ settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeRange: { kind: "recent" }, ...patch } });
+      return status({ settings: { enabled: true, modelId: "m", autoCategorize: true, useGpu: true, vision: true, categorizeRange: { kind: "recent" }, autocomplete: true, ...patch } });
     },
     download: async (id) => {
       calls.push(`download:${id}`);
@@ -75,6 +75,13 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     learnedSenders: async () => [{ address: "news@tsv.example", category: "newsletter", learnedAt: "2026-10-01T10:00:00Z" }],
     forgetSender: async (address) => {
       calls.push(`forget:${address}`);
+    },
+    complete: async (input) => {
+      calls.push(`complete:${input.before}`);
+      return { text: " gern dabei.", durationMs: 900 };
+    },
+    cancelCompletion: async () => {
+      calls.push("cancelCompletion");
     },
     resume: async () => {
       calls.push("resume");
@@ -131,6 +138,20 @@ describe("BrowserStore – KI", () => {
     await done;
     expect(store.getState().summary).toMatchObject({ busy: false, error: null, view: { summary: "Kurz gesagt.", waitingOn: "me" } });
     expect(ai.calls).toContain(`summarize:${first.threadId}`);
+  });
+
+  it("Autovervollständigung: nur wenn die KI bereit und die Einstellung an ist; Fehler werden still", async () => {
+    const ai = fakeAI();
+    const store = await setup(ai);
+    expect(store.canAutocomplete).toBe(true);
+    expect(await store.completeText({ before: "Ich komme ", accountId: "acc" })).toBe(" gern dabei.");
+    store.cancelCompletion();
+    expect(ai.calls).toContain("cancelCompletion");
+    await store.updateAI({ autocomplete: false });
+    expect(store.canAutocomplete).toBe(false);
+    expect(await store.completeText({ before: "Ich komme ", accountId: "acc" })).toBeNull();
+    const off = await setup(fakeAI({ ready: false }));
+    expect(await off.completeText({ before: "Ich komme ", accountId: "acc" })).toBeNull();
   });
 
   it("zeigt Fehler in der Karte statt im Banner", async () => {

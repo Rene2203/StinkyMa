@@ -37,6 +37,18 @@ export function AISection() {
             <input type="checkbox" checked={settings.useGpu} data-testid="ai-use-gpu" onChange={(e) => void store.updateAI({ useGpu: e.target.checked })} />
             <span>{t("ai.useGpu")}</span>
           </label>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={settings.autocomplete && !ai.autocompleteSlow}
+              data-testid="ai-autocomplete"
+              onChange={(e) => void store.updateAI({ autocomplete: e.target.checked })}
+            />
+            <span>
+              {t("ai.autocomplete")}
+              <span className="hint block">{ai.autocompleteSlow ? t("ai.autocompleteSlow") : t("ai.autocompleteHint")}</span>
+            </span>
+          </label>
           <VisionRow />
           <LearnedSenders />
         </>

@@ -21,3 +21,4 @@ export * from "./promises.js";
 export * from "./compress.js";
 export * from "./ask.js";
 export * from "./evalAsk.js";
+export * from "./complete.js";

@@ -598,5 +598,21 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   Längen-Hinweis im Prompt (ohne Stilprofil bleibt der gemessene Prompt wörtlich gleich). Transparenz-Seite in den
   Optionen mit „immer/nie wichtig“ und „Alles vergessen“. 4 Unit-Tests, E2E. **Ungeprüft:** ob die Antwortvorschläge mit
   Längen-Hinweis besser werden (nicht nachgemessen).
-- Stand Tests: 450 Unit-Tests grün (inkl. GreenMail), E2E 19 grün / 2 übersprungen (Modell-abhängig).
-- Als Nächstes: W8.5 Autovervollständigung im Editor.
+- **W8.5 Autovervollständigung – gebaut, lokal geprüft:** grauer Vorschlag im Editor (ProseMirror-Dekoration) nach
+  300 ms Tipppause am Absatzende, Tab/→ übernimmt, Esc/Weitertippen verwirft, laufende Anfrage wird abgebrochen.
+  Prompt mit Beispielen, Code-Prüfung (Zahlen, Zeitwörter, Adressen, Platzhalter, doppeltes Wort, neuer Satz).
+  Abschaltbar; schaltet sich bei über 6 s (Median) selbst ab. Messung E2B: Kontrollsatz 9/12 brauchbar (10/12 nach einer
+  allgemeinen Korrektur), ~2,3 s je Vorschlag auf 4 Kernen. Unit-Tests (Prüfung, Dienst, Oberflächen-Zustand), E2E mit
+  dem winzigen CI-Modell (Ablauf: Vorschlag erscheint, Tab übernimmt, Weitertippen verwirft).
+- **Vorrang für Klicks:** Die Modell-Warteschlange stellt Vordergrund-Aufgaben vor Hintergrundarbeit (Unit-Test).
+- **Gefunden, nicht gelöst – Electron + Gemma im Linux-Container:** Die App stürzt hier beim Laden von Gemma 4 E2B
+  (und später bei Qwen 3.5 2B) im Electron-Hauptprozess ab (SIGTRAP/SIGILL, interner Abbruch in einem libuv-Thread).
+  Nachgestellt mit einem 15-Zeilen-Electron-Programm ganz ohne App-Code, auch mit 4K-Kontext, ohne Q8_0-Zwischenspeicher,
+  ohne mmap und ohne Grafikkarte – liegt also **nicht** an W8 oder 16K. Im normalen Node (Messskripte) läuft dasselbe
+  Modell. Electron (44.5.1) und node-llama-cpp (3.22.1) sind seit W1/W5 unverändert, und der Nutzer hat die KI unter
+  Windows benutzt – vermutlich eine Eigenheit dieses Containers. **Ungeprüft:** ob es unter Windows mit 16K weiter läuft
+  → bitte beim nächsten Test unter Windows auf Abstürze beim ersten Zusammenfassen achten. Deshalb ist die
+  Autovervollständigung mit einem echten Modell **in der App ungetestet** (nur Ablauf mit Testmodell + Messung im Node).
+- Stand Tests: 458 Unit-Tests grün (inkl. GreenMail), E2E 19 grün / 2 übersprungen (Modell-abhängig); KI-E2E mit dem
+  winzigen Testmodell grün.
+- Als Nächstes: Test des Nutzers unter Windows (W8 komplett), danach Roadmap (Server mit Browser) oder Nachbesserungen.

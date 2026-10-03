@@ -30,6 +30,16 @@
 - **Transparenz-Seite** (Optionen, „Was StinkyMail über dich gelernt hat“): Schreibstil, Anrede je Person, Wichtigkeit je
   Absender mit Kennzahlen und Knöpfen „immer/nie wichtig“, Protokoll-Zähler und **„Alles vergessen“**. Alles bleibt auf
   diesem Rechner; keine neue Tabelle (genutzt werden `behaviorEvent`/`senderProfile` aus v1).
+- **Autovervollständigung beim Schreiben** (W8.5): Nach einer kurzen Tipppause am Ende eines Absatzes schlägt das lokale
+  Modell das Satzende als grauen Text vor (höchstens 12 Wörter). **Tab** oder **→** übernimmt, **Esc** oder Weitertippen
+  verwirft. Der Code prüft jeden Vorschlag: keine erfundenen Zahlen, Uhrzeiten, Wochentage oder Monate, keine Adressen
+  und Platzhalter, kein doppeltes Wort am Anschluss, kein neuer Satz mitten im Satz. du/Sie aus dem Stilprofil.
+  Abschaltbar (Optionen → KI); braucht ein Vorschlag auf dem Rechner im Mittel über 6 s, schaltet sie sich aus.
+
+### Geändert
+- **Was du anklickst, geht vor**: Zusammenfassen, Antwortvorschläge, Fragen, Bilder lesen, Regeln und Vorschläge beim
+  Tippen werden vor wartender Hintergrundarbeit (Einordnung, Abos, Belege, Zusagen, eigene Kategorien) gerechnet.
+  Vorher stellte sich ein Klick hinter alles, was die Hintergrunddienste eingereiht hatten.
 
 ## W7 – Alleinstellungsmerkmale I
 

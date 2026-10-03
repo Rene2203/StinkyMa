@@ -347,6 +347,26 @@ Suche nach Bedeutung mit EmbeddingGemma 300M (Q8_0, 256 Dimensionen), 4 CPU-Kern
   Handwerkers. Prompt v2 („ähnliches Thema ist keine Antwort“) half nicht (gleiches Ergebnis wie v1). Darum zeigt die
   App immer die Quellen an. **Ehrlich:** nur eine Falle, kleine Sätze aus einer Hand; echte Postfächer ungeprüft.
 
+## Autovervollständigung (W8.5, 03.10.2026)
+
+Aufgabe: angefangenen Satz fortsetzen (höchstens 12 Wörter). Es gibt keine einzig richtige Fortsetzung – bewertet habe ich
+jede Zeile von Hand („brauchbar“ = grammatisch, passend, nichts erfunden). Gemma 4 E2B, 4 CPU-Kerne, Skript
+`packages/core/scripts/eval-complete.ts`. Testsatz 16 erfundene Entwürfe (du/Sie, Antwort mit Zitat, Englisch, Fallen
+„Ich komme um …“), Kontrollsatz 12 (geschrieben nach der Abstimmung, danach nicht angepasst).
+
+| Stand | Satz | brauchbar | holprig/falsch gezeigt | richtig unterdrückt | Zeit je Vorschlag (Median / max) |
+|---|---|---|---|---|---|
+| Prompt-Entwurf 1 (nur Regeln) | Testsatz | 0/16 | 16 (jede Antwort mit „-“, oft neuer Satz statt Fortsetzung) | 0 | 2,0 s / 2,9 s |
+| Prompt mit Beispielen + Code-Prüfung | Testsatz | 11/16 | 2 („mich dich sofort darum“, „zu … habe ich“) | 3 (erfundene Uhrzeit „zwei Uhr“, erfundener „Sonntag“, „zu meiner ich …“) | 2,3 s / 3,2 s |
+| dto. | **Kontrollsatz** | **9/12** | 3 („mir mir bitte …“, „einfach den Schlüssel einfach …“, „Vielleicht … vielleicht“) | 0 | 2,5 s / 2,9 s |
+| + doppeltes Wort am Anschluss entfernt (allgemein) | Kontrollsatz | 10/12 | 2 | 0 | 2,3 s / 3,2 s |
+
+- Für ein ~3B-Modell helfen **Beispiele** („Text → Fortsetzung“) deutlich mehr als Regeln im Prompt.
+- Die Code-Prüfung ist nötig: Das Modell erfindet gern Uhrzeiten und Tage („ich komme um zwei Uhr“).
+- **Ehrlich:** kleine, selbst geschriebene Sätze; Bewertung von Hand durch mich; die letzte Zeile ist nach einem Blick auf
+  den Kontrollsatz entstanden (allgemeine Regel, aber nicht mehr unabhängig). Mit Temperatur 0,2 schwanken einzelne
+  Vorschläge zwischen Läufen. Auf dem N97/iPad ungemessen – dafür schaltet sich die Funktion bei über 6 s selbst ab.
+
 ## Kontextfenster 16K (03.10.2026)
 
 Auf Wunsch des Nutzers **ohne Messung** für alle Rechner eingestellt (16 384 Token, KV-Cache Q8_0 mit Rückfall auf F16).

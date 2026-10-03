@@ -1,3 +1,4 @@
+import type { CompletionInput, CompletionView } from "./complete.js";
 import type { MessageCategory } from "../models.js";
 import type { DigestView } from "../digest.js";
 import type { AITask } from "./types.js";
@@ -28,6 +29,8 @@ export interface AISettings {
    * werden immer eingeordnet – sonst bliebe neue Post bei einem Zeitraum in der Vergangenheit liegen.
    */
   categorizeRange: CategorizeRange;
+  /** Autovervollständigung beim Schreiben (W8.5): grauer Vorschlag, Tab übernimmt. */
+  autocomplete: boolean;
 }
 
 export type CategorizeRange =
@@ -81,7 +84,7 @@ export function categorizeWindow(range: CategorizeRange, now: Date): CategorizeW
   }
 }
 
-export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true, vision: false, categorizeRange: { kind: "recent" } };
+export const defaultAISettings: AISettings = { enabled: false, modelId: null, autoCategorize: true, useGpu: true, vision: false, categorizeRange: { kind: "recent" }, autocomplete: true };
 
 export function normalizeAISettings(raw: unknown): AISettings {
   const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -92,6 +95,7 @@ export function normalizeAISettings(raw: unknown): AISettings {
     useGpu: typeof value.useGpu === "boolean" ? value.useGpu : defaultAISettings.useGpu,
     vision: typeof value.vision === "boolean" ? value.vision : defaultAISettings.vision,
     categorizeRange: normalizeRange(value.categorizeRange, value.categorizeOlder),
+    autocomplete: typeof value.autocomplete === "boolean" ? value.autocomplete : defaultAISettings.autocomplete,
   };
 }
 
@@ -136,6 +140,8 @@ export interface AIStatus {
   backlog: { recent: number; older: number };
   /** Letzter Fehler (Download, Laden des Modells) – verständlich, ohne Mail-Inhalte. */
   error: string | null;
+  /** Autovervollständigung war auf diesem Rechner zu langsam und hat sich ausgeschaltet (bis sie wieder eingeschaltet wird). */
+  autocompleteSlow?: boolean;
 }
 
 /** Zusammenfassung für die Anzeige. */
@@ -239,6 +245,13 @@ export interface AIApi {
   forgetSender(address: string): Promise<void>;
   /** Nach einem Fehler: Fehler vergessen und die Einordnung neu anstoßen. */
   resume(): Promise<AIStatus>;
+  /**
+   * Fortsetzung des angefangenen Satzes (W8.5). `null`: aus, KI beschäftigt, nichts Brauchbares oder abgebrochen.
+   * Eine neue Anfrage bricht die vorige ab.
+   */
+  complete(input: CompletionInput): Promise<CompletionView | null>;
+  /** Laufende Vorschlags-Anfrage abbrechen (weitergetippt). */
+  cancelCompletion(): Promise<void>;
 }
 
-export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender"] as const satisfies readonly (keyof AIApi)[];
+export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender", "complete", "cancelCompletion"] as const satisfies readonly (keyof AIApi)[];
