@@ -12,6 +12,7 @@ const cleanupMethods = ["groups", "groupMails", "trash", "check", "unsubscribeIn
 const subscriptionsMethods = ["list", "scan", "addFromMail", "merge", "update", "setStatus", "remind", "cancelReminder"];
 const categoriesMethods = ["list", "save", "remove", "assign"];
 const promisesMethods = ["list", "scan", "setStatus", "setDueDate", "remind", "cancelReminder", "followUpDraft"];
+const askMethods = ["ask", "status", "downloadModel", "deleteModel"];
 const receiptsMethods = ["list", "scan", "addFromMail", "update", "setStatus", "addCategory", "removeCategory", "remind", "cancelReminder", "export"];
 const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender"];
 
@@ -30,6 +31,7 @@ contextBridge.exposeInMainWorld("stinkyma", {
   categories: bridge("categories", categoriesMethods),
   receipts: bridge("receipts", receiptsMethods),
   promises: bridge("promises", promisesMethods),
+  ask: bridge("ask", askMethods),
   /** Meldet Änderungen (neue Mails, Abgleich, Konten). Gibt eine Abmelde-Funktion zurück. */
   onMailChanged: (callback: () => void) => {
     const listener = () => callback();

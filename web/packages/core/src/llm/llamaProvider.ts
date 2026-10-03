@@ -36,7 +36,7 @@ interface Loaded {
 let llamaInstance: Promise<{ module: LlamaModule; llama: Llama }> | null = null;
 let llamaGpu: "auto" | false | null = null;
 
-async function loadLlama(gpu: "auto" | false, maxThreads: number): Promise<{ module: LlamaModule; llama: Llama }> {
+export async function loadLlama(gpu: "auto" | false, maxThreads: number): Promise<{ module: LlamaModule; llama: Llama }> {
   if (llamaInstance && llamaGpu === gpu) return llamaInstance;
   llamaGpu = gpu;
   llamaInstance = (async () => {

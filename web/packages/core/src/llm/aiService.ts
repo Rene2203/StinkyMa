@@ -13,6 +13,7 @@ import type { DigestStore } from "../sqlite/digestStore.js";
 import { extractSubscription, type SubscriptionResult } from "../ai/subscriptions.js";
 import { extractReceipt, type ReceiptResult } from "../ai/receipts.js";
 import { extractPromises, type PromiseDirection, type PromiseResult } from "../ai/promises.js";
+import { answerQuestion, type AskContextSource } from "../ai/ask.js";
 import { classifyUserCategory, userCategoryPromptFor, type UserCategoryResult } from "../ai/userCategories.js";
 import type { UserCategory } from "../userCategories.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
@@ -581,6 +582,14 @@ export class AIService implements AIApi {
     if (!(await this.#modelReady())) return null;
     const { router } = await this.#router();
     return extractSubscription(router, message, { attachmentText });
+  }
+
+  /** „Frag dein Postfach“: Antwort aus den gefundenen Stellen; `null`, wenn kein Modell bereit ist. */
+  async answerQuestion(question: string, sources: AskContextSource[], accountIds: string[]) {
+    if (!(await this.#modelReady())) return null;
+    const { router } = await this.#router();
+    const now = this.options.now?.() ?? new Date();
+    return answerQuestion(router, question, sources, { accountIds, today: now.toISOString().slice(0, 10) });
   }
 
   /** Zusagen einer Mail per Modell (Zitat geprüft, Frist per Code); `null`, wenn kein Modell bereit ist. */

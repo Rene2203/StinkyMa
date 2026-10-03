@@ -3735,3 +3735,148 @@ dialog.webpanel::backdrop {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* Frag dein Postfach */
+
+.ask-panel {
+  overflow-y: auto;
+}
+
+.ask-form {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.ask-form input {
+  flex: 1;
+  font: inherit;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.ask-form button {
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--fg-on-accent);
+  border-radius: 8px;
+  padding: 0 16px;
+}
+
+.ask-form button:disabled {
+  opacity: 0.5;
+}
+
+.ask-index,
+.ask-sender {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  margin: 0 0 10px;
+}
+
+.ask-index button:not(.link) {
+  font: inherit;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.ask-panel .link {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ask-panel .link.muted {
+  color: var(--fg-muted);
+}
+
+.ask-license {
+  margin-left: auto;
+}
+
+.ask-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.ask-answer {
+  font-size: 15px;
+  line-height: 1.5;
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0 0 12px;
+}
+
+.ask-sources-title {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin: 0 0 6px;
+}
+
+.ask-sources {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ask-source {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.ask-sources li.cited .ask-source {
+  border-color: var(--accent);
+}
+
+.ask-source-n {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ask-source-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ask-excerpt {
+  color: var(--fg-muted);
+}

@@ -10,6 +10,9 @@ import {
   type UserCategoriesApi,
   type ReceiptsApi,
   type PromisesApi,
+  type AskApi,
+  type AskResult,
+  type AskIndexStatus,
   type PromisesView,
   type PromiseStatus,
   type StoredPromise,
@@ -155,7 +158,7 @@ export interface BrowserState {
   /** Offene fremde Seite im Fenster innerhalb der App; null = zu */
   webPanel: WebPanelState | null;
   /** Was die beiden rechten Spalten zeigen: Mails oder „Abos & Verträge“ */
-  panel: "mail" | "subscriptions" | "receipts" | "promises";
+  panel: "mail" | "subscriptions" | "receipts" | "promises" | "ask";
   /** Verträge & Abos (W7.1) */
   subscriptions: { view: SubscriptionsView | null; selectedId: string | null; busy: boolean; error: string | null } | null;
   /** Eigene Kategorien (Seitenleiste); null = nicht verfügbar oder noch nicht geladen */
@@ -174,6 +177,8 @@ export interface BrowserState {
   } | null;
   /** Versprechen-Tracker (W7.3): welche Liste, Daten */
   promises: { view: PromisesView | null; tab: "mine" | "theirs"; busy: boolean; error: string | null } | null;
+  /** „Frag dein Postfach“ (W8.1) */
+  ask: { question: string; sender: string | null; busy: boolean; result: AskResult | null; error: string | null; status: AskIndexStatus | null } | null;
   /** Rückmeldung nach eigener Zuordnung (geöffnete Mail) */
   userCategoryNote: { messageId: string; categoryId: string | null; remembered: boolean; changed: number } | null;
 }
@@ -300,6 +305,7 @@ export const initialState: BrowserState = {
   userCategories: null,
   receipts: null,
   promises: null,
+  ask: null,
   categoryDialog: null,
   userCategoryNote: null,
 };
@@ -369,10 +375,11 @@ export class BrowserStore {
   readonly #categories: UserCategoriesApi | undefined;
   readonly #receipts: ReceiptsApi | undefined;
   readonly #promises: PromisesApi | undefined;
+  readonly #ask: AskApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi; promises?: PromisesApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi; promises?: PromisesApi; ask?: AskApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -387,6 +394,78 @@ export class BrowserStore {
     this.#categories = options.categories;
     this.#receipts = options.receipts;
     this.#promises = options.promises;
+    this.#ask = options.ask;
+  }
+
+  // --- „Frag dein Postfach“ (W8.1) ---
+
+  get canAsk(): boolean {
+    return Boolean(this.#ask);
+  }
+
+  #patchAsk(patch: Partial<NonNullable<BrowserState["ask"]>>): void {
+    const current = this.#state.ask ?? { question: "", sender: null, busy: false, result: null, error: null, status: null };
+    this.#set({ ask: { ...current, ...patch } });
+  }
+
+  /** Ansicht öffnen; mit Frage gleich fragen. `sender`: nur Mails von/an diese Person (Steckbrief). */
+  async openAsk(question = "", sender: string | null = null): Promise<void> {
+    if (!this.#ask) return;
+    this.#set({ panel: "ask" });
+    this.#patchAsk({ question, sender, error: null, ...(question ? {} : { result: null }) });
+    await this.#loadAskStatus();
+    if (question.trim()) await this.askQuestion(question, sender);
+  }
+
+  closeAsk(): void {
+    this.#set({ panel: "mail" });
+  }
+
+  async askQuestion(question: string, sender: string | null = this.#state.ask?.sender ?? null): Promise<void> {
+    const api = this.#ask;
+    if (!api) return;
+    this.#patchAsk({ question, sender, busy: true, error: null });
+    try {
+      const result = await api.ask(question, sender ? { sender } : {});
+      this.#patchAsk({ busy: false, result });
+    } catch (e) {
+      this.#patchAsk({ busy: false, error: messageOf(e) });
+    }
+  }
+
+  clearAskSender(): void {
+    this.#patchAsk({ sender: null });
+  }
+
+  async #loadAskStatus(): Promise<void> {
+    const api = this.#ask;
+    if (!api) return;
+    try {
+      this.#patchAsk({ status: await api.status() });
+    } catch {
+      // Status ist nur Anzeige
+    }
+  }
+
+  async downloadAskModel(): Promise<void> {
+    const api = this.#ask;
+    if (!api) return;
+    const done = api.downloadModel().catch((e: unknown) => this.#patchAsk({ error: messageOf(e) }));
+    await this.#loadAskStatus();
+    await done;
+    await this.#loadAskStatus();
+  }
+
+  async deleteAskModel(): Promise<void> {
+    const api = this.#ask;
+    if (!api) return;
+    await api.deleteModel();
+    await this.#loadAskStatus();
+  }
+
+  async openAskSource(messageId: string): Promise<void> {
+    this.#set({ panel: "mail" });
+    await this.openMessage(messageId);
   }
 
   // --- Versprechen-Tracker (W7.3) ---
@@ -1486,6 +1565,7 @@ export class BrowserStore {
       this.#state.panel === "subscriptions" ? this.#loadSubscriptions() : Promise.resolve(),
       this.#state.panel === "receipts" ? this.#loadReceipts() : Promise.resolve(),
       this.#state.panel === "promises" ? this.#loadPromises() : Promise.resolve(),
+      this.#state.panel === "ask" ? this.#loadAskStatus() : Promise.resolve(),
       this.loadUserCategories(),
     ]);
     const selected = this.#state.selectedMessageId;

@@ -1,4 +1,4 @@
-import { AlertTriangle, Broom, Handshake, LogIn, Plus, ReceiptText, RefreshCw, Repeat, Send, Settings, Sun, X } from "lucide-react";
+import { AlertTriangle, Broom, Handshake, LogIn, MessageCircleQuestion, Plus, ReceiptText, RefreshCw, Repeat, Send, Settings, Sun, X } from "lucide-react";
 import { isDemoAccount, scopeKey } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -120,6 +120,20 @@ export function Sidebar() {
                 >
                   <Repeat className="sidebar-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
                   <span className="sidebar-label">{t("subs.sidebar")}</span>
+                </button>
+              </li>
+            )}
+            {section.id === "smart" && store.canAsk && (
+              <li>
+                <button
+                  type="button"
+                  className={`sidebar-item${state.panel === "ask" ? " selected" : ""}`}
+                  aria-current={state.panel === "ask" ? "page" : undefined}
+                  data-testid="sidebar-ask"
+                  onClick={() => void store.openAsk()}
+                >
+                  <MessageCircleQuestion className="sidebar-icon" size={18} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="sidebar-label">{t("ask.sidebar")}</span>
                 </button>
               </li>
             )}

@@ -14,6 +14,7 @@ import {
   userCategoriesApiMethods,
   receiptsApiMethods,
   promisesApiMethods,
+  askApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -35,9 +36,9 @@ import {
   type Message,
 } from "@stinkyma/core";
 import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
-import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService, PromiseService } from "@stinkyma/core/llm";
+import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService, PromiseService, AskService, LlamaEmbedder } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, PromiseStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, PromiseStore, EmbeddingStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -70,6 +71,7 @@ let subscriptions: SubscriptionService | null = null;
 let userCategories: UserCategoryService | null = null;
 let receipts: ReceiptService | null = null;
 let promises: PromiseService | null = null;
+let ask: AskService | null = null;
 let aiWasReady = false;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
@@ -181,6 +183,8 @@ function setUpServices(): void {
       void receipts?.scan().catch(() => undefined);
       // Versprechen-Tracker: neue gesendete/eingegangene Mails, Folge-Mails erkennen
       void promises?.scan().catch(() => undefined);
+      // „Frag dein Postfach“: neue Mails für die Suche nach Bedeutung vorbereiten (falls das Modell geladen ist)
+      ask?.startIndexing();
     },
   });
 
@@ -252,6 +256,17 @@ function setUpServices(): void {
     onChange: notifyRenderer,
   });
   void userCategories.refresh().catch(() => undefined);
+
+  // „Frag dein Postfach“ (W8.1): Suche nach Bedeutung (EmbeddingGemma, lokal, nur nach Download auf Klick) + Volltext;
+  // die Antwort schreibt das lokale Sprachmodell nur aus den gefundenen Stellen
+  ask = new AskService({
+    store: new EmbeddingStore(db),
+    modelDirectory: dataPath("models/embedding"),
+    createEmbedder: (modelPath) => new LlamaEmbedder({ modelPath, gpu: "auto" }),
+    answer: (question, sources, accountIds) => aiService.answerQuestion(question, sources, accountIds),
+    onChange: notifyRenderer,
+  });
+  ask.startIndexing();
 
   // Versprechen-Tracker (W7.3): Regeln sofort, lokales Modell im Hintergrund; sendet nie etwas
   promises = new PromiseService({
@@ -528,6 +543,7 @@ function registerIpc(): void {
     ["categories", new Set<string>(userCategoriesApiMethods), () => userCategories],
     ["receipts", new Set<string>(receiptsApiMethods), () => receipts],
     ["promises", new Set<string>(promisesApiMethods), () => promises],
+    ["ask", new Set<string>(askApiMethods), () => ask],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {
@@ -642,6 +658,7 @@ app.on("before-quit", () => {
   // Offene IMAP-Verbindungen sofort trennen, damit die App ohne Verzögerung beendet wird.
   service?.dispose();
   void ai?.dispose();
+  void ask?.dispose();
   destroyTray();
 });
 }

@@ -367,6 +367,21 @@ test("Zusagen: eigene Zusage aus gesendeter Mail mit Frist, Erinnerung, erledigt
   await panel.getByRole("button", { name: "Zurück zu den Mails" }).click();
 });
 
+test("Frag dein Postfach: ohne Zusatzmodell und KI – Wortsuche mit Quellen, Klick öffnet die Mail", async () => {
+  await page.getByTestId("sidebar-ask").click();
+  const panel = page.getByTestId("ask");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId("ask-download")).toContainText("334 MB");
+  await panel.getByTestId("ask-input").fill("Wann wird der Abschlag abgebucht?");
+  await panel.getByTestId("ask-submit").click();
+  const source = panel.getByTestId("ask-source").filter({ hasText: "Abschlagsrechnung" });
+  await expect(source).toBeVisible();
+  await shot("36-Frag-dein-Postfach");
+  await source.click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId("thread-subject")).toContainText("Abschlagsrechnung");
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

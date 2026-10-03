@@ -592,6 +592,21 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // „Frag dein Postfach“ (W8.1): Textstücke je Mail (Text und Anhänge) mit Vektor des Embedding-Modells.
+    // Die Tabelle `embedding` gibt es seit v1 (ungenutzt) – hier um Text, Quelle und Modell ergänzt.
+    name: "v21-embeddings",
+    sql: `
+      ALTER TABLE embedding ADD COLUMN text TEXT NOT NULL DEFAULT '';
+      ALTER TABLE embedding ADD COLUMN source TEXT NOT NULL DEFAULT 'mail';
+      ALTER TABLE embedding ADD COLUMN modelId TEXT NOT NULL DEFAULT '';
+      CREATE TABLE embeddingScan (
+        messageId TEXT PRIMARY KEY NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+        modelId TEXT NOT NULL,
+        indexedAt TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

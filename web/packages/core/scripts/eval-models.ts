@@ -39,6 +39,9 @@ const userCategoriesOnly = args.includes("--user-categories");
 if (userCategoriesOnly) args.splice(args.indexOf("--user-categories"), 1);
 const userCategoriesVersion = args.includes("--v1") ? 1 : args.includes("--v2") ? 2 : 3;
 for (const name of ["--v1", "--v2", "--v3"]) if (args.includes(name)) args.splice(args.indexOf(name), 1);
+// --ask: „Frag dein Postfach“ – Embedding-Modell im Modellordner unter embedding/, dazu ein Sprachmodell
+const askOnly = args.includes("--ask");
+if (askOnly) args.splice(args.indexOf("--ask"), 1);
 // --promises: Versprechen-Tracker (W7.3), Regeln + Modelle
 const promisesOnly = args.includes("--promises");
 if (promisesOnly) args.splice(args.indexOf("--promises"), 1);
@@ -108,6 +111,14 @@ if (rulesOnly) {
     }
   }
   console.log(formatRulesReports(reports));
+  process.exit(0);
+}
+
+if (askOnly) {
+  const { runAskEval } = await import("./eval-ask.js");
+  const model = modelCatalog.find((m) => ids.includes(m.id)) ?? modelCatalog.find((m) => m.recommended);
+  if (!model) throw new Error("Modell fehlt.");
+  console.log(await runAskEval({ directory, model, gpu, threads, out }));
   process.exit(0);
 }
 
