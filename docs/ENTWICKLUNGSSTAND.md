@@ -660,5 +660,5 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   jeweils nach einem gescheiterten Q8_0-Versuch (das Testmodell kann Q8_0 nicht). Unter Linux 12× wiederholt nicht
   nachstellbar. Trotzdem behoben statt als Zufall abgetan: Q8_0 wird nur noch versucht, wenn das Modell es laut
   GGUF-Metadaten kann (Kopfgröße durch 32 teilbar: Testmodell nein, Gemma 4 E2B und Qwen 3.5 2B ja – geprüft), und ein
-  Fehlschlag wird je Modell gemerkt. Damit fällt der fehlschlagende Weg weg. **Ungeprüft:** ob das Hängen unter Windows
-  damit sicher verschwunden ist – das zeigt erst die CI.
+  Fehlschlag wird je Modell gemerkt. Damit fällt der fehlschlagende Weg weg. Windows-CI Lauf #123 danach **grün**
+  (Unit-Tests, E2E, Installer). Ein einzelner grüner Lauf beweist nicht, dass das Hängen nie wieder auftritt – weiter beobachten.
