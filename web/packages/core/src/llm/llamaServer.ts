@@ -138,67 +138,83 @@ export class LlamaServerProvider implements ManagedProvider {
     if (this.#client && this.#process) return Promise.resolve(this.#client);
     if (this.#starting) return this.#starting;
     this.#starting = (async () => {
-      const port = await freePort();
-      const apiKey = randomBytes(24).toString("hex");
-      const args = [
-        "-m", this.options.modelPath,
-        "--host", "127.0.0.1",
-        "--port", String(port),
-        "-c", String(this.contextWindow),
-        "-np", "1",
-        // Automatische Speicher-Anpassung aus: kostete beim Start mehrere Minuten (gemessen).
-        "--fit", "off",
-        "--no-ui",
-        "-ngl", this.options.gpu ? "99" : "0",
-        // Zwischenspeicher (Schlüssel) halb so groß – stabil ohne Flash-Attention; spart Speicher beim 16K-Fenster
-        "--cache-type-k", "q8_0",
-      ];
-      if (this.options.mmprojPath) args.push("--mmproj", this.options.mmprojPath);
-      if (this.options.maxThreads) args.push("-t", String(this.options.maxThreads));
-      // Schlüssel über die Umgebung, nicht über die Befehlszeile (dort für andere Programme sichtbar)
-      const env: NodeJS.ProcessEnv = { ...process.env, LLAMA_API_KEY: apiKey };
-      if (process.platform === "linux") env.LD_LIBRARY_PATH = [dirname(this.options.serverPath), process.env.LD_LIBRARY_PATH].filter(Boolean).join(":");
-      const child = spawn(this.options.serverPath, args, { env, stdio: "ignore", windowsHide: true });
-      this.#process = child;
-      let exited: number | null | undefined;
-      child.once("exit", (code) => {
-        exited = code;
-        if (this.#process === child) {
-          this.#process = null;
-          this.#client = null;
+      if (!this.#plainCache) {
+        try {
+          return await this.#launch(true);
+        } catch (error) {
+          // Manche Modelle können den Q8_0-Zwischenspeicher nicht (Kopfgröße nicht durch 32 teilbar) – dann ohne
+          if (!(error instanceof EarlyExitError)) throw error;
+          this.#plainCache = true;
         }
-      });
-      const spawnError = new Promise<never>((_, reject) => child.once("error", (error) => reject(new Error(`Die Bild-Laufzeit startet nicht: ${error.message}`))));
-      const client = new OpenAIChatClient({ baseUrl: `http://127.0.0.1:${port}`, apiKey });
-      const deadline = Date.now() + (this.options.startTimeoutMs ?? 180_000);
-      const ready = (async () => {
-        while (Date.now() < deadline) {
-          if (exited !== undefined) throw new Error(`Die Bild-Laufzeit wurde unerwartet beendet (Code ${exited}).`);
-          try {
-            const health = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) });
-            if (health.ok) return client;
-          } catch {
-            // noch nicht bereit
-          }
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
-        throw new Error("Die Bild-Laufzeit hat zu lange zum Starten gebraucht.");
-      })();
-      try {
-        const result = await Promise.race([ready, spawnError]);
-        this.#client = result;
-        return result;
-      } catch (error) {
-        child.kill();
-        this.#process = null;
-        throw error;
       }
+      return this.#launch(false);
     })();
     const starting = this.#starting;
     void starting.finally(() => {
       if (this.#starting === starting) this.#starting = null;
     }).catch(() => undefined);
     return starting;
+  }
+
+  /** Nach einem Fehlstart mit Q8_0 merken: dieses Modell nur mit normalem Zwischenspeicher starten */
+  #plainCache = false;
+
+  async #launch(smallCache: boolean): Promise<OpenAIChatClient> {
+    const port = await freePort();
+    const apiKey = randomBytes(24).toString("hex");
+    const args = [
+      "-m", this.options.modelPath,
+      "--host", "127.0.0.1",
+      "--port", String(port),
+      "-c", String(this.contextWindow),
+      "-np", "1",
+      // Automatische Speicher-Anpassung aus: kostete beim Start mehrere Minuten (gemessen).
+      "--fit", "off",
+      "--no-ui",
+      "-ngl", this.options.gpu ? "99" : "0",
+    ];
+    // Zwischenspeicher (Schlüssel) halb so groß – stabil ohne Flash-Attention; spart Speicher beim 16K-Fenster
+    if (smallCache) args.push("--cache-type-k", "q8_0");
+    if (this.options.mmprojPath) args.push("--mmproj", this.options.mmprojPath);
+    if (this.options.maxThreads) args.push("-t", String(this.options.maxThreads));
+    // Schlüssel über die Umgebung, nicht über die Befehlszeile (dort für andere Programme sichtbar)
+    const env: NodeJS.ProcessEnv = { ...process.env, LLAMA_API_KEY: apiKey };
+    if (process.platform === "linux") env.LD_LIBRARY_PATH = [dirname(this.options.serverPath), process.env.LD_LIBRARY_PATH].filter(Boolean).join(":");
+    const child = spawn(this.options.serverPath, args, { env, stdio: "ignore", windowsHide: true });
+    this.#process = child;
+    let exited: number | null | undefined;
+    child.once("exit", (code) => {
+      exited = code;
+      if (this.#process === child) {
+        this.#process = null;
+        this.#client = null;
+      }
+    });
+    const spawnError = new Promise<never>((_, reject) => child.once("error", (error) => reject(new Error(`Die Bild-Laufzeit startet nicht: ${error.message}`))));
+    const client = new OpenAIChatClient({ baseUrl: `http://127.0.0.1:${port}`, apiKey });
+    const deadline = Date.now() + (this.options.startTimeoutMs ?? 180_000);
+    const ready = (async () => {
+      while (Date.now() < deadline) {
+        if (exited !== undefined) throw new EarlyExitError(exited);
+        try {
+          const health = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) });
+          if (health.ok) return client;
+        } catch {
+          // noch nicht bereit
+        }
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      throw new Error("Die Bild-Laufzeit hat zu lange zum Starten gebraucht.");
+    })();
+    try {
+      const result = await Promise.race([ready, spawnError]);
+      this.#client = result;
+      return result;
+    } catch (error) {
+      child.kill();
+      this.#process = null;
+      throw error;
+    }
   }
 
   #cancelIdle(): void {
@@ -237,5 +253,13 @@ export class LlamaServerProvider implements ManagedProvider {
   async dispose(): Promise<void> {
     this.#disposed = true;
     await this.unload();
+  }
+}
+
+/** llama-server hat sich beim Start beendet (z. B. Einstellung, die das Modell nicht kann) */
+class EarlyExitError extends Error {
+  constructor(code: number | null) {
+    super(`Die Bild-Laufzeit wurde unerwartet beendet (Code ${code}).`);
+    this.name = "EarlyExitError";
   }
 }

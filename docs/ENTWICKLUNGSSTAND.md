@@ -641,3 +641,12 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   (werden nicht ausgewertet, nur einfache Monatswiederholung), Zeitzonen-Sonderfälle.
 - Stand Tests: 475 Unit-Tests grün (inkl. GreenMail), E2E 21 grün / 2 übersprungen (Modell-abhängig).
 - Als Nächstes: Test des Nutzers unter Windows (W8 + W9), danach Server mit Browser (S1).
+
+### 03.10.2026 – Windows-CI wieder grün (Korrektur)
+- **Fehler:** Seit der 16K-Änderung (Lauf #116–#120) schlug in der Windows-CI genau ein Test fehl: die Bild-Laufzeit
+  `llama-server` startete nicht. Ursache: Sie bekam fest `--cache-type-k q8_0` mit; das winzige CI-Testmodell kann das nicht
+  (Kopfgröße 8 nicht durch 32 teilbar) und `llama-server` beendet sich dann sofort. Beim Hauptmodell gab es einen Rückfall,
+  bei `llama-server` hatte ich ihn vergessen – und lokal läuft dieser Test nur mit eigener Freigabe, darum fiel es mir nicht auf.
+- **Behoben:** Beendet sich `llama-server` beim Start, startet er einmal ohne den kleinen Zwischenspeicher neu und merkt
+  sich das. Lokal nachgestellt (gleicher Test mit Testmodell und echter Laufzeit): ohne Korrektur Fehler, mit Korrektur grün.
+- **Lehre:** Vor jedem Push auch die Laufzeit-Tests (`STINKYMA_TEST_LLAMA_RUNTIME=1`) laufen lassen und den CI-Lauf prüfen.

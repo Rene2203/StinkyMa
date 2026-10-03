@@ -68,6 +68,10 @@
   und Platzhalter, kein doppeltes Wort am Anschluss, kein neuer Satz mitten im Satz. du/Sie aus dem Stilprofil.
   Abschaltbar (Optionen → KI); braucht ein Vorschlag auf dem Rechner im Mittel über 6 s, schaltet sie sich aus.
 
+### Behoben
+- Bild-Laufzeit (`llama-server`) startete nicht mit Modellen, die den 8-Bit-Zwischenspeicher nicht können (Windows-CI
+  seit der 16K-Änderung rot); jetzt Neustart ohne diese Einstellung.
+
 ### Geändert
 - **Was du anklickst, geht vor**: Zusammenfassen, Antwortvorschläge, Fragen, Bilder lesen, Regeln und Vorschläge beim
   Tippen werden vor wartender Hintergrundarbeit (Einordnung, Abos, Belege, Zusagen, eigene Kategorien) gerechnet.
