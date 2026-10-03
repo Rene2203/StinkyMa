@@ -656,3 +656,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   schmalem Fenster. Behoben: Leiste bricht um, Mail-Ansicht ragt nicht mehr über ihre Spalte. Lokal mit 1024×768
   nachgestellt (vorher Fehler, nachher alle 21 E2E grün, KI-E2E mit Testmodell grün).
 - **Lehre:** E2E zusätzlich mit kleinem Bildschirm (`xvfb-run -s "-screen 0 1024x768x24"`) laufen lassen.
+- **Dritter Punkt (Lauf #122):** Der Test des Hauptmodells hing unter Windows einmal 180 s – nach dem Neuladen des Modells,
+  jeweils nach einem gescheiterten Q8_0-Versuch (das Testmodell kann Q8_0 nicht). Unter Linux 12× wiederholt nicht
+  nachstellbar. Trotzdem behoben statt als Zufall abgetan: Q8_0 wird nur noch versucht, wenn das Modell es laut
+  GGUF-Metadaten kann (Kopfgröße durch 32 teilbar: Testmodell nein, Gemma 4 E2B und Qwen 3.5 2B ja – geprüft), und ein
+  Fehlschlag wird je Modell gemerkt. Damit fällt der fehlschlagende Weg weg. **Ungeprüft:** ob das Hängen unter Windows
+  damit sicher verschwunden ist – das zeigt erst die CI.

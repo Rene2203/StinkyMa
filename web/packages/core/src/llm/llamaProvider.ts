@@ -185,7 +185,7 @@ export class LlamaCppProvider implements AIProvider {
         const { module, llama } = await loadLlama(this.options.gpu ?? "auto", this.options.maxThreads ?? 0);
         const model = await llama.loadModel({ modelPath: this.options.modelPath });
         try {
-          const context = await createContextWithSmallCache(model, this.contextWindow);
+          const context = await createContextWithSmallCache(model, this.contextWindow, this.options.modelPath);
           return { llama, model, context, sequence: context.getSequence(), module };
         } catch (error) {
           await model.dispose();
@@ -234,21 +234,55 @@ export class LlamaCppProvider implements AIProvider {
   }
 }
 
+/** Modelle, bei denen der Q8_0-Zwischenspeicher schon einmal gescheitert ist (je Datei) – nicht erneut versuchen */
+const plainCacheModels = new Set<string>();
+
+/**
+ * Kann das Modell den Q8_0-Zwischenspeicher? llama.cpp verlangt eine Kopfgröße, die durch 32 teilbar ist (sonst bricht
+ * das Anlegen ab). Aus den GGUF-Metadaten; im Zweifel „nein“ – dann gibt es keinen Fehlversuch.
+ */
+export function supportsQ8Cache(metadata: unknown): boolean {
+  const meta = (metadata && typeof metadata === "object" ? metadata : {}) as Record<string, unknown>;
+  const general = meta.general as Record<string, unknown> | undefined;
+  const arch = typeof general?.architecture === "string" ? general.architecture : null;
+  const section = arch ? (meta[arch] as Record<string, unknown> | undefined) : undefined;
+  const attention = section?.attention as Record<string, unknown> | undefined;
+  const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "bigint" ? Number(v) : Array.isArray(v) && typeof v[0] === "number" ? v[0] : null);
+  const keyLength = num(attention?.key_length);
+  const embedding = num(section?.embedding_length);
+  const heads = num(attention?.head_count);
+  const head = keyLength ?? (embedding && heads ? embedding / heads : null);
+  return head !== null && Number.isInteger(head) && head % 32 === 0;
+}
+
 /**
  * Kontext mit halb so großem Zwischenspeicher (KV-Cache als Q8_0 statt F16, Flash-Attention wenn möglich) – spart bei
- * 16K-Fenster Arbeitsspeicher bei kaum Qualitätsverlust. Die Option ist in node-llama-cpp als experimentell markiert;
- * schlägt das Anlegen fehl, gilt der normale Zwischenspeicher.
+ * 16K-Fenster Arbeitsspeicher bei kaum Qualitätsverlust. Die Option ist in node-llama-cpp als experimentell markiert:
+ * Nur versuchen, wenn das Modell sie laut Metadaten kann, und nach einem Fehlschlag für dieses Modell nie wieder
+ * (ein gescheiterter Versuch hinterließ unter Windows in der CI einmal einen hängenden Zustand).
  */
-async function createContextWithSmallCache(model: LlamaModel, contextSize: number): Promise<LlamaContext> {
-  try {
-    return await model.createContext({
-      contextSize,
-      sequences: 1,
-      flashAttention: "auto",
-      experimentalKvCacheKeyType: "Q8_0",
-      experimentalKvCacheValueType: "Q8_0",
-    });
-  } catch {
-    return model.createContext({ contextSize, sequences: 1 });
+async function createContextWithSmallCache(model: LlamaModel, contextSize: number, modelPath: string): Promise<LlamaContext> {
+  let small = !plainCacheModels.has(modelPath);
+  if (small) {
+    try {
+      small = supportsQ8Cache(model.fileInfo.metadata);
+    } catch {
+      small = false;
+    }
+    if (!small) plainCacheModels.add(modelPath);
   }
+  if (small) {
+    try {
+      return await model.createContext({
+        contextSize,
+        sequences: 1,
+        flashAttention: "auto",
+        experimentalKvCacheKeyType: "Q8_0",
+        experimentalKvCacheValueType: "Q8_0",
+      });
+    } catch {
+      plainCacheModels.add(modelPath);
+    }
+  }
+  return model.createContext({ contextSize, sequences: 1 });
 }
