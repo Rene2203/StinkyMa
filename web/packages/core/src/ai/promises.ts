@@ -1,6 +1,6 @@
 import type { EmailAddress, Message } from "../models.js";
 import { explicitDates, relativeDates } from "./actions.js";
-import { cleanMailText, truncate } from "./prepare.js";
+import { cleanMailText, inputBudget, truncate } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { extractJson, type ResultOrigin } from "./tasks.js";
 import type { AIMessage, AIRequest, JsonSchema } from "./types.js";
@@ -181,7 +181,7 @@ export async function extractPromises(
   const mailDate = new Date(message.date);
   const rules = rulePromises(message.bodyText ?? message.snippet, mailDate, direction, message.from);
   if (direction === "theirs" && isAutomatedSender(message.from)) return { findings: [], origin: "rules", durationMs: 0 };
-  const body = cleanMailText(message.bodyText ?? message.snippet, 1800);
+  const body = cleanMailText(message.bodyText ?? message.snippet, inputBudget.mail);
   const mail = `${direction === "mine" ? `An: ${message.to.map((t) => t.name ?? t.address).join(", ")}` : `Von: ${message.from.name ?? ""} <${message.from.address}>`}\nBetreff: ${message.subject}\n\n${body}`;
   const request: AIRequest = { task: "extractPromises", messages: promisePrompt(mail, direction), jsonSchema: promiseSchema, maxTokens: 300, temperature: 0 };
   let durationMs = 0;

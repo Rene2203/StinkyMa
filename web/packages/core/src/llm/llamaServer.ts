@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
 import { dirname } from "node:path";
 import type { AIRequest, AIResponse, PrivacyClass } from "../ai/types.js";
+import { modelContextTokens } from "../ai/prepare.js";
 import type { ManagedProvider } from "./aiService.js";
 
 // Anbieter über die OpenAI-kompatible Schnittstelle von llama.cpp (llama-server). Zwei Teile:
@@ -107,7 +108,7 @@ export class LlamaServerProvider implements ManagedProvider {
     this.id = options.id;
     this.displayName = options.displayName;
     this.privacyClass = options.privacyClass ?? "onDevice";
-    this.contextWindow = options.contextSize ?? 4096;
+    this.contextWindow = options.contextSize ?? modelContextTokens;
     this.acceptsImages = !!options.mmprojPath;
   }
 
@@ -149,6 +150,8 @@ export class LlamaServerProvider implements ManagedProvider {
         "--fit", "off",
         "--no-ui",
         "-ngl", this.options.gpu ? "99" : "0",
+        // Zwischenspeicher (Schlüssel) halb so groß – stabil ohne Flash-Attention; spart Speicher beim 16K-Fenster
+        "--cache-type-k", "q8_0",
       ];
       if (this.options.mmprojPath) args.push("--mmproj", this.options.mmprojPath);
       if (this.options.maxThreads) args.push("-t", String(this.options.maxThreads));

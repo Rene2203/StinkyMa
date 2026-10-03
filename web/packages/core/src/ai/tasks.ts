@@ -1,5 +1,5 @@
 import type { Message, MessageCategory } from "../models.js";
-import { mailForModel, threadForModel } from "./prepare.js";
+import { inputBudget, mailForModel, threadForModel } from "./prepare.js";
 import { categories, categorizePrompt, categorizeSchema, documentTypes, readImagePrompt, readImageSchema, summarizePrompt, summarizePromptV2, summarizeSchema, summarizeSchemaV2, type DocumentType } from "./prompts.js";
 import type { AIRouter } from "./router.js";
 import type { AIImage, AIRequest, AIResponse, PrivacyClass } from "./types.js";
@@ -130,7 +130,7 @@ export async function summarizeThread(
   const last = [...thread].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
   const lastFromUser = !!last && own.has(last.from.address.toLowerCase());
   const lastLine = last ? `\n\n---\nDie letzte Mail ist ${lastFromUser ? "vom Nutzer selbst" : `von ${last.from.name || last.from.address} an den Nutzer`}.` : "";
-  const threadText = threadForModel(thread, options.maxChars ?? 6000, options.ownAddresses);
+  const threadText = threadForModel(thread, options.maxChars ?? inputBudget.thread, options.ownAddresses);
   const v2 = options.promptVersion === 2;
   const request: AIRequest = {
     task: "summarize",

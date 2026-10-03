@@ -8,6 +8,22 @@ const originalMarker = /^\s*-{2,}\s*(original|urspr(ü|ue)ngliche|weitergeleitet
 const footerMarker = /(abmelden|abbestellen|unsubscribe|newsletter abbestellen|diese e-mail wurde (automatisch )?versendet|impressum|datenschutzerklärung)/i;
 
 /** Mailtext ohne Zitate, Signatur und Fußzeilen; Leerraum zusammengefasst; auf `maxChars` gekürzt. */
+/**
+ * Kontextfenster der lokalen Modelle (Tokens) – auf Wunsch des Nutzers 16K für alle Rechner (vorher 4K).
+ * Grob 3–4 Zeichen je Token im Deutschen; die Eingabebudgets unten lassen Platz für Anweisung und Antwort.
+ */
+export const modelContextTokens = 16_384;
+
+/** Eingabebudgets (Zeichen) für längere Texte – passend zu `modelContextTokens` */
+export const inputBudget = {
+  /** Konversation für die Zusammenfassung; darüber: ältere Mails stufenweise verdichten (Map-Reduce) */
+  thread: 24_000,
+  /** Einzelne Mail (Aktionen, Zusagen, Antworten) */
+  mail: 4_000,
+  /** Anhangtext (Belege, Abos) */
+  attachment: 6_000,
+} as const;
+
 export function cleanMailText(text: string, maxChars: number): string {
   const kept: string[] = [];
   const lines = text.replace(/\r\n/g, "\n").split("\n");

@@ -1,4 +1,5 @@
 import type { AIProvider, AIRequest, AIResponse, JsonSchema } from "../ai/types.js";
+import { modelContextTokens } from "../ai/prepare.js";
 
 // Lokales Modell über llama.cpp (node-llama-cpp). Nur Node (Windows-App, später Server) – nie in der Oberfläche.
 // Das native Modul wird erst beim ersten Aufruf geladen: Wer keine KI nutzt, zahlt nichts dafür.
@@ -93,7 +94,7 @@ export class LlamaCppProvider implements AIProvider {
   constructor(private readonly options: LlamaProviderOptions) {
     this.id = options.id;
     this.displayName = options.displayName;
-    this.contextWindow = options.contextSize ?? 4096;
+    this.contextWindow = options.contextSize ?? modelContextTokens;
   }
 
   /** Ist das Modell gerade im Speicher? */
@@ -184,7 +185,7 @@ export class LlamaCppProvider implements AIProvider {
         const { module, llama } = await loadLlama(this.options.gpu ?? "auto", this.options.maxThreads ?? 0);
         const model = await llama.loadModel({ modelPath: this.options.modelPath });
         try {
-          const context = await model.createContext({ contextSize: this.contextWindow, sequences: 1 });
+          const context = await createContextWithSmallCache(model, this.contextWindow);
           return { llama, model, context, sequence: context.getSequence(), module };
         } catch (error) {
           await model.dispose();
@@ -230,5 +231,24 @@ export class LlamaCppProvider implements AIProvider {
   async dispose(): Promise<void> {
     this.#disposed = true;
     await this.unload();
+  }
+}
+
+/**
+ * Kontext mit halb so großem Zwischenspeicher (KV-Cache als Q8_0 statt F16, Flash-Attention wenn möglich) – spart bei
+ * 16K-Fenster Arbeitsspeicher bei kaum Qualitätsverlust. Die Option ist in node-llama-cpp als experimentell markiert;
+ * schlägt das Anlegen fehl, gilt der normale Zwischenspeicher.
+ */
+async function createContextWithSmallCache(model: LlamaModel, contextSize: number): Promise<LlamaContext> {
+  try {
+    return await model.createContext({
+      contextSize,
+      sequences: 1,
+      flashAttention: "auto",
+      experimentalKvCacheKeyType: "Q8_0",
+      experimentalKvCacheValueType: "Q8_0",
+    });
+  } catch {
+    return model.createContext({ contextSize, sequences: 1 });
   }
 }

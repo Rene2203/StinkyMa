@@ -1,5 +1,5 @@
 import type { EmailAddress, Message } from "../models.js";
-import { cleanMailText } from "./prepare.js";
+import { cleanMailText, inputBudget } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { extractJson } from "./tasks.js";
 import type { AIMessage, AIRequest, JsonSchema, PrivacyClass } from "./types.js";
@@ -147,7 +147,7 @@ export async function draftReplies(
   message: Message,
   options: { earlier?: Message[]; signal?: AbortSignal } = {},
 ): Promise<ReplyDrafts> {
-  const body = cleanMailText(message.bodyText ?? message.snippet, 1500);
+  const body = cleanMailText(message.bodyText ?? message.snippet, inputBudget.mail);
   const mail = `Von: ${message.from.name ?? message.from.address}\nBetreff: ${message.subject}\n\n${body}`;
   const earlier = (options.earlier ?? [])
     .slice(-2)

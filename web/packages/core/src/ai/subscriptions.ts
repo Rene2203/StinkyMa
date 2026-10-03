@@ -1,7 +1,7 @@
 import type { EmailAddress, Message } from "../models.js";
 import { explicitDates, fixYear, relativeDates } from "./actions.js";
 import { amountToCents } from "../subscriptions.js";
-import { cleanMailText, truncate } from "./prepare.js";
+import { cleanMailText, inputBudget, truncate } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { extractJson, type ResultOrigin } from "./tasks.js";
 import type { AIMessage, AIRequest, JsonSchema } from "./types.js";
@@ -393,7 +393,7 @@ export interface SubscriptionResult {
 export function subscriptionMailText(bodyText: string, attachmentText = ""): string {
   const extra = attachmentText.replace(/\s+/g, " ").trim();
   if (!extra) return cleanMailText(bodyText, 2000);
-  return `${cleanMailText(bodyText, 1300)}\n\nAnhang:\n${truncate(extra, 1200)}`;
+  return `${cleanMailText(bodyText, 2000)}\n\nAnhang:\n${truncate(extra, inputBudget.attachment)}`;
 }
 
 export async function extractSubscription(

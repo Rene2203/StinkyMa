@@ -1,7 +1,7 @@
 import type { EmailAddress, Message } from "../models.js";
 import { explicitDates } from "./actions.js";
 import { receiptCategoryDefaults } from "./evalReceipts.js";
-import { cleanMailText, truncate } from "./prepare.js";
+import { cleanMailText, inputBudget, truncate } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { providerName } from "./subscriptions.js";
 import { extractJson, type ResultOrigin } from "./tasks.js";
@@ -333,7 +333,7 @@ export function mergeReceipts(model: ReceiptFinding, rules: ReceiptFinding | nul
 export function receiptMailText(bodyText: string, attachmentText = ""): string {
   const extra = attachmentText.replace(/\s+/g, " ").trim();
   if (!extra) return cleanMailText(bodyText, 2000);
-  return `${cleanMailText(bodyText, 1000)}\n\nAnhang:\n${truncate(extra, 1600)}`;
+  return `${cleanMailText(bodyText, 2000)}\n\nAnhang:\n${truncate(extra, inputBudget.attachment)}`;
 }
 
 export interface ReceiptResult {

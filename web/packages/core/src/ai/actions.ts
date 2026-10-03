@@ -1,5 +1,5 @@
 import type { Message } from "../models.js";
-import { cleanMailText } from "./prepare.js";
+import { cleanMailText, inputBudget } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { extractJson, type ResultOrigin } from "./tasks.js";
 import type { AIMessage, AIRequest, JsonSchema } from "./types.js";
@@ -320,7 +320,7 @@ export interface ActionsResult {
 
 /** Aktionen einer Mail: Modell (mit Belegprüfung), sonst Regeln. Blockade/fehlendes Modell → Fehler an den Aufrufer. */
 export async function extractActions(router: AIRouter, message: Message, options: { signal?: AbortSignal } = {}): Promise<ActionsResult> {
-  const body = cleanMailText(message.bodyText ?? message.snippet, 2000);
+  const body = cleanMailText(message.bodyText ?? message.snippet, inputBudget.mail);
   const mailDate = new Date(message.date);
   const mail = `Betreff: ${message.subject}\n\n${body}`;
   const request: AIRequest = { task: "extractActions", messages: actionsPrompt(mail, mailDate), jsonSchema: actionsSchema, maxTokens: 400, temperature: 0 };
