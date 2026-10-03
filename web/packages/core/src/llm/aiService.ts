@@ -216,11 +216,18 @@ export class AIService implements AIApi {
     return this.#view(stored, await this.options.thread(threadId));
   }
 
-  async summarize(threadId: string): Promise<SummaryView> {
+  async summarize(threadId: string, options: { full?: boolean } = {}): Promise<SummaryView> {
     const thread = await this.options.thread(threadId);
     if (thread.length === 0) throw new Error("Die Konversation gibt es nicht mehr.");
     const { router, model } = await this.#router();
-    const result = await summarizeThread(router, thread, { ownAddresses: await this.options.ownAddresses() });
+    // Laufende Zusammenfassung: gibt es schon eine (gleiche Prompt-Version) und sind nur Mails dazugekommen, liest das
+    // Modell die bisherige Zusammenfassung plus die neuen Mails statt des ganzen Verlaufs
+    const cached = options.full ? null : this.options.results.summary(threadId);
+    const previous =
+      cached && cached.promptVersion === promptVersions.summarize && cached.messageCount < thread.length
+        ? { summary: cached.summary, openPoints: cached.openPoints, lastMessageDate: cached.lastMessageDate }
+        : undefined;
+    const result = await summarizeThread(router, thread, { ownAddresses: await this.options.ownAddresses(), ...(previous ? { previous } : {}) });
     const last = thread.reduce((latest, m) => (m.date > latest ? m.date : latest), "");
     const stored: StoredSummary = {
       threadId,

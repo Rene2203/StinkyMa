@@ -1,4 +1,5 @@
 import type { Message, MessageCategory } from "../models.js";
+import { condense } from "./compress.js";
 import { inputBudget, mailForModel, threadForModel } from "./prepare.js";
 import { categories, categorizePrompt, categorizeSchema, documentTypes, readImagePrompt, readImageSchema, summarizePrompt, summarizePromptV2, summarizeSchema, summarizeSchemaV2, type DocumentType } from "./prompts.js";
 import type { AIRouter } from "./router.js";
@@ -120,18 +121,79 @@ export async function categorizeMessage(
   return { ...result.value, origin: result.response.privacyClass, providerId: result.response.providerId, durationMs: result.durationMs };
 }
 
-/** Zusammenfassung einer Konversation. Ohne gültige Antwort: Fehler (keine erfundene Zusammenfassung). */
+/** Bisheriger Stand für die laufende Zusammenfassung (nur neue Mails lesen) */
+export interface PreviousSummary {
+  summary: string;
+  openPoints: string[];
+  /** Datum der letzten schon zusammengefassten Mail */
+  lastMessageDate: string;
+}
+
+/**
+ * Text der Konversation für das Modell, passend ins Budget: Passt alles, kommt alles; sonst bleiben die neuesten Mails
+ * im Wortlaut und der frühere Verlauf wird verdichtet (Map-Reduce) statt weggelassen.
+ */
+export async function threadTextFor(
+  router: AIRouter,
+  thread: Message[],
+  options: { ownAddresses: string[]; budget: number; accountIds: string[]; signal?: AbortSignal },
+): Promise<string> {
+  const ordered = [...thread].sort((a, b) => a.date.localeCompare(b.date));
+  const full = ordered.map((m) => mailForModel(m, 8000, { ownAddresses: options.ownAddresses })).join("\n\n---\n\n");
+  if (full.length <= options.budget) return full;
+  // Neueste Mails im Wortlaut (halbes Budget), der Rest verdichtet
+  const recent: Message[] = [];
+  let used = 0;
+  for (const message of [...ordered].reverse()) {
+    const block = mailForModel(message, 8000, { ownAddresses: options.ownAddresses });
+    if (recent.length > 0 && used + block.length > options.budget / 2) break;
+    recent.unshift(message);
+    used += block.length;
+  }
+  const older = ordered.slice(0, ordered.length - recent.length);
+  const recentText = threadForModel(recent, Math.floor(options.budget / 2), options.ownAddresses);
+  if (older.length === 0) return recentText;
+  const olderText = older.map((m) => mailForModel(m, 8000, { ownAddresses: options.ownAddresses })).join("\n\n---\n\n");
+  const condensed = await condense(router, olderText, {
+    accountIds: options.accountIds,
+    targetChars: Math.floor(options.budget / 2) - 200,
+    label: "früherer Teil einer E-Mail-Konversation",
+    signal: options.signal,
+  });
+  return `[Früherer Verlauf, verdichtet – ${older.length} Mail(s)]\n${condensed}\n\n---\n\n${recentText}`;
+}
+
+/**
+ * Zusammenfassung einer Konversation. Mit `previous` (laufende Zusammenfassung): das Modell liest nur die bisherige
+ * Zusammenfassung plus die neuen Mails. Ohne gültige Antwort: Fehler (keine erfundene Zusammenfassung).
+ */
 export async function summarizeThread(
   router: AIRouter,
   thread: Message[],
-  options: { ownAddresses: string[]; maxChars?: number; signal?: AbortSignal; /** nur für Vergleichsmessungen */ promptVersion?: 2 | 4 },
+  options: { ownAddresses: string[]; maxChars?: number; signal?: AbortSignal; previous?: PreviousSummary; /** nur für Vergleichsmessungen */ promptVersion?: 2 | 4 },
 ): Promise<ThreadSummary> {
   const own = new Set(options.ownAddresses.map((a) => a.toLowerCase()));
   const last = [...thread].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
   const lastFromUser = !!last && own.has(last.from.address.toLowerCase());
   const lastLine = last ? `\n\n---\nDie letzte Mail ist ${lastFromUser ? "vom Nutzer selbst" : `von ${last.from.name || last.from.address} an den Nutzer`}.` : "";
-  const threadText = threadForModel(thread, options.maxChars ?? inputBudget.thread, options.ownAddresses);
+  const accountIds = [...new Set(thread.map((m) => m.accountId))];
+  const budget = options.maxChars ?? inputBudget.thread;
   const v2 = options.promptVersion === 2;
+  let threadText: string;
+  const fresh = options.previous ? thread.filter((m) => m.date > options.previous!.lastMessageDate) : thread;
+  if (v2) {
+    threadText = threadForModel(thread, budget, options.ownAddresses);
+  } else if (options.previous && fresh.length > 0 && fresh.length < thread.length) {
+    const earlier = [
+      `[Bisherige Zusammenfassung bis ${options.previous.lastMessageDate.slice(0, 10)}]`,
+      options.previous.summary,
+      options.previous.openPoints.length ? `Offene Punkte bisher: ${options.previous.openPoints.join("; ")}` : "",
+    ].filter(Boolean).join("\n");
+    const newText = await threadTextFor(router, fresh, { ownAddresses: options.ownAddresses, budget: budget - earlier.length, accountIds, signal: options.signal });
+    threadText = `${earlier}\n\n---\n\n[Neue Mails seitdem]\n\n${newText}`;
+  } else {
+    threadText = await threadTextFor(router, thread, { ownAddresses: options.ownAddresses, budget, accountIds, signal: options.signal });
+  }
   const request: AIRequest = {
     task: "summarize",
     messages: v2 ? summarizePromptV2(threadText, options.ownAddresses) : summarizePrompt(threadText + lastLine, options.ownAddresses),
@@ -139,7 +201,6 @@ export async function summarizeThread(
     maxTokens: 400,
     temperature: 0.2,
   };
-  const accountIds = [...new Set(thread.map((m) => m.accountId))];
   const result = await runParsed(router, request, accountIds, (text) => parseSummary(text, { lastFromUser }), options.signal);
   if (!result) throw new Error("Das Modell hat keine brauchbare Zusammenfassung geliefert. Bitte noch einmal versuchen.");
   return { ...result.value, origin: result.response.privacyClass as ThreadSummary["origin"], providerId: result.response.providerId, durationMs: result.durationMs };
