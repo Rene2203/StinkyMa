@@ -1,6 +1,38 @@
 # Changelog
 
-## W8 – Alleinstellungsmerkmale II: Personalisierung (in Arbeit)
+## W9 – Anhänge verstehen und Terminfinder (Spezifikation Phase 7 und 8, Nachzügler)
+
+### Neu
+- **Anhänge: erst entscheiden, dann lesen** (Spezifikation 7.8.3):
+  - Beim Abgleich per Code: Prüfsumme, Seitenzahl, „passwortgeschützt“ und Risiko-Kennzeichen (Programm, getarnte
+    Endung wie „Rechnung.pdf.exe“, Office mit Makros, verschlüsseltes ZIP, HTML-Anhang mit Anmeldeformular).
+  - **Vorfilter ohne KI**: Logos und Signatur-Bilder, AGB/Datenschutz/Widerruf, Kalender- und Kontaktdateien; dieselbe
+    Datei (gleiche Prüfsumme) wird nur einmal beurteilt.
+  - **Relevanz**: „wichtig“ (der Anhang ist der Inhalt, z. B. „anbei die Rechnung“), „Zusatz“ oder „übersprungen“ – per
+    Regel sofort, die lokale KI prüft im Hintergrund nach (sieht nur Name, Größe und ~500 Zeichen je Anhang). Verweist die
+    Mail klar auf einen Anhang, wird er nie „unwichtig“.
+  - An jedem Anhang ein **Status-Knopf** mit Begründung: **„Trotzdem lesen“** bzw. **„Ist unwichtig“**, auf Wunsch
+    **für diese Art von diesem Absender gemerkt** (andere Anhänge folgen). Migration `v22-attachment-relevance`.
+  - Belege und Abos lesen übersprungene Anhänge (AGB & Co.) nicht mehr mit.
+  - Gefährliche Anhänge fließen mit Begründung in den Phishing-Check ein.
+- **Word, PowerPoint, Excel lesen**: Text aus DOCX/PPTX/XLSX (Folien als Seiten) für Suche und KI – ohne Makros.
+- **Tiefenanalyse**: wichtige Anhänge werden im Hintergrund zusammengefasst (lange Dokumente stückweise); auf Klick
+  „Zusammenfassen“.
+- **„Frag den Anhang“**: Frage zu einem Dokument, Antwort mit **Seitenangabe** und wörtlichem **Zitat** (der Code prüft,
+  dass Seite und Zitat im Dokument stehen); steht es nicht drin, sagt die App das.
+- **Passwortgeschützte PDFs** (7.8.2): werden als „gesperrt“ erkannt. **„Passwort in den Mails suchen“** probiert lokal
+  das für den Absender gemerkte Passwort und Kandidaten aus dem Verlauf und aus Mails desselben Absenders (±3 Tage) –
+  „Das Passwort lautet: …“, „PIN …“, „Ihre Kundennummer“. Oder selbst eingeben; „für diesen Absender merken“ speichert
+  es mit Windows-DPAPI, nie in der Datenbank oder im Log. Danach sind Inhalt, Suche und KI verfügbar (nur auf diesem Rechner).
+- **Terminfinder** (Phase 8): Erkennt Terminanfragen („Wann passt es dir nächste Woche für einen zweistündigen
+  Workshop?“) samt Dauer, Zeitraum und genannten Wochentagen. Freie Zeitfenster rechnet der Code aus dem **Kalender-Abo
+  (ICS-Link aus Google oder iCloud)**, den Arbeitszeiten, dem Puffer und Terminen, die StinkyMail aus Mails kennt.
+  „Antwort mit diesen Vorschlägen“ öffnet die Antwort mit 2–3 Terminen (die KI schreibt nur Einleitung und Schluss, die
+  Zeiten setzt der Code ein). Sagt die Gegenseite zu („Dienstag um 10 Uhr passt“), bietet die Mail „In den Kalender“ an.
+  Aus dem Kalender werden nur Zeiten gelesen, keine Titel; die Adresse liegt verschlüsselt im sicheren Speicher.
+  Optionen → Kalender: Links hinzufügen/entfernen, Arbeitstage, Arbeitszeit, Dauer, Puffer. Migration `v23-meetings`.
+
+## W8 – Alleinstellungsmerkmale II: Personalisierung
 
 ### Neu
 - **Kontextfenster 16K für alle Rechner** (Wunsch des Nutzers, ohne vorherige Messung): Das lokale Modell bekommt

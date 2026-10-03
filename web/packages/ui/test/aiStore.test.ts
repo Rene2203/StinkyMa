@@ -83,6 +83,14 @@ function fakeAI(options: { ready?: boolean; cached?: SummaryView | null; fail?: 
     cancelCompletion: async () => {
       calls.push("cancelCompletion");
     },
+    analyzeAttachment: async (id) => {
+      calls.push(`analyze:${id}`);
+      return { attachmentId: id, documentType: "invoice", title: "Rechnung 4711", summary: "Rechnung über 89,99 €", text: "", origin: "onDevice", modelName: "Gemma", createdAt: "", durationMs: 1000 };
+    },
+    askAttachment: async (id, question) => {
+      calls.push(`askAttachment:${id}:${question}`);
+      return { attachmentId: id, question, answer: "89,99 €", pages: [1], quote: "Gesamt 89,99 €", found: true, modelName: "Gemma", durationMs: 900 };
+    },
     resume: async () => {
       calls.push("resume");
       return status({ ready: true });

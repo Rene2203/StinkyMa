@@ -9,6 +9,8 @@ export const SecretKeys = {
   oauthRefreshToken: (accountId: string): SecretKey => ({ service: "oauth-refresh-token", account: accountId }),
   aiApiKey: (providerId: string): SecretKey => ({ service: "ai-api-key", account: providerId }),
   attachmentPassword: (sender: string): SecretKey => ({ service: "attachment-password", account: sender.toLowerCase() }),
+  /** Private ICS-Adresse eines Kalender-Abos (enthält einen geheimen Schlüssel) */
+  calendarFeedUrl: (feedId: string): SecretKey => ({ service: "calendar-feed-url", account: feedId }),
 };
 
 /** Sicherer Speicher für Passwörter, Tokens und API-Keys. Inhalte werden nie geloggt. */

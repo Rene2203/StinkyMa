@@ -167,7 +167,11 @@ async function syncMailbox(
         for (const [index, attachment] of parsed.attachments.entries()) {
           if (!attachment.content) continue;
           const extracted = await extractAttachmentText({ filename: attachment.filename, mimeType: attachment.mimeType, content: attachment.content });
-          if (extracted) writer.setAttachmentText(`${id}/a${index}`, extracted.text, extracted.source);
+          if (extracted && "locked" in extracted) writer.setAttachmentMeta(`${id}/a${index}`, { encrypted: true });
+          else if (extracted) {
+            writer.setAttachmentText(`${id}/a${index}`, extracted.text, extracted.source);
+            if (extracted.pageCount) writer.setAttachmentMeta(`${id}/a${index}`, { pageCount: extracted.pageCount });
+          }
         }
         added += 1;
         if (!options.arrivedSince || date >= options.arrivedSince.toISOString()) {

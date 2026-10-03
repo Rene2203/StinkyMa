@@ -399,6 +399,52 @@ test("Steckbrief: alles zur Person neben der Mail, Schnellfrage führt zu „Fra
   await ask.getByRole("button", { name: "Zurück zu den Mails" }).click();
 });
 
+test("Anhänge: Rechnung „wichtig“, AGB übersprungen mit Grund, „Trotzdem lesen“ für diesen Absender merken", async () => {
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  await rows().filter({ hasText: "Abschlagsrechnung" }).first().click();
+  const invoice = page.getByTestId("attachment").filter({ hasText: "Rechnung_2026-10.pdf" });
+  const terms = page.getByTestId("attachment").filter({ hasText: "AGB.pdf" });
+  await expect(invoice.getByTestId("attachment-status")).toHaveAttribute("data-relevance", "central");
+  await expect(terms.getByTestId("attachment-status")).toHaveAttribute("data-relevance", "irrelevant");
+  await terms.getByTestId("attachment-status").click();
+  const insight = page.getByTestId("attachment-insight");
+  await expect(insight).toContainText("Standardtext");
+  await shot("40-Anhang-uebersprungen");
+  await insight.getByTestId("insight-remember").check();
+  await insight.getByTestId("insight-read").click();
+  await expect(terms.getByTestId("attachment-status")).toHaveAttribute("data-relevance", "central");
+  // Ein zweiter Klick schließt das Feld
+  await terms.getByTestId("attachment-status").click();
+  await expect(page.getByTestId("attachment-insight")).toHaveCount(0);
+});
+
+test("Terminfinder: Anfrage erkannt, freie Zeiten ohne Kalender, Antwort mit Vorschlägen öffnet den Editor; Kalender-Link nur https", async () => {
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  await rows().filter({ hasText: "Terminanfrage" }).first().click();
+  const card = page.getByTestId("meeting-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("120 Min.");
+  await expect(card.getByTestId("meeting-slot")).toHaveCount(3);
+  await expect(card).toContainText("Ohne Kalender");
+  await shot("41-Terminfinder");
+  await card.getByTestId("meeting-slot").last().uncheck();
+  await card.getByTestId("meeting-reply").click();
+  const body = page.getByTestId("compose-body");
+  await expect(body).toContainText("folgende Termine würden bei mir passen");
+  expect(((await body.textContent()) ?? "").match(/–/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  await page.getByTestId("compose-discard").click();
+  const confirm = page.getByTestId("compose-confirm-discard");
+  if (await confirm.isVisible()) await confirm.click();
+
+  await page.getByTestId("open-options").click();
+  const section = page.getByTestId("calendar-section");
+  await section.getByTestId("calendar-name").fill("Privat");
+  await section.getByTestId("calendar-url").fill("http://kalender.example/basic.ics");
+  await section.getByTestId("calendar-add").click();
+  await expect(section.getByRole("alert")).toContainText("https");
+  await page.getByTestId("options-dialog").getByRole("button", { name: "Fertig" }).click();
+});
+
 test("Transparenz-Seite: gelerntes Verhalten sehen, Absender „immer wichtig“, erscheint unter „Wichtig“, alles vergessen", async () => {
   await page.getByTestId("open-options").click();
   const options = page.getByTestId("options-dialog");

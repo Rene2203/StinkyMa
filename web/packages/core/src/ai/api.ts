@@ -170,6 +170,18 @@ export interface AttachmentReadingView {
   durationMs: number;
 }
 
+/** Antwort von „Frag den Anhang“ */
+export interface AttachmentAnswerView {
+  attachmentId: string;
+  question: string;
+  answer: string;
+  pages: number[];
+  quote: string;
+  found: boolean;
+  modelName: string;
+  durationMs: number;
+}
+
 /** Größte Bildgröße (Base64-Zeichen) je Seite, die die Oberfläche schicken darf. */
 export const maxPageImageChars = 8_000_000;
 
@@ -250,8 +262,12 @@ export interface AIApi {
    * Eine neue Anfrage bricht die vorige ab.
    */
   complete(input: CompletionInput): Promise<CompletionView | null>;
+  /** Tiefenanalyse eines Anhangs (Text-Dokumente: Zusammenfassung, lange per Map-Reduce; Bilder: wie „Mit KI lesen“) */
+  analyzeAttachment(attachmentId: string): Promise<AttachmentReadingView>;
+  /** „Frag den Anhang“: Antwort mit Seitenangabe und Zitat aus dem Dokument */
+  askAttachment(attachmentId: string, question: string): Promise<AttachmentAnswerView>;
   /** Laufende Vorschlags-Anfrage abbrechen (weitergetippt). */
   cancelCompletion(): Promise<void>;
 }
 
-export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender", "complete", "cancelCompletion"] as const satisfies readonly (keyof AIApi)[];
+export const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender", "complete", "cancelCompletion", "analyzeAttachment", "askAttachment"] as const satisfies readonly (keyof AIApi)[];

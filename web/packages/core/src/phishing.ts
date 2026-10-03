@@ -1,3 +1,4 @@
+import { AttachmentRisk } from "./attachments.js";
 import { isRiskyAttachment } from "./files.js";
 import type { Message } from "./models.js";
 
@@ -98,7 +99,7 @@ function shownHost(text: string): string | null {
 
 export function assessPhishing(
   message: Pick<Message, "from" | "subject" | "bodyText" | "bodyHtml" | "snippet" | "category">,
-  options: { attachmentNames?: string[]; knownSender?: boolean } = {},
+  options: { attachmentNames?: string[]; knownSender?: boolean; attachmentRisks?: { filename: string; riskFlags: number }[] } = {},
 ): PhishingAssessment {
   const reasons: PhishingReason[] = [];
   let score = 0;
@@ -178,6 +179,13 @@ export function assessPhishing(
   if (risky) {
     reasons.push({ code: "riskyAttachment", filename: risky });
     score += options.knownSender ? 1 : 2;
+  }
+  // Inhalt geprüft (beim Abgleich): Programm mit getarnter Endung, Makros, verschlüsseltes Archiv, Anmeldeformular
+  const flagged = (options.attachmentRisks ?? []).find((a) => a.riskFlags !== 0);
+  if (flagged) {
+    if (!risky) reasons.push({ code: "riskyAttachment", filename: flagged.filename });
+    // Doppelte Endung, verschlüsseltes Archiv und HTML-Anmeldeseite sind klassische Muster – von Fremden fast immer Betrug
+    if (flagged.riskFlags & (AttachmentRisk.doubleExtension | AttachmentRisk.encryptedArchive | AttachmentRisk.htmlLoginForm)) score += options.knownSender ? 1 : 3;
   }
 
   if (message.category === "spam_suspect") {

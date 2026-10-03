@@ -22,3 +22,7 @@ export * from "./compress.js";
 export * from "./ask.js";
 export * from "./evalAsk.js";
 export * from "./complete.js";
+export * from "./attachmentRelevance.js";
+export * from "./evalAttachments.js";
+export * from "./askAttachment.js";
+export * from "./meetingReply.js";

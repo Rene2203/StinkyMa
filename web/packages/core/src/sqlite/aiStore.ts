@@ -179,6 +179,16 @@ export class AIResultStore {
     return row ?? null;
   }
 
+  /** Gelesener Text eines Anhangs (PDF, Office, Text; Seiten mit \f getrennt) – null, wenn keiner da ist */
+  attachmentText(attachmentId: string): string | null {
+    const row = this.db.prepare("SELECT text FROM attachmentText WHERE attachmentId = ?").get(attachmentId) as { text: string } | undefined;
+    return row && row.text.trim() ? row.text : null;
+  }
+
+  setAttachmentAnalysisStatus(attachmentId: string, status: "analyzed" | "failed"): void {
+    this.db.prepare("UPDATE attachment SET analysisStatus = ? WHERE id = ? AND analysisStatus <> 'locked'").run(status, attachmentId);
+  }
+
   reading(attachmentId: string): StoredReading | null {
     const row = this.db.prepare("SELECT * FROM attachmentAnalysis WHERE attachmentId = ?").get(attachmentId) as Row | undefined;
     if (!row) return null;

@@ -17,6 +17,8 @@ import {
   askApiMethods,
   contactsApiMethods,
   personalApiMethods,
+  attachmentsApiMethods,
+  meetingsApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -37,10 +39,10 @@ import {
   type AttachmentFiles,
   type Message,
 } from "@stinkyma/core";
-import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
-import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService, PromiseService, AskService, LlamaEmbedder } from "@stinkyma/core/llm";
+import { CleanupService, MailService, RuleService, extractLockedPdfText, type OAuthBroker } from "@stinkyma/core/mail";
+import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService, PromiseService, AskService, LlamaEmbedder, AttachmentService, MeetingService } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, PromiseStore, EmbeddingStore, ContactStore, PriorityStore, PersonalStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, PromiseStore, EmbeddingStore, ContactStore, PriorityStore, PersonalStore, AttachmentStore, MeetingStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -76,6 +78,8 @@ let promises: PromiseService | null = null;
 let ask: AskService | null = null;
 let contacts: ContactStore | null = null;
 let personal: PersonalStore | null = null;
+let attachments: AttachmentService | null = null;
+let meetings: MeetingService | null = null;
 let priorityTimer: NodeJS.Timeout | null = null;
 let aiWasReady = false;
 let syncTimer: NodeJS.Timeout | null = null;
@@ -209,6 +213,8 @@ function setUpServices(): void {
       // „Frag dein Postfach“: neue Mails für die Suche nach Bedeutung vorbereiten (falls das Modell geladen ist)
       ask?.startIndexing();
       recomputePriority();
+      // Anhänge: Vorfilter und Regeln sofort, KI-Relevanz und Zusammenfassung zentraler Anhänge im Hintergrund
+      void attachments?.scan().catch(() => undefined);
     },
   });
 
@@ -248,7 +254,10 @@ function setUpServices(): void {
     onStatus: (status) => {
       mainWindow?.webContents.send("ai:status", status);
       // KI gerade bereit geworden: offene Mails gegen die eigenen Kategorien prüfen
-      if (status.ready && !aiWasReady) void userCategories?.refresh().catch(() => undefined);
+      if (status.ready && !aiWasReady) {
+        void userCategories?.refresh().catch(() => undefined);
+        void attachments?.scan().catch(() => undefined);
+      }
       aiWasReady = status.ready;
     },
     onCategorized: () => {
@@ -309,6 +318,42 @@ function setUpServices(): void {
     onChange: notifyRenderer,
     locale: app.getLocale().startsWith("de") ? "de" : "en",
   });
+
+  // Anhänge verstehen (W9.1/W9.2): erst entscheiden (Vorfilter, Regeln, KI), dann lesen – nur zentrale Anhänge
+  attachments = new AttachmentService({
+    store: new AttachmentStore(db, () => randomUUID()),
+    check: (mail, list, accountId) => aiService.checkAttachmentRelevance(mail, list, accountId),
+    analyze: async (attachmentId) => {
+      await aiService.analyzeAttachment(attachmentId);
+    },
+    modelReady: () => aiService.modelReady(),
+    // Passwortgeschützte PDFs: Passwörter je Absender mit DPAPI verschlüsselt, nie in der Datenbank oder im Log
+    secrets,
+    content: async (attachmentId) => (await mailService.attachmentContent(attachmentId)).content,
+    openWithPassword: (content, password) => extractLockedPdfText(Buffer.from(content), password),
+    onChange: notifyRenderer,
+  });
+  void attachments.scan().catch(() => undefined);
+
+  // Terminfinder (W9.4): Kalender-Abo (ICS-Link, Adresse mit DPAPI verschlüsselt), freie Zeiten per Code; sendet nie
+  meetings = new MeetingService({
+    store: new MeetingStore(db),
+    secrets,
+    message: (id) => repository.message(id),
+    thread: (threadId) => repository.thread(threadId),
+    ownAddresses: async () => (await repository.accounts()).map((a) => a.email),
+    draft: (message, form, slots) => aiService.draftMeetingReply(message, form, slots),
+    openCalendarFile: async (ics, filename) => {
+      const dir = join(app.getPath("temp"), "StinkyMail-Kalender");
+      mkdirSync(dir, { recursive: true });
+      const path = join(dir, safeFilename(filename));
+      writeFileSync(path, ics, "utf8");
+      const error = await shell.openPath(path);
+      if (error) throw new Error(`Der Kalender konnte nicht geöffnet werden: ${error}`);
+    },
+    newId: () => randomUUID(),
+  });
+  void meetings.refresh().catch(() => undefined);
 
   // Belegordner (W7.2): Regeln sofort, lokales Modell im Hintergrund; Export als ZIP (PDFs + CSV) nur auf Klick
   receipts = new ReceiptService({
@@ -579,6 +624,8 @@ function registerIpc(): void {
     ["ask", new Set<string>(askApiMethods), () => ask],
     ["contacts", new Set<string>(contactsApiMethods), () => contacts],
     ["personal", new Set<string>(personalApiMethods), () => personal],
+    ["attachments", new Set<string>(attachmentsApiMethods), () => attachments],
+    ["meetings", new Set<string>(meetingsApiMethods), () => meetings],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {

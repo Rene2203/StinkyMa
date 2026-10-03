@@ -2,6 +2,8 @@ import { convert } from "html-to-text";
 import { simpleParser, type AddressObject, type ParsedMail } from "mailparser";
 import type { EmailAddress } from "../models.js";
 import { makeSnippet } from "../mockData.js";
+import { createHash } from "node:crypto";
+import { attachmentRiskFlags } from "../attachments.js";
 import { isExtractable } from "./attachmentText.js";
 import { headerValue, parseListUnsubscribe, type UnsubscribeInfo } from "../unsubscribe.js";
 
@@ -13,6 +15,10 @@ export interface ParsedAttachment {
   isInline: boolean;
   /** Inhalt nur bei Anhängen, aus denen Text für die Suche gelesen wird (PDF, Text) – nicht gespeichert. */
   content?: Buffer;
+  /** Prüfsumme (gleiche Datei = gleiches Ergebnis, z. B. dieselben AGB jeden Monat) */
+  sha256?: string;
+  /** Risiko-Kennzeichen (Programm, Makros, doppelte Endung, verschlüsseltes Archiv, Anmeldeformular) */
+  riskFlags?: number;
 }
 
 export interface ParsedMessage {
@@ -100,6 +106,8 @@ export async function parseMessage(source: Buffer | string): Promise<ParsedMessa
         size: a.size,
         contentId: a.cid ?? null,
         isInline,
+        sha256: createHash("sha256").update(a.content).digest("hex"),
+        riskFlags: attachmentRiskFlags(filename, a.contentType, a.content),
         ...(!isInline && isExtractable(filename, a.contentType, a.size) ? { content: a.content } : {}),
       };
     }),

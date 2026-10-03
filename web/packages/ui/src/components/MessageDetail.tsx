@@ -1,5 +1,5 @@
 import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, MessageSquareReply, Pencil, ReceiptText, Repeat, Reply, UserRound, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
-import { assessPhishing, displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
+import { assessPhishing, displayName, initials, isFlagged, isRiskyAttachment, riskReasons, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
 import { formatBytes, formatFullDate, formatList } from "../format.js";
@@ -9,10 +9,12 @@ import { CategoryChip } from "./CategoryChip.js";
 import { CategoryPicker } from "./CategoryPicker.js";
 import { UserCategoryPicker } from "./UserCategoryPicker.js";
 import { ContactPanel } from "./ContactPanel.js";
+import { AttachmentInsight, AttachmentStatus } from "./AttachmentInsight.js";
 import { composeLabels } from "../composeLabels.js";
 import { SafeHtml } from "./SafeHtml.js";
 import { SummaryCard } from "./SummaryCard.js";
 import { ActionsCard } from "./ActionsCard.js";
+import { MeetingCard } from "./MeetingCard.js";
 import { PhishingBanner } from "./PhishingBanner.js";
 import { ScreenerBar } from "./ScreenerBar.js";
 import { UnsubscribeBar } from "./UnsubscribeBar.js";
@@ -133,13 +135,14 @@ export function MessageDetail() {
           {!isDraft && (
             <PhishingBanner
               key={message.id}
-              assessment={assessPhishing(message, { attachmentNames: (state.attachmentsByMessageId[message.id] ?? []).map((a) => a.filename) })}
+              assessment={assessPhishing(message, { attachmentNames: (state.attachmentsByMessageId[message.id] ?? []).map((a) => a.filename), attachmentRisks: state.attachmentsByMessageId[message.id] ?? [] })}
             />
           )}
           {!isDraft && <UnsubscribeBar messageId={message.id} />}
           {state.summary?.threadId === message.threadId && <SummaryCard summary={state.summary} />}
           {state.replies?.messageId === message.id && <ReplyDraftsCard replies={state.replies} />}
           {state.actions?.messageId === message.id && <ActionsCard view={state.actions} />}
+          <MeetingCard messageId={message.id} />
           {thread.map((m) => (
             <ThreadMessage
               key={`${message.id}-${m.id}`}
@@ -199,6 +202,9 @@ function ThreadMessage({ message, attachments, initiallyExpanded }: { message: M
               ))}
             </ul>
           )}
+          {attachments.map((a) => (
+            <AttachmentInsight key={`insight-${a.id}`} attachment={a} />
+          ))}
         </>
       )}
     </article>
@@ -210,7 +216,7 @@ function AttachmentItem({ attachment: a }: { attachment: Attachment }) {
   const { store, t, locale } = useUi();
   const state = useBrowserState();
   const Icon = attachmentIcon(a.filename);
-  const risky = isRiskyAttachment(a.filename);
+  const risky = isRiskyAttachment(a.filename) || a.riskFlags !== 0;
   const busy = state.attachmentBusy === a.id;
   const canOpen = store.canOpenAttachments && !risky;
   const info = (
@@ -226,8 +232,9 @@ function AttachmentItem({ attachment: a }: { attachment: Attachment }) {
       </span>
     </>
   );
+  const riskTitle = risky ? [t("attachment.risky"), ...riskReasons(a.riskFlags)].join(" ") : undefined;
   return (
-    <li className="attachment" data-testid="attachment" title={risky ? t("attachment.risky") : undefined}>
+    <li className="attachment" data-testid="attachment" title={riskTitle}>
       {canOpen ? (
         <button
           type="button"
@@ -255,6 +262,7 @@ function AttachmentItem({ attachment: a }: { attachment: Attachment }) {
           <Download size={16} />
         </button>
       )}
+      <AttachmentStatus attachment={a} />
     </li>
   );
 }

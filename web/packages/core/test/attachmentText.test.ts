@@ -5,7 +5,7 @@ import { minimalPdf } from "./fixtures.js";
 describe("Text aus Anhängen", () => {
   it("liest Text aus einem PDF", async () => {
     const result = await extractAttachmentText({ filename: "Rechnung.pdf", mimeType: "application/pdf", content: minimalPdf("Rechnung Nummer 4711 Stadtwerke") });
-    expect(result).toEqual({ text: "Rechnung Nummer 4711 Stadtwerke", source: "pdf" });
+    expect(result).toEqual({ text: "Rechnung Nummer 4711 Stadtwerke", source: "pdf", pageCount: 1 });
   });
 
   it("liest Textdateien, ignoriert Bilder, HTML und Übergroßes", () => {

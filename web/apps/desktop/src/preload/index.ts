@@ -14,9 +14,11 @@ const categoriesMethods = ["list", "save", "remove", "assign"];
 const promisesMethods = ["list", "scan", "setStatus", "setDueDate", "remind", "cancelReminder", "followUpDraft"];
 const contactsMethods = ["profile"];
 const personalMethods = ["overview", "setSenderPriority", "forget"];
+const attachmentsMethods = ["decide", "rules", "removeRule", "scan", "unlock"];
+const meetingsMethods = ["feeds", "addFeed", "removeFeed", "refresh", "preferences", "setPreferences", "forMessage", "draftReply", "acceptance", "addToCalendar"];
 const askMethods = ["ask", "status", "downloadModel", "deleteModel"];
 const receiptsMethods = ["list", "scan", "addFromMail", "update", "setStatus", "addCategory", "removeCategory", "remind", "cancelReminder", "export"];
-const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender", "complete", "cancelCompletion"];
+const aiMethods = ["status", "update", "download", "cancelDownload", "deleteModel", "cachedSummary", "summarize", "downloadVision", "attachmentReading", "readAttachment", "messageActions", "setActionStatus", "remind", "cancelReminder", "addToCalendar", "replyDrafts", "dailyDigest", "resume", "setCategory", "learnedSenders", "forgetSender", "complete", "cancelCompletion", "analyzeAttachment", "askAttachment"];
 
 const bridge = (channel: string, methods: string[]) =>
   Object.fromEntries(methods.map((method) => [method, (...args: unknown[]) => ipcRenderer.invoke(channel, method, args)]));
@@ -36,6 +38,8 @@ contextBridge.exposeInMainWorld("stinkyma", {
   ask: bridge("ask", askMethods),
   contacts: bridge("contacts", contactsMethods),
   personal: bridge("personal", personalMethods),
+  attachments: bridge("attachments", attachmentsMethods),
+  meetings: bridge("meetings", meetingsMethods),
   /** Meldet Änderungen (neue Mails, Abgleich, Konten). Gibt eine Abmelde-Funktion zurück. */
   onMailChanged: (callback: () => void) => {
     const listener = () => callback();

@@ -56,7 +56,7 @@ export interface NewMessage {
   category?: MessageCategory | null;
   /** Abmelde-Angabe als JSON; '' = keine */
   listUnsubscribe?: string | null;
-  attachments: { filename: string; mimeType: string; size: number; contentId: string | null; isInline: boolean }[];
+  attachments: { filename: string; mimeType: string; size: number; contentId: string | null; isInline: boolean; sha256?: string | null; riskFlags?: number }[];
 }
 
 /** Schreibzugriffe für den Abgleich mit dem Mailserver. Alles synchron (better-sqlite3), Aufrufer bündelt in Transaktionen. */
@@ -179,13 +179,19 @@ export class MailWriter {
         });
       if (inserted.changes === 0) return;
       const insertAttachment = this.db.prepare(
-        `INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId, sha256, riskFlags)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       m.attachments.forEach((a, i) =>
-        insertAttachment.run(`${m.id}/a${i}`, m.id, a.filename, a.mimeType, a.size, a.isInline ? 1 : 0, a.contentId),
+        insertAttachment.run(`${m.id}/a${i}`, m.id, a.filename, a.mimeType, a.size, a.isInline ? 1 : 0, a.contentId, a.sha256 ?? null, a.riskFlags ?? 0),
       );
     });
+  }
+
+  /** Seitenzahl bzw. „gesperrt“ (passwortgeschütztes PDF), beim Textlesen festgestellt. */
+  setAttachmentMeta(attachmentId: string, meta: { pageCount?: number | null; encrypted?: boolean }): void {
+    if (meta.pageCount !== undefined) this.db.prepare("UPDATE attachment SET pageCount = ? WHERE id = ?").run(meta.pageCount, attachmentId);
+    if (meta.encrypted) this.db.prepare("UPDATE attachment SET isEncrypted = 1, analysisStatus = 'locked' WHERE id = ?").run(attachmentId);
   }
 
   /** Text eines Anhangs für die Suche (vorhandener Text wird ersetzt). */
@@ -270,13 +276,12 @@ export class MailWriter {
       this.db.prepare(`INSERT INTO message (${columns}) VALUES (${params})`).run({
         ...row, id: target.newId, mailboxId: target.mailboxId, uid: target.uid,
       });
-      const insertAttachment = this.db.prepare(
-        `INSERT INTO attachment (id, messageId, filename, mimeType, size, isInline, contentId, pageCount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      );
+      // Alle Spalten mitnehmen (Prüfsumme, Relevanz, Status, Risiko …) – nur ID und Mail ändern sich
       const newAttachmentId = new Map<string, string>();
       attachments.forEach((a, i) => {
-        insertAttachment.run(`${target.newId}/a${i}`, target.newId, a.filename, a.mimeType, a.size, a.isInline, a.contentId, a.pageCount);
+        const next: Row = { ...a, id: `${target.newId}/a${i}`, messageId: target.newId };
+        const keys = Object.keys(next);
+        this.db.prepare(`INSERT INTO attachment (${keys.map((k) => `"${k}"`).join(", ")}) VALUES (${keys.map((k) => `@${k}`).join(", ")})`).run(next);
         newAttachmentId.set(String(a.id), `${target.newId}/a${i}`);
       });
       const reinsert = (table: string, rows: Row[], change: (row: Row) => Row) => {

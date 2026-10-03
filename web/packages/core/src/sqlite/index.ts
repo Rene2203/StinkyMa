@@ -16,3 +16,5 @@ export * from "./embeddingStore.js";
 export * from "./contactStore.js";
 export * from "./priorityStore.js";
 export * from "./personalStore.js";
+export * from "./attachmentStore.js";
+export * from "./meetingStore.js";

@@ -24,7 +24,7 @@ export interface SubscriptionCandidate {
 const candidateColumns = `message.id, message.accountId, message.fromName, message.fromAddress, message.subject, message.date, message.category,
   substr(COALESCE(message.bodyText, message.snippet), 1, 4000) AS body,
   (SELECT substr(group_concat(t.text, char(10)), 1, 3000) FROM attachmentText t JOIN attachment a ON a.id = t.attachmentId
-   WHERE a.messageId = message.id) AS attachmentText`;
+   WHERE a.messageId = message.id AND coalesce(a.relevance, '') <> 'irrelevant') AS attachmentText`;
 
 function candidateFromRow(r: Row): SubscriptionCandidate {
   return {

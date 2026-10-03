@@ -347,6 +347,49 @@ Suche nach Bedeutung mit EmbeddingGemma 300M (Q8_0, 256 Dimensionen), 4 CPU-Kern
   Handwerkers. Prompt v2 („ähnliches Thema ist keine Antwort“) half nicht (gleiches Ergebnis wie v1). Darum zeigt die
   App immer die Quellen an. **Ehrlich:** nur eine Falle, kleine Sätze aus einer Hand; echte Postfächer ungeprüft.
 
+## Anhang-Relevanz (W9.1, 03.10.2026)
+
+Aufgabe: je Anhang „zentral“, „unterstützend“ oder „unwichtig“. Testsatz 16 Mails / 30 Anhänge (Rechnung + AGB + Logo,
+Fotos, Prospekt-Werbung, Police + Bedingungen, Ticket, Bescheid als „Scan_….pdf“, Protokoll + Folien …), Kontrollsatz
+8 Mails / 13 Anhänge (vorher geschrieben, **nicht** zum Abstimmen benutzt – an Prompt und Regeln wurde nach der Messung
+nichts geändert). Vorfilter per Code immer davor. 4 CPU-Kerne.
+
+| Verfahren | Testsatz | Kontrollsatz | zentral übersehen | unnötig gelesen | Zeit je Mail (Median) |
+|---|---|---|---|---|---|
+| Vorfilter + Regeln | 23/30 (76,7 %) | 8/13 (61,5 %) | 0 | 0 | 0 s |
+| Vorfilter + Gemma 4 E2B | 25/30 (83,3 %) | 10/13 (76,9 %) | 0 | 0 | 9,2–9,7 s |
+| Vorfilter + Gemma 4 E4B | 26/30 (86,7 %) | 11/13 (84,6 %) | 0 | 0 | 17–18 s |
+
+- **Wichtigstes Ergebnis: kein zentraler Anhang wurde als unwichtig übersprungen** (bei allen Verfahren).
+- Fehler fast nur „zentral ↔ unterstützend“ (Fotos von Freunden, Folien „zur Vollständigkeit“, Versicherungsbedingungen).
+  Ob das als Fehler zählt, ist teils Ansichtssache (meine Erwartung).
+- Im Kontrollsatz rutschen „Datenschutzinformation_Mandanten.pdf“ und „Conditions_of_Carriage.pdf“ am Vorfilter vorbei
+  (die Namensliste kennt nur „Datenschutz…“ als ganzes Wort und kein „Conditions of Carriage“). Bewusst **nicht**
+  nachgebessert, weil es am Kontrollsatz aufgefallen ist; für eine Verbesserung braucht es einen neuen Satz.
+- **Entscheidung:** E2B als Standard wie überall. **Ehrlich:** kleine, selbst geschriebene Sätze; echte Postfächer ungeprüft.
+
+## Frag den Anhang (W9.2, 03.10.2026)
+
+Zwei erfundene mehrseitige Dokumente (Mietvertrag 5 Seiten, Police 3 Seiten), 7 Fragen mit bekannter Antwort und Seite,
+2 Fallen (Frage nach etwas, das nicht drinsteht). Gemma 4 E2B, 4 Kerne, Skript `scripts/eval-ask-attachment.ts`.
+
+| Lauf | Antwort richtig | richtige Seite | Zitat im Dokument gefunden | Fallen erkannt | Zeit je Frage (Median) |
+|---|---|---|---|---|---|
+| 1 | 7/7 | 7/7 | 7/7 | 0/2 | 5,2 s |
+| 2 (nach Korrektur der „nicht gefunden“-Erkennung) | 7/7 | 7/7 | 7/7 | 1/2 | 9,7 s |
+
+- Bei den Fallen antwortete das Modell **inhaltlich richtig** („Das Dokument enthält keine Informationen …“); nur mein
+  Code erkannte diese Formulierungen nicht als „nicht gefunden“. Danach allgemein erweitert (auch „keine spezifische
+  Information“) – nach Sicht der Ergebnisse, also nicht unabhängig gemessen.
+- Die Zeit schwankt zwischen den Läufen (andere Prozesse auf dem Rechner).
+- **Ehrlich:** sehr kleiner Satz; lange Dokumente (50+ Seiten) und Scans ungeprüft.
+
+## Terminfinder (W9.4, 03.10.2026)
+
+Keine KI-Messung: Freie Zeiten, Dauer, Zeitraum, Wochentage und Zusage erkennt der Code (Unit-Tests). Die KI schreibt nur
+Einleitung und Schluss der Antwort; Sätze mit Zahlen, Tagen, Monaten oder „Uhr“ verwirft der Code (dann Vorlage).
+**Ungeprüft:** wie oft die Erkennung von Terminanfragen in echten Postfächern anschlägt oder etwas übersieht.
+
 ## Autovervollständigung (W8.5, 03.10.2026)
 
 Aufgabe: angefangenen Satz fortsetzen (höchstens 12 Wörter). Es gibt keine einzig richtige Fortsetzung – bewertet habe ich

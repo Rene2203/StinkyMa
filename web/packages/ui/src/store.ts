@@ -14,6 +14,13 @@ import {
   type AskApi,
   type ContactsApi,
   type PersonalApi,
+  type AttachmentsApi,
+  type MeetingsApi,
+  type MeetingView,
+  type MeetingSlot,
+  type CalendarFeed,
+  type MeetingPreferences,
+  type AttachmentAnswerView,
   type CompletionInput,
   type PersonalOverview,
   type ContactProfile,
@@ -190,6 +197,22 @@ export interface BrowserState {
   contact: { address: string; profile: ContactProfile | null; busy: boolean; error: string | null } | null;
   /** Transparenz-Seite (W8.3/W8.4): was gelernt wurde */
   personal: { overview: PersonalOverview | null; busy: boolean; error: string | null } | null;
+  /** Feld zu einem Anhang (W9): Begründung, Entscheidung, Zusammenfassung, „Frag den Anhang“ */
+  insight: {
+    attachmentId: string;
+    reading: AttachmentReadingView | null;
+    analyzing: boolean;
+    asking: boolean;
+    answer: AttachmentAnswerView | null;
+    error: string | null;
+    /** Entsperren: läuft / Ergebnis */
+    unlocking?: boolean;
+    unlock?: { unlocked: boolean; source: "remembered" | "mail" | "entered" | null; tried: number } | null;
+  } | null;
+  /** Terminfinder an der geöffneten Mail (W9.4) */
+  meeting: { messageId: string; view: MeetingView | null; selected: string[]; accepted: MeetingSlot | null; busy: boolean; error: string | null; added: boolean } | null;
+  /** Kalender-Abos und Einstellungen (Optionen) */
+  calendar: { feeds: CalendarFeed[]; preferences: MeetingPreferences | null; busy: boolean; error: string | null } | null;
   /** Rückmeldung nach eigener Zuordnung (geöffnete Mail) */
   userCategoryNote: { messageId: string; categoryId: string | null; remembered: boolean; changed: number } | null;
 }
@@ -319,6 +342,9 @@ export const initialState: BrowserState = {
   ask: null,
   contact: null,
   personal: null,
+  insight: null,
+  meeting: null,
+  calendar: null,
   categoryDialog: null,
   userCategoryNote: null,
 };
@@ -391,10 +417,12 @@ export class BrowserStore {
   readonly #ask: AskApi | undefined;
   readonly #contacts: ContactsApi | undefined;
   readonly #personal: PersonalApi | undefined;
+  readonly #attachments: AttachmentsApi | undefined;
+  readonly #meetings: MeetingsApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi; promises?: PromisesApi; ask?: AskApi; contacts?: ContactsApi; personal?: PersonalApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi; promises?: PromisesApi; ask?: AskApi; contacts?: ContactsApi; personal?: PersonalApi; attachments?: AttachmentsApi; meetings?: MeetingsApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -412,6 +440,199 @@ export class BrowserStore {
     this.#ask = options.ask;
     this.#contacts = options.contacts;
     this.#personal = options.personal;
+    this.#attachments = options.attachments;
+    this.#meetings = options.meetings;
+  }
+
+  // --- Terminfinder (W9.4) ---
+
+  get canMeetings(): boolean {
+    return Boolean(this.#meetings);
+  }
+
+  async #loadMeeting(messageId: string): Promise<void> {
+    const api = this.#meetings;
+    if (!api) return;
+    try {
+      const [view, accepted] = await Promise.all([api.forMessage(messageId), api.acceptance(messageId)]);
+      if (this.#state.selectedMessageId !== messageId) return;
+      this.#set({ meeting: view || accepted ? { messageId, view, selected: (view?.slots ?? []).map((s) => s.start), accepted, busy: false, error: null, added: false } : null });
+    } catch {
+      // Terminfinder ist Beiwerk
+    }
+  }
+
+  toggleMeetingSlot(start: string): void {
+    const m = this.#state.meeting;
+    if (!m) return;
+    this.#set({ meeting: { ...m, selected: m.selected.includes(start) ? m.selected.filter((s) => s !== start) : [...m.selected, start] } });
+  }
+
+  /** Antwort mit den gewählten Vorschlägen öffnen – gesendet wird nur, was du abschickst */
+  async replyWithSlots(labels: ComposeLabels): Promise<void> {
+    const api = this.#meetings;
+    const m = this.#state.meeting;
+    if (!api || !m?.view) return;
+    const slots = m.view.slots.filter((s) => m.selected.includes(s.start));
+    this.#set({ meeting: { ...m, busy: true, error: null } });
+    try {
+      const draft = await api.draftReply(m.messageId, slots);
+      this.#set({ meeting: { ...m, busy: false } });
+      this.openCompose("reply", labels, draft.text);
+    } catch (e) {
+      this.#set({ meeting: { ...m, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  async addMeetingToCalendar(slot: MeetingSlot): Promise<void> {
+    const api = this.#meetings;
+    const m = this.#state.meeting;
+    if (!api || !m) return;
+    try {
+      await api.addToCalendar(m.messageId, slot);
+      this.#set({ meeting: { ...m, added: true } });
+    } catch (e) {
+      this.#set({ meeting: { ...m, error: messageOf(e) } });
+    }
+  }
+
+  async loadCalendar(): Promise<void> {
+    const api = this.#meetings;
+    if (!api) return;
+    try {
+      const [feeds, preferences] = await Promise.all([api.feeds(), api.preferences()]);
+      this.#set({ calendar: { feeds, preferences, busy: false, error: null } });
+    } catch (e) {
+      this.#set({ calendar: { feeds: [], preferences: null, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  async #calendarAction(run: (api: MeetingsApi) => Promise<CalendarFeed[]>): Promise<boolean> {
+    const api = this.#meetings;
+    if (!api) return false;
+    const current = this.#state.calendar ?? { feeds: [], preferences: null, busy: false, error: null };
+    this.#set({ calendar: { ...current, busy: true, error: null } });
+    try {
+      const feeds = await run(api);
+      this.#set({ calendar: { ...current, feeds, busy: false, error: null } });
+      return true;
+    } catch (e) {
+      this.#set({ calendar: { ...current, busy: false, error: messageOf(e) } });
+      return false;
+    }
+  }
+
+  addCalendarFeed(name: string, url: string): Promise<boolean> {
+    return this.#calendarAction((api) => api.addFeed(name, url));
+  }
+
+  removeCalendarFeed(id: string): Promise<boolean> {
+    return this.#calendarAction((api) => api.removeFeed(id));
+  }
+
+  refreshCalendar(): Promise<boolean> {
+    return this.#calendarAction((api) => api.refresh());
+  }
+
+  async setMeetingPreferences(prefs: MeetingPreferences): Promise<void> {
+    const api = this.#meetings;
+    if (!api) return;
+    const preferences = await api.setPreferences(prefs);
+    const current = this.#state.calendar ?? { feeds: [], preferences: null, busy: false, error: null };
+    this.#set({ calendar: { ...current, preferences } });
+  }
+
+  // --- Anhänge verstehen (W9) ---
+
+  get canAttachmentInsight(): boolean {
+    return Boolean(this.#attachments || this.#ai);
+  }
+
+  /** Feld zum Anhang öffnen (bzw. schließen, wenn es schon offen ist) und vorhandene Zusammenfassung laden */
+  async toggleInsight(attachmentId: string): Promise<void> {
+    if (this.#state.insight?.attachmentId === attachmentId) {
+      this.#set({ insight: null });
+      return;
+    }
+    this.#set({ insight: { attachmentId, reading: null, analyzing: false, asking: false, answer: null, error: null } });
+    const ai = this.#ai;
+    if (!ai) return;
+    try {
+      const reading = await ai.attachmentReading(attachmentId);
+      if (this.#state.insight?.attachmentId === attachmentId) this.#set({ insight: { ...this.#state.insight, reading } });
+    } catch {
+      // ohne gespeicherte Zusammenfassung weiter
+    }
+  }
+
+  closeInsight(): void {
+    this.#set({ insight: null });
+  }
+
+  /** „Trotzdem lesen“ (fasst sofort zusammen) oder „unwichtig“; `remember`: für diese Art von diesem Absender */
+  async decideAttachment(attachmentId: string, decision: "read" | "ignore", remember: boolean): Promise<void> {
+    const api = this.#attachments;
+    if (!api) return;
+    if (decision === "read") this.#patchInsight(attachmentId, { analyzing: true, error: null });
+    try {
+      await api.decide(attachmentId, decision, remember);
+      await this.reload();
+      if (decision === "read" && this.#ai) {
+        const reading = await this.#ai.attachmentReading(attachmentId).catch(() => null);
+        this.#patchInsight(attachmentId, { reading, analyzing: false });
+      }
+    } catch (e) {
+      this.#patchInsight(attachmentId, { analyzing: false, error: messageOf(e) });
+    }
+  }
+
+  get canUnlockAttachments(): boolean {
+    return Boolean(this.#attachments);
+  }
+
+  /** Gesperrtes PDF entsperren: ohne Passwort sucht StinkyMail selbst (gemerkt, in den Mails) */
+  async unlockAttachment(attachmentId: string, password: string | undefined, remember: boolean): Promise<void> {
+    const api = this.#attachments;
+    if (!api) return;
+    this.#patchInsight(attachmentId, { unlocking: true, unlock: null, error: null });
+    try {
+      const result = await api.unlock(attachmentId, { ...(password !== undefined ? { password } : {}), remember });
+      this.#patchInsight(attachmentId, { unlocking: false, unlock: result });
+      if (result.unlocked) await this.reload();
+    } catch (e) {
+      this.#patchInsight(attachmentId, { unlocking: false, error: messageOf(e) });
+    }
+  }
+
+  async summarizeAttachment(attachmentId: string): Promise<void> {
+    const ai = this.#ai;
+    if (!ai) return;
+    this.#patchInsight(attachmentId, { analyzing: true, error: null });
+    try {
+      const reading = await ai.analyzeAttachment(attachmentId);
+      this.#patchInsight(attachmentId, { reading, analyzing: false });
+      await this.reload();
+    } catch (e) {
+      this.#patchInsight(attachmentId, { analyzing: false, error: messageOf(e) });
+    }
+  }
+
+  async askAttachment(attachmentId: string, question: string): Promise<void> {
+    const ai = this.#ai;
+    if (!ai || !question.trim()) return;
+    this.#patchInsight(attachmentId, { asking: true, answer: null, error: null });
+    try {
+      const answer = await ai.askAttachment(attachmentId, question);
+      this.#patchInsight(attachmentId, { asking: false, answer });
+    } catch (e) {
+      this.#patchInsight(attachmentId, { asking: false, error: messageOf(e) });
+    }
+  }
+
+  #patchInsight(attachmentId: string, patch: Partial<NonNullable<BrowserState["insight"]>>): void {
+    const current = this.#state.insight;
+    if (current?.attachmentId !== attachmentId) return;
+    this.#set({ insight: { ...current, ...patch } });
   }
 
   // --- Transparenz-Seite (W8.3/W8.4) ---
@@ -1668,7 +1889,12 @@ export class BrowserStore {
     const request = ++this.#threadRequest;
     await this.#guard(async () => {
       const thread = await this.#repository.thread(message.threadId);
-      if (request === this.#threadRequest) this.#set({ thread: thread.length ? thread : [message] });
+      // Anhänge mit: Status (wichtig/übersprungen/gelesen) kann sich im Hintergrund geändert haben
+      const attachmentsByMessageId: Record<string, Attachment[]> = {};
+      for (const m of thread) {
+        if (m.hasAttachments) attachmentsByMessageId[m.id] = await this.#repository.attachments(m.id);
+      }
+      if (request === this.#threadRequest) this.#set({ thread: thread.length ? thread : [message], attachmentsByMessageId });
     });
     await Promise.all([this.#loadCachedSummary(), this.#loadActions(message.id)]);
   }
@@ -1992,6 +2218,9 @@ export class BrowserStore {
     if (this.#state.categoryNote && this.#state.categoryNote.messageId !== id) this.#set({ categoryNote: null });
     if (this.#state.userCategoryNote && this.#state.userCategoryNote.messageId !== id) this.#set({ userCategoryNote: null });
     if (this.#state.contact) this.#set({ contact: null });
+    if (this.#state.insight) this.#set({ insight: null });
+    if (this.#state.meeting && this.#state.meeting.messageId !== id) this.#set({ meeting: null });
+    void this.#loadMeeting(id);
     void this.#loadCachedSummary();
     void this.#loadActions(id);
     void this.loadUnsubscribe(id);

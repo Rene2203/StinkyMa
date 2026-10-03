@@ -616,3 +616,28 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - Stand Tests: 458 Unit-Tests grün (inkl. GreenMail), E2E 19 grün / 2 übersprungen (Modell-abhängig); KI-E2E mit dem
   winzigen Testmodell grün.
 - Als Nächstes: Test des Nutzers unter Windows (W8 komplett), danach Roadmap (Server mit Browser) oder Nachbesserungen.
+
+### 03.10.2026 – W9: Anhänge verstehen und Terminfinder (Phase 7/8 der Spezifikation, Wunsch des Nutzers)
+- **Vom Nutzer bestätigt:** Gmail- und iCloud-Konto laufen seit Wochen einwandfrei unter Windows (damit sind „echtes
+  iCloud-Konto“ und die Konten-Grundfunktionen geprüft).
+- **W9.1 Relevanzprüfung – gebaut, lokal geprüft:** Prüfsumme, Seitenzahl, Sperre und Risiko-Kennzeichen beim Abgleich;
+  Vorfilter per Code; Regeln sofort, KI im Hintergrund (neueste 300 Mails); Status-Knopf am Anhang mit Begründung,
+  „Trotzdem lesen“/„Ist unwichtig“ mit Regel je Absender; Phishing-Check nutzt die Risiko-Kennzeichen. Migration v22.
+  Messung: nie ein zentraler Anhang übersehen (Regeln, E2B, E4B); E2B Kontrollsatz 10/13. Tests: Unit + E2E.
+- **W9.2 Tiefenanalyse + „Frag den Anhang“ – gebaut, lokal geprüft:** Text aus PDF, Text und neu Word/PowerPoint/Excel;
+  Zusammenfassung zentraler Anhänge im Hintergrund (Map-Reduce bei langen Dokumenten); Frage mit Seite und geprüftem
+  Zitat. Messung E2B: 7/7 richtig mit Seite. **Ungeprüft:** in der App mit echtem Modell (siehe Electron-Absturz in diesem
+  Container), Scans/Bilder (laufen über „Mit KI lesen“), sehr lange Dokumente.
+- **W9.3 Passwortgeschützte PDFs – gebaut, lokal geprüft:** mit echtem AES-128-verschlüsselten Test-PDF (pypdf):
+  Sperre erkannt, Passwort aus einer zweiten Mail gefunden, für den Absender gemerkt (im Test: Speicher im Arbeitsspeicher;
+  in der App DPAPI), beim nächsten PDF ohne Suche entsperrt; danach durchsuchbar. **Nicht umgesetzt:** verschlüsselte
+  ZIPs und Office-Dateien (Spezifikation: spätere Phase), Liste „häufige Passwörter“, Anzeige gesperrter PDFs im Betrachter
+  der App (Text, Suche und KI gehen; zum Ansehen weiter das Standardprogramm).
+- **W9.4 Terminfinder – gebaut, lokal geprüft:** ICS-Abo (Entscheidung des Nutzers) mit Zeitzonen, Wiederholungen
+  (täglich/wöchentlich mit Tagen/monatlich/jährlich, COUNT/UNTIL/EXDATE, verschobene Einzeltermine), ganztägig, abgesagt,
+  „frei“; freie Zeiten mit Arbeitszeiten/Puffer/Dauer, genannte Wochentage bevorzugt; Antwort öffnet den Editor; Zusage
+  → Kalenderdatei. Migration v23. Tests: Unit (Parser, Zeitfenster, Dienst mit Test-Abruf) + E2E (ohne Kalender).
+  **Ungeprüft:** echte Google-/iCloud-ICS-Links (Format, Größe, Abrufzeit), monatliche Regeln mit BYDAY/BYMONTHDAY
+  (werden nicht ausgewertet, nur einfache Monatswiederholung), Zeitzonen-Sonderfälle.
+- Stand Tests: 475 Unit-Tests grün (inkl. GreenMail), E2E 21 grün / 2 übersprungen (Modell-abhängig).
+- Als Nächstes: Test des Nutzers unter Windows (W8 + W9), danach Server mit Browser (S1).

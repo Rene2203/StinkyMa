@@ -607,6 +607,53 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    // W9.1: Relevanzprüfung für Anhänge (Spalten relevance, documentType, analysisStatus gibt es seit v1)
+    name: "v22-attachment-relevance",
+    sql: `
+      ALTER TABLE attachment ADD COLUMN relevanceOrigin TEXT;
+      ALTER TABLE attachment ADD COLUMN relevanceVersion INTEGER;
+      CREATE INDEX attachment_on_relevance ON attachment(relevance);
+      CREATE TABLE attachmentRule (
+        id TEXT PRIMARY KEY NOT NULL,
+        sender TEXT NOT NULL,
+        match TEXT NOT NULL,
+        decision TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX attachmentRule_on_sender_match ON attachmentRule(sender, match);
+    `,
+  },
+  {
+    // W9.4 Terminfinder: Kalender-Abos (Adresse im sicheren Speicher, nicht hier), nur belegte Zeiten ohne Titel
+    name: "v23-meetings",
+    sql: `
+      CREATE TABLE calendarFeed (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        lastSync TEXT,
+        error TEXT,
+        createdAt TEXT NOT NULL
+      );
+      CREATE TABLE calendarBusy (
+        feedId TEXT NOT NULL REFERENCES calendarFeed(id) ON DELETE CASCADE,
+        start TEXT NOT NULL,
+        "end" TEXT NOT NULL,
+        allDay INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX calendarBusy_on_start ON calendarBusy(start);
+      CREATE TABLE meetingProposal (
+        threadId TEXT PRIMARY KEY NOT NULL,
+        messageId TEXT NOT NULL,
+        slots TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      );
+      CREATE TABLE meetingSettings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        json TEXT NOT NULL
+      );
+    `,
+  },
 ];
 
 /** Bringt die Datenbank auf den neuesten Stand. Jede Migration läuft in einer eigenen Transaktion. */

@@ -8,6 +8,7 @@ import { useBrowserState, useUi } from "../context.js";
 import { AISection } from "./AISection.js";
 import { RulesSection } from "./RulesSection.js";
 import { PersonalSection } from "./PersonalSection.js";
+import { CalendarSection } from "./CalendarSection.js";
 
 /** Dialog „Optionen“. Erster Bereich: Absender, deren externe Inhalte sofort geladen werden. */
 export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onClose: () => void }) {
@@ -127,6 +128,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
         <ScreenerSection />
 
         <RulesSection />
+
+        <CalendarSection />
 
         <PersonalSection />
 

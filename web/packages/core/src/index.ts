@@ -29,3 +29,5 @@ export * from "./contacts.js";
 export * from "./priority.js";
 export * from "./style.js";
 export * from "./personal.js";
+export * from "./attachments.js";
+export * from "./meetings.js";

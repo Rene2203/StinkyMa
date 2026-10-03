@@ -2,7 +2,7 @@ import { actionsPromptVersion, extractActions, ruleActions } from "../ai/actions
 import { cleanMailText } from "../ai/prepare.js";
 import { calendarFileName, toICalendar } from "../calendar.js";
 import type { ActionStatus, ActionStore, StoredAction } from "../sqlite/actionStore.js";
-import { categorizeWindow, categorizeWindowDays, maxPageImageChars, type CategorizeWindow, normalizeAISettings, type ActionView, type MessageActionsView, type ReplyDraftsView, type AIApi, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
+import { categorizeWindow, categorizeWindowDays, maxPageImageChars, type CategorizeWindow, normalizeAISettings, type ActionView, type MessageActionsView, type ReplyDraftsView, type AIApi, type AttachmentAnswerView, type AIModelInfo, type AISettings, type AIStatus, type AttachmentReadingView, type SummaryView } from "../ai/api.js";
 import { modelCatalog, type CatalogModel } from "../ai/catalog.js";
 import { promptVersions } from "../ai/prompts.js";
 import { AIRouter, GrantPolicy } from "../ai/router.js";
@@ -16,6 +16,10 @@ import { extractSubscription, type SubscriptionResult } from "../ai/subscription
 import { extractReceipt, type ReceiptResult } from "../ai/receipts.js";
 import { extractPromises, type PromiseDirection, type PromiseResult } from "../ai/promises.js";
 import { answerQuestion, type AskContextSource } from "../ai/ask.js";
+import { analyzeDocument, askAttachment } from "../ai/askAttachment.js";
+import { draftMeetingReply } from "../ai/meetingReply.js";
+import type { MeetingSlot } from "../meetings.js";
+import { checkAttachmentRelevance, type RelevanceAttachment, type RelevanceMail } from "../ai/attachmentRelevance.js";
 import { classifyUserCategory, userCategoryPromptFor, type UserCategoryResult } from "../ai/userCategories.js";
 import type { UserCategory } from "../userCategories.js";
 import { categorizeMessage, ruleCategory, maxImagesPerReading, readDocumentImages, summarizeThread } from "../ai/tasks.js";
@@ -341,6 +345,44 @@ export class AIService implements AIApi {
     return this.#readingView(stored);
   }
 
+  async analyzeAttachment(attachmentId: string): Promise<AttachmentReadingView> {
+    const info = this.options.results.attachmentInfo(attachmentId);
+    if (!info) throw new Error("Den Anhang gibt es nicht mehr.");
+    const text = this.options.results.attachmentText(attachmentId);
+    if (!text) {
+      if (imageType(info.mimeType, info.filename)) return this.readAttachment(attachmentId);
+      throw new Error("Aus dieser Datei kann StinkyMail (noch) keinen Text lesen.");
+    }
+    const { router, model } = await this.#router();
+    try {
+      const result = await analyzeDocument(router, { filename: info.filename, text }, { accountIds: [info.accountId] });
+      const stored: StoredReading = {
+        attachmentId, documentType: result.documentType, title: result.title, summary: result.summary, text: "",
+        modelId: model.id, privacyClass: "onDevice", analyzedAt: (this.options.now?.() ?? new Date()).toISOString(), durationMs: result.durationMs,
+      };
+      this.options.results.saveReading(stored);
+      this.options.results.setAttachmentAnalysisStatus(attachmentId, "analyzed");
+      return this.#readingView(stored);
+    } catch (error) {
+      this.options.results.setAttachmentAnalysisStatus(attachmentId, "failed");
+      throw error;
+    }
+  }
+
+  async askAttachment(attachmentId: string, question: string): Promise<AttachmentAnswerView> {
+    const trimmed = question.trim();
+    if (!trimmed) throw new Error("Bitte eine Frage eingeben.");
+    const info = this.options.results.attachmentInfo(attachmentId);
+    if (!info) throw new Error("Den Anhang gibt es nicht mehr.");
+    // Text aus der Datei; bei Bildern/Scans der Text aus „Mit KI lesen“
+    const text = this.options.results.attachmentText(attachmentId) ?? (this.options.results.reading(attachmentId)?.text || null);
+    if (!text) throw new Error(imageType(info.mimeType, info.filename) ? "Bitte den Anhang zuerst „Mit KI lesen“." : "Aus dieser Datei kann StinkyMail (noch) keinen Text lesen.");
+    const { router, model } = await this.#router();
+    const now = this.options.now?.() ?? new Date();
+    const result = await askAttachment(router, { filename: info.filename, text, question: trimmed }, { accountIds: [info.accountId], today: now.toISOString().slice(0, 10) });
+    return { attachmentId, question: trimmed, answer: result.answer, pages: result.pages, quote: result.quote, found: result.found, modelName: model.name, durationMs: result.durationMs };
+  }
+
   async #attachmentImage(attachmentId: string): Promise<AIImage[]> {
     if (!this.options.attachmentContent) throw new Error("Anhänge können hier nicht gelesen werden.");
     const { mimeType, filename, content } = await this.options.attachmentContent(attachmentId);
@@ -632,6 +674,20 @@ export class AIService implements AIApi {
     if (!(await this.#modelReady())) return null;
     const { router } = await this.#router();
     return extractSubscription(router, message, { attachmentText });
+  }
+
+  /** Terminfinder (W9.4): Einleitung/Schluss vom Modell, Termine vom Code; `null` ohne Modell oder bei Unbrauchbarem. */
+  async draftMeetingReply(message: Message, form: "du" | "Sie", slots: MeetingSlot[]): Promise<string | null> {
+    if (!(await this.#modelReady())) return null;
+    const { router } = await this.#router();
+    return draftMeetingReply(router, `Von: ${message.from.name ?? message.from.address}\nBetreff: ${message.subject}\n\n${message.bodyText ?? message.snippet}`, form, slots, { accountIds: [message.accountId] });
+  }
+
+  /** Anhang-Relevanz (W9.1) einer Mail; `null`, wenn kein Modell bereit ist. */
+  async checkAttachmentRelevance(mail: RelevanceMail, attachments: RelevanceAttachment[], accountId: string) {
+    if (!(await this.#modelReady())) return null;
+    const { router } = await this.#router();
+    return checkAttachmentRelevance(router, mail, attachments, { accountIds: [accountId] });
   }
 
   /** „Frag dein Postfach“: Antwort aus den gefundenen Stellen; `null`, wenn kein Modell bereit ist. */
@@ -990,5 +1046,5 @@ export function validatePageImages(images: AIImage[]): AIImage[] {
 
 /** Aufgaben, auf die der Nutzer gerade wartet (Klick, Tippen) – gehen vor Hintergrundarbeit. */
 export function isForegroundTask(task: AITask): boolean {
-  return task === "summarize" || task === "draftReply" || task === "ask" || task === "readImage" || task === "parseRule" || task === "complete";
+  return task === "summarize" || task === "draftReply" || task === "ask" || task === "readImage" || task === "parseRule" || task === "complete" || task === "askAttachment";
 }

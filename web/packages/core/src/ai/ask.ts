@@ -74,14 +74,23 @@ const stopwords = new Set(
 
 /** Volltext-Anfrage aus einer Frage: Inhaltswörter mit ODER und Präfix („Abrechnung*“). Leer, wenn nichts übrig bleibt. */
 export function keywordQuery(question: string): string {
-  const words = question
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+  return questionWords(question)
+    .slice(0, 8)
+    .map((w) => `"${w}"*`)
+    .join(" OR ");
+}
+
+/** Inhaltswörter einer Frage (klein, ohne Akzente, ohne Füllwörter), ohne Doppelte */
+export function questionWords(question: string): string[] {
+  const words = foldAccents(question)
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length >= 3 && !stopwords.has(w));
-  const unique = [...new Set(words)].slice(0, 8);
-  return unique.map((w) => `"${w}"*`).join(" OR ");
+  return [...new Set(words)];
+}
+
+/** Klein und ohne Akzente (für Wortvergleiche) */
+export function foldAccents(text: string): string {
+  return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
 }
 
 /** Rangfolgen zusammenführen (Reciprocal Rank Fusion): wer in beiden Listen weit oben steht, gewinnt. */

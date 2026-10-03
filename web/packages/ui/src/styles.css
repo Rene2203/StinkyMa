@@ -4065,3 +4065,126 @@ dialog.webpanel::backdrop {
   pointer-events: none;
   user-select: none;
 }
+
+/* Anhänge verstehen (W9): Status am Anhang und Feld darunter */
+.attachment-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  font-size: 11px;
+  padding: 1px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.attachment-status[data-relevance="central"] {
+  color: var(--accent);
+}
+.attachment-status.skipped {
+  opacity: 0.75;
+}
+.attachment-status.open {
+  border-color: var(--accent);
+}
+.attachment-insight {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.insight-reason {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.insight-risk {
+  margin: 0;
+  color: var(--danger);
+}
+.insight-actions,
+.insight-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.insight-ask input {
+  flex: 1;
+  min-width: 160px;
+}
+.insight-summary p,
+.insight-answer p {
+  margin: 0 0 4px;
+}
+.insight-answer blockquote {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+.insight-ok {
+  margin: 0;
+  color: var(--green);
+}
+.insight-unlock .hint {
+  margin: 0 0 6px;
+}
+
+/* Terminfinder (W9.4) */
+.meeting-card {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.meeting-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.meeting-slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.calendar-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.calendar-add input {
+  flex: 1;
+  min-width: 140px;
+}
+.calendar-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.calendar-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.calendar-prefs input[type="number"] {
+  width: 64px;
+}
+.error-text {
+  color: var(--danger);
+}

@@ -17,6 +17,8 @@ const taskKey: Record<AITask, MessageKey> = {
   extractPromises: "aiActivity.extractPromises",
   ask: "aiActivity.ask",
   complete: "aiActivity.complete",
+  attachmentRelevance: "aiActivity.attachmentRelevance",
+  askAttachment: "aiActivity.askAttachment",
 };
 
 /** Sekunden seit `iso`, jede Sekunde neu – damit man sieht, dass sich etwas tut. */

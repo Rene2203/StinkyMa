@@ -1,4 +1,4 @@
-import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi, SubscriptionsApi, UserCategoriesApi, ReceiptsApi, PromisesApi, AskApi, ContactsApi, PersonalApi } from "@stinkyma/core";
+import type { AccountsApi, AIApi, AIStatus, AppSettingsApi, AttachmentFiles, CleanupApi, MailRepository, RulesApi, SubscriptionsApi, UserCategoriesApi, ReceiptsApi, PromisesApi, AskApi, ContactsApi, PersonalApi, AttachmentsApi, MeetingsApi } from "@stinkyma/core";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { MessageDetail } from "./components/MessageDetail.js";
 import { OptionsDialog } from "./components/OptionsDialog.js";
@@ -49,6 +49,10 @@ export interface AppProps {
   contacts?: ContactsApi;
   /** Transparenz-Seite (Priorisierung, Stilprofil) */
   personal?: PersonalApi;
+  /** Anhänge verstehen (Relevanz, Regeln) */
+  attachments?: AttachmentsApi;
+  /** Terminfinder */
+  meetings?: MeetingsApi;
   /** Meldet Statusänderungen der KI (Download-Fortschritt usw.). */
   subscribeAIStatus?: (onStatus: (status: AIStatus) => void) => () => void;
   /** Meldet Änderungen von außen (Abgleich, Aktionen); gibt eine Abmelde-Funktion zurück. */
@@ -59,8 +63,8 @@ export interface AppProps {
 }
 
 /** Drei-Spalten-Layout: Postfächer │ Mail-Liste │ Konversation. */
-export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises, ask, contacts, personal, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
-  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises, ask, contacts, personal }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises, ask, contacts, personal]);
+export function App({ repository, locale, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises, ask, contacts, personal, attachments, meetings, subscribeAIStatus, subscribeChanges, subscribeOpenMessage, subscribeOpenDigest }: AppProps) {
+  const store = useMemo(() => new BrowserStore(repository, { accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises, ask, contacts, personal, attachments, meetings }), [repository, accounts, files, settings, ai, rules, cleanup, webPanel, subscriptions, categories, receipts, promises, ask, contacts, personal, attachments, meetings]);
   const value = useMemo(() => ({ store, t: translator(locale), locale }), [store, locale]);
 
   useEffect(() => {
