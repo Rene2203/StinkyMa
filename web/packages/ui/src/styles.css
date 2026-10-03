@@ -453,10 +453,13 @@ button {
   min-width: 0;
   background: var(--bg);
   position: relative;
+  /* Nichts darf über die Spalte hinaus auf die Mail-Liste ragen (Steckbrief liegt innerhalb) */
+  overflow: hidden;
 }
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap; /* schmales Fenster: umbrechen statt nach links über die Mail-Liste laufen */
   justify-content: flex-end;
   gap: 4px;
   padding: 8px 12px;

@@ -650,3 +650,9 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
 - **Behoben:** Beendet sich `llama-server` beim Start, startet er einmal ohne den kleinen Zwischenspeicher neu und merkt
   sich das. Lokal nachgestellt (gleicher Test mit Testmodell und echter Laufzeit): ohne Korrektur Fehler, mit Korrektur grün.
 - **Lehre:** Vor jedem Push auch die Laufzeit-Tests (`STINKYMA_TEST_LLAMA_RUNTIME=1`) laufen lassen und den CI-Lauf prüfen.
+- **Zweiter Fehler (sichtbar erst, nachdem die Unit-Tests wieder grün waren):** Zwei App-Tests konnten „Neue E-Mail“ nicht
+  anklicken – die Werkzeugleiste der Mail-Ansicht lief im kleineren Windows-Fenster nach links über die Mail-Liste (seit
+  W8.2: zusätzlicher Knopf „Person“ und `position: relative` für den Steckbrief). Das trifft auch echte Nutzer mit
+  schmalem Fenster. Behoben: Leiste bricht um, Mail-Ansicht ragt nicht mehr über ihre Spalte. Lokal mit 1024×768
+  nachgestellt (vorher Fehler, nachher alle 21 E2E grün, KI-E2E mit Testmodell grün).
+- **Lehre:** E2E zusätzlich mit kleinem Bildschirm (`xvfb-run -s "-screen 0 1024x768x24"`) laufen lassen.

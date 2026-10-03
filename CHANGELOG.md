@@ -71,6 +71,8 @@
 ### Behoben
 - Bild-Laufzeit (`llama-server`) startete nicht mit Modellen, die den 8-Bit-Zwischenspeicher nicht können (Windows-CI
   seit der 16K-Änderung rot); jetzt Neustart ohne diese Einstellung.
+- In schmalen Fenstern lief die Werkzeugleiste der Mail-Ansicht über die Mail-Liste und verdeckte „Neue E-Mail“; die Leiste
+  bricht jetzt um.
 
 ### Geändert
 - **Was du anklickst, geht vor**: Zusammenfassen, Antwortvorschläge, Fragen, Bilder lesen, Regeln und Vorschläge beim
