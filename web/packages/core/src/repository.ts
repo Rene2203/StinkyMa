@@ -89,6 +89,8 @@ export interface UnreadCounts {
   mailboxes: Record<string, number>;
   /** Mails neuer Absender, die auf eine Entscheidung warten (Türsteher) – gelesen oder nicht. */
   screener: number;
+  /** Ungelesene wichtige Mails im Posteingang (W8.3; fehlt bei älteren Quellen). */
+  important?: number;
 }
 
 export interface MailOverview {

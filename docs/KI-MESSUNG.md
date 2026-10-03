@@ -329,6 +329,31 @@ Konjunktiv, Weiterleitung, verschobene Zusage; geschrieben nach dem Feinschliff 
 - E4B nahm einmal den Anlass als Frist („wegen Samstag“ → Samstag).
 - **Entscheidung:** wie überall E2B als Standard. **Ehrlich:** kleine Sätze aus einer Hand; echte Postfächer ungeprüft.
 
+## Frag dein Postfach (W8.1, 03.10.2026)
+
+Aufgabe: Frage in eigenen Worten → passende Mails finden → Antwort mit Quellenangabe. Postfach: 108 erfundene Mails
+(Beispielkonten + Testsätze), 14 Fragen: 13 mit bekannter Quell-Mail, 1 **Falle** (Frage nach etwas, das nicht im Postfach
+steht, aber ein ähnliches Thema hat: „Mieterhöhung“ vs. Preiserhöhung eines Handwerkers). Antwortmodell Gemma 4 E2B,
+Suche nach Bedeutung mit EmbeddingGemma 300M (Q8_0, 256 Dimensionen), 4 CPU-Kerne.
+
+| Suche | Quelle gefunden (Top 6) | Quelle auf Platz 1 | Antwort richtig (mit Quelle) | Falle erkannt | Zeit je Frage (Median) |
+|---|---|---|---|---|---|
+| Nur Wörter (Volltext) | 10/13 | 5/13 | 10/13 | 1/1 | 6,0 s |
+| Bedeutung + Wörter | **13/13** | 11/13 | **13/13** | **0/1** | 13,7 s |
+
+- Vorbereiten (Embeddings) der 108 Mails: 9–11 s.
+- Die Suche nach Bedeutung findet auch Mails, in denen die Wörter der Frage nicht vorkommen (die 3 Fehlschläge der Wortsuche).
+- **Die Falle wird mit Bedeutungssuche nicht erkannt:** E2B beantwortet die Mieterhöhungs-Frage mit der Preiserhöhung des
+  Handwerkers. Prompt v2 („ähnliches Thema ist keine Antwort“) half nicht (gleiches Ergebnis wie v1). Darum zeigt die
+  App immer die Quellen an. **Ehrlich:** nur eine Falle, kleine Sätze aus einer Hand; echte Postfächer ungeprüft.
+
+## Kontextfenster 16K (03.10.2026)
+
+Auf Wunsch des Nutzers **ohne Messung** für alle Rechner eingestellt (16 384 Token, KV-Cache Q8_0 mit Rückfall auf F16).
+Einzige Stichprobe: eine kurze Anfrage brauchte mit 4K/F16, 16K/F16 und 16K/Q8_0 je etwa 4 s (E2B, 4 Kerne).
+**Ungeprüft:** Speicherbedarf und Tempo mit wirklich langen Eingaben auf schwacher Hardware (N97, 8 GB), Qualität
+der Antworten bei vollem Fenster.
+
 ## Ergebnis und Entscheidung
 
 - **Standard: Gemma 4 E2B.** Mit v2 98,8 % (Testsatz) bzw. 92,9 % (Kontrollsatz) richtig eingeordnet – Ziel ≥ 90 % erreicht –,

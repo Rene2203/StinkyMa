@@ -7,6 +7,7 @@ const SignatureEditor = lazy(() => import("./SignatureEditor.js"));
 import { useBrowserState, useUi } from "../context.js";
 import { AISection } from "./AISection.js";
 import { RulesSection } from "./RulesSection.js";
+import { PersonalSection } from "./PersonalSection.js";
 
 /** Dialog „Optionen“. Erster Bereich: Absender, deren externe Inhalte sofort geladen werden. */
 export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onClose: () => void }) {
@@ -126,6 +127,8 @@ export function OptionsDialog({ suggestion, onClose }: { suggestion: string; onC
         <ScreenerSection />
 
         <RulesSection />
+
+        <PersonalSection />
 
         <section className="options-section" aria-labelledby="options-signature-heading">
           <h3 id="options-signature-heading">

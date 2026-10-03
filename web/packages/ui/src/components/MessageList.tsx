@@ -1,5 +1,5 @@
-import { Archive, Flag, FlagOff, Mail, MailOpen, Paperclip, Search, ShieldAlert, SquarePen, Trash2 } from "lucide-react";
-import { assessPhishing, displayName, isFlagged, isRead, type Message, type MessageScope } from "@stinkyma/core";
+import { Archive, Flag, FlagOff, Mail, MailOpen, Paperclip, Search, ShieldAlert, SquarePen, Star, Trash2 } from "lucide-react";
+import { assessPhishing, displayName, importantThreshold, isFlagged, isRead, type Message, type MessageScope } from "@stinkyma/core";
 import type { BrowserState } from "../store.js";
 import type { MessageKey, Translate } from "../i18n.js";
 import { useState, type MouseEvent } from "react";
@@ -156,6 +156,7 @@ function MessageRow(props: {
           )}
           <span className="row-sender">{displayName(message.from)}</span>
           {message.hasAttachments && <Paperclip className="muted" size={13} aria-label={t("list.hasAttachment")} />}
+          {(message.priorityScore ?? 0) >= importantThreshold && <Star className="row-important" size={12} fill="currentColor" aria-label={t("list.important")} data-testid="row-important" />}
           {assessPhishing(message).level === "danger" && <ShieldAlert className="row-phishing" size={13} aria-label={t("phishing.listHint")} data-testid="row-phishing" />}
           <span className="row-date">{formatListDate(message.date, locale, t)}</span>
         </div>

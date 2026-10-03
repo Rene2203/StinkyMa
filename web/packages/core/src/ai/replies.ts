@@ -1,4 +1,5 @@
 import type { EmailAddress, Message } from "../models.js";
+import type { ReplyStyle } from "../personal.js";
 import { cleanMailText, inputBudget } from "./prepare.js";
 import type { AIRouter } from "./router.js";
 import { extractJson } from "./tasks.js";
@@ -87,7 +88,28 @@ export const repliesSchema: JsonSchema = {
 
 const kindLabels: Record<ReplyKind, string> = { agree: "Zusagen / Danke", decline: "Absagen / Später", ask: "Nachfragen" };
 
-export function repliesPrompt(mail: string, form: AddressForm, earlier: string | null): AIMessage[] {
+/** Längen-Hinweis aus dem Stilprofil (W8.4): wer knapp schreibt, bekommt knappe Vorschläge. */
+export function lengthHint(medianWords: number | null | undefined): string {
+  if (medianWords === null || medianWords === undefined) return "Jede Antwort 1 bis 3 kurze Sätze";
+  if (medianWords <= 30) return "Jede Antwort 1 bis 2 sehr kurze Sätze (der Nutzer schreibt knapp)";
+  if (medianWords >= 120) return "Jede Antwort 2 bis 4 Sätze (der Nutzer schreibt ausführlich)";
+  return "Jede Antwort 1 bis 3 kurze Sätze";
+}
+
+/**
+ * Anrede aus dem Stilprofil: zuerst so, wie der Nutzer diese Person zuletzt angesprochen hat („Liebe Lena,“);
+ * sonst seine übliche Anrede-Art beim Duzen („Hi Tom,“, „Moin Tom,“); sonst die Regel.
+ */
+export function styledGreeting(from: EmailAddress, form: AddressForm, style: ReplyStyle | undefined): string {
+  const base = replyGreeting(from, form);
+  const own = style?.recipient?.greetingLine;
+  if (own) return /[,!]$/.test(own) ? own : `${own},`;
+  const kind = style?.profile.greeting;
+  if (form === "du" && (kind === "Hi" || kind === "Moin" || kind === "Servus") && base.startsWith("Hallo")) return base.replace(/^Hallo/, kind);
+  return base;
+}
+
+export function repliesPrompt(mail: string, form: AddressForm, earlier: string | null, length = lengthHint(null)): AIMessage[] {
   const formText = form === "du" ? "Duze den Absender (du, dir, dich)." : "Sieze den Absender (Sie, Ihnen) – höflich und sachlich.";
   return [
     {
@@ -95,7 +117,7 @@ export function repliesPrompt(mail: string, form: AddressForm, earlier: string |
       content: `Du schreibst drei kurze Antwortvorschläge auf die E-Mail unten, aus Sicht des Empfängers. Antworte nur mit JSON:
 {"agree": "zusagen, zustimmen oder danken", "decline": "absagen, ablehnen oder auf später verschieben", "ask": "eine sinnvolle Rückfrage stellen"}
 - ${formText}
-- Jede Antwort 1 bis 3 kurze Sätze, auf Deutsch, natürlich und freundlich.
+- ${length}, auf Deutsch, natürlich und freundlich.
 - OHNE Anrede („Hallo …“) und OHNE Grußformel oder Namen am Ende – die kommen automatisch dazu.
 - Nichts erfinden: keine neuen Termine, Uhrzeiten, Beträge oder Fakten. Keine Platzhalter wie [Name] oder [Datum].
 - Passt eine Richtung gar nicht (z. B. nichts zum Absagen), lass sie leer: "".`,
@@ -145,7 +167,7 @@ export function parseReplies(text: string, mail: string, form: AddressForm): Rep
 export async function draftReplies(
   router: AIRouter,
   message: Message,
-  options: { earlier?: Message[]; signal?: AbortSignal } = {},
+  options: { earlier?: Message[]; signal?: AbortSignal; style?: ReplyStyle } = {},
 ): Promise<ReplyDrafts> {
   const body = cleanMailText(message.bodyText ?? message.snippet, inputBudget.mail);
   const mail = `Von: ${message.from.name ?? message.from.address}\nBetreff: ${message.subject}\n\n${body}`;
@@ -153,9 +175,10 @@ export async function draftReplies(
     .slice(-2)
     .map((m) => `${m.from.name ?? m.from.address}: ${cleanMailText(m.bodyText ?? m.snippet, 300)}`)
     .join("\n---\n");
-  const form = addressForm(body, message.from);
-  const greeting = replyGreeting(message.from, form);
-  const request: AIRequest = { task: "draftReply", messages: repliesPrompt(mail, form, earlier || null), jsonSchema: repliesSchema, maxTokens: 450, temperature: 0.3 };
+  // Wie der Nutzer diese Person bisher anspricht, schlägt die Form der eingegangenen Mail
+  const form = options.style?.recipient?.form ?? addressForm(body, message.from);
+  const greeting = styledGreeting(message.from, form, options.style);
+  const request: AIRequest = { task: "draftReply", messages: repliesPrompt(mail, form, earlier || null, lengthHint(options.style?.profile.medianWords)), jsonSchema: repliesSchema, maxTokens: 450, temperature: 0.3 };
   let durationMs = 0;
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await router.run(request, { accountIds: [message.accountId] }, options.signal);

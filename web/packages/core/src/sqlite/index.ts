@@ -13,3 +13,6 @@ export * from "./userCategoryStore.js";
 export * from "./receiptStore.js";
 export * from "./promiseStore.js";
 export * from "./embeddingStore.js";
+export * from "./contactStore.js";
+export * from "./priorityStore.js";
+export * from "./personalStore.js";

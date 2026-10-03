@@ -93,7 +93,7 @@ export function fuseRankings(lists: string[][], k = 60): string[] {
 
 // --- Antwort ---
 
-export const askPromptVersion = 1;
+export const askPromptVersion = 2;
 
 const askSchema: JsonSchema = {
   type: "object",
@@ -119,6 +119,7 @@ export function askPrompt(question: string, sources: AskContextSource[], today: 
       content: `Du beantwortest Fragen zum E-Mail-Postfach des Nutzers – nur mit den nummerierten Quellen unten (Auszüge aus seinen Mails). Heute ist ${today}.
 - Antworte kurz auf Deutsch (1–4 Sätze). Übernimm Daten, Beträge und Namen genau wie in den Quellen.
 - Gib in "quellen" die Nummern an, auf die sich die Antwort stützt.
+- Prüfe zuerst, ob eine Quelle genau das Gefragte enthält. Behandeln die Quellen nur ein ähnliches Thema (z. B. Nebenkosten statt Mieterhöhung), beantwortet das die Frage NICHT.
 - Steht die Antwort in keiner Quelle, antworte genau: "Dazu habe ich in deinen Mails nichts gefunden." und lass "quellen" leer. Erfinde nichts.
 Antworte nur mit JSON: {"antwort": "...", "quellen": [1, 2]}
 

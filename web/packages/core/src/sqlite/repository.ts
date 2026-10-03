@@ -10,6 +10,7 @@ import type {
   MessageFlagName,
   MessageScope,
 } from "../models.js";
+import { importantThreshold } from "../priority.js";
 import { MessageFlag, mailboxRoleRank } from "../models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "../repository.js";
 import { requireRemoteContentException } from "../remoteContent.js";
@@ -100,6 +101,8 @@ export function scopeCondition(scope: MessageScope): { sql: string; params: unkn
       return { sql: `message.mailboxId = ? AND NOT ${screenedOut}`, params: [scope.mailboxId] };
     case "screener":
       return { sql: `mailbox.role = ? AND ${pendingSender}`, params: ["inbox"] };
+    case "important":
+      return { sql: `mailbox.role = ? AND message.priorityScore >= ? AND NOT ${screenedOut}`, params: ["inbox", importantThreshold] };
     case "category": {
       const own = scope.category.startsWith("u:");
       return {
@@ -176,7 +179,12 @@ export class SqliteMailRepository implements MailRepository {
       )
       .all({ seen: MessageFlag.seen, flagged: MessageFlag.flagged }) as { mailboxId: string; role: string; unread: number; flaggedUnread: number }[];
     const screener = (this.db.prepare(`SELECT COUNT(*) AS n FROM message JOIN mailbox ON mailbox.id = message.mailboxId WHERE mailbox.role = 'inbox' AND ${pendingSender}`).get() as { n: number }).n;
-    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {}, screener };
+    const important = (
+      this.db
+        .prepare(`SELECT COUNT(*) AS n FROM message JOIN mailbox ON mailbox.id = message.mailboxId WHERE mailbox.role = 'inbox' AND (message.flags & ?) = 0 AND message.priorityScore >= ? AND NOT ${screenedOut}`)
+        .get(MessageFlag.seen, importantThreshold) as { n: number }
+    ).n;
+    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {}, screener, important };
     for (const r of rows) {
       if (r.unread > 0) counts.mailboxes[r.mailboxId] = r.unread;
       if (r.role === "inbox") {

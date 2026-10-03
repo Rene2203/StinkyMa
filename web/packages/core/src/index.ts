@@ -25,3 +25,7 @@ export * from "./receipts.js";
 export * from "./zip.js";
 export * from "./promises.js";
 export * from "./ask.js";
+export * from "./contacts.js";
+export * from "./priority.js";
+export * from "./style.js";
+export * from "./personal.js";

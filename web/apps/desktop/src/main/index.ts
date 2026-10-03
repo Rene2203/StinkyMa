@@ -15,6 +15,8 @@ import {
   receiptsApiMethods,
   promisesApiMethods,
   askApiMethods,
+  contactsApiMethods,
+  personalApiMethods,
   oauthProviders,
   refreshTokens,
   type OAuthClient,
@@ -38,7 +40,7 @@ import {
 import { CleanupService, MailService, RuleService, type OAuthBroker } from "@stinkyma/core/mail";
 import { AIService, ModelStore, RuntimeStore, SubscriptionService, UserCategoryService, ReceiptService, PromiseService, AskService, LlamaEmbedder } from "@stinkyma/core/llm";
 import { EncryptedFileSecretStore, signInWithLoopback } from "@stinkyma/core/node";
-import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, PromiseStore, EmbeddingStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
+import { ActionStore, AIResultStore, CleanupStore, DigestStore, SubscriptionStore, UserCategoryStore, ReceiptStore, PromiseStore, EmbeddingStore, ContactStore, PriorityStore, PersonalStore, MailWriter, openDatabase, RuleStore, seedIfEmpty, SqliteMailRepository } from "@stinkyma/core/sqlite";
 import { buildMenu } from "./menu";
 import { trayIconDataUrl, trayIconUnreadDataUrl, windowIconDataUrl } from "./icons";
 import { SettingsFile } from "./settings";
@@ -72,6 +74,9 @@ let userCategories: UserCategoryService | null = null;
 let receipts: ReceiptService | null = null;
 let promises: PromiseService | null = null;
 let ask: AskService | null = null;
+let contacts: ContactStore | null = null;
+let personal: PersonalStore | null = null;
+let priorityTimer: NodeJS.Timeout | null = null;
 let aiWasReady = false;
 let syncTimer: NodeJS.Timeout | null = null;
 let reminderTimer: NodeJS.Timeout | null = null;
@@ -167,11 +172,29 @@ function setUpServices(): void {
   });
 
   const repository = new SqliteMailRepository(db);
+  // Priorisierung (W8.3): Verhalten protokollieren, Wichtigkeit per Code – alles auf diesem Rechner
+  const priority = new PriorityStore(db);
+  const recomputePriority = () => {
+    if (priorityTimer) clearTimeout(priorityTimer);
+    priorityTimer = setTimeout(() => {
+      priorityTimer = null;
+      try {
+        priority.recompute();
+        notifyRenderer();
+      } catch {
+        // Wichtigkeit ist Beiwerk
+      }
+    }, 3000);
+  };
   service = new MailService(repository, new MailWriter(db), secrets, {
     oauth: oauthBroker,
     ...(testOAuth ? { oauthServers: { imap: testOAuth.imap, smtp: testOAuth.smtp } } : {}),
     onChange: notifyRenderer,
     onNewMail: (_accountId, messages) => showNewMailNotification(messages),
+    onUserAction: (type, messageIds) => {
+      const senders = priority.record(type, messageIds, new Date().toISOString());
+      if (senders.length) priority.recompute({ senders });
+    },
     // Regeln (W6.4) laufen vor der Benachrichtigung – Weggeräumtes meldet sich nicht
     onArrived: async (_accountId, messageIds) => {
       await rules?.arrived(messageIds);
@@ -185,11 +208,16 @@ function setUpServices(): void {
       void promises?.scan().catch(() => undefined);
       // „Frag dein Postfach“: neue Mails für die Suche nach Bedeutung vorbereiten (falls das Modell geladen ist)
       ask?.startIndexing();
+      recomputePriority();
     },
   });
 
   // KI: Modelle im Benutzerordner, alles läuft auf diesem Rechner. Ohne gewähltes Modell passiert nichts.
   const settingsFile = settings;
+  // Stilprofil und Transparenz-Seite (W8.4)
+  const personalStore = new PersonalStore(db, priority);
+  personal = personalStore;
+  recomputePriority();
   ai = new AIService({
     store: new ModelStore(dataPath("models")),
     // Bild-Laufzeit (llama-server) erst bei Bedarf – „Bilder und Scans verstehen“ in den Optionen
@@ -201,6 +229,7 @@ function setUpServices(): void {
     results: new AIResultStore(db),
     actions: new ActionStore(db, () => randomUUID()),
     digest: new DigestStore(db),
+    replyStyle: (address) => personalStore.replyStyle(address),
     message: (messageId) => repository.message(messageId),
     onActionsUpdated: () => notifyRenderer(),
     // Kalendereintrag: .ics im Temp-Ordner ablegen und mit dem Standardprogramm (Outlook, Kalender) öffnen
@@ -224,6 +253,7 @@ function setUpServices(): void {
     },
     onCategorized: () => {
       notifyRenderer();
+      recomputePriority();
       // Regeln, die auf die Einordnung warten („Newsletter ins Archiv“)
       void rules?.processQueue();
     },
@@ -267,6 +297,9 @@ function setUpServices(): void {
     onChange: notifyRenderer,
   });
   ask.startIndexing();
+
+  // Absender-Steckbrief (W8.2): nur aus vorhandenen Daten, ohne KI
+  contacts = new ContactStore(db);
 
   // Versprechen-Tracker (W7.3): Regeln sofort, lokales Modell im Hintergrund; sendet nie etwas
   promises = new PromiseService({
@@ -544,6 +577,8 @@ function registerIpc(): void {
     ["receipts", new Set<string>(receiptsApiMethods), () => receipts],
     ["promises", new Set<string>(promisesApiMethods), () => promises],
     ["ask", new Set<string>(askApiMethods), () => ask],
+    ["contacts", new Set<string>(contactsApiMethods), () => contacts],
+    ["personal", new Set<string>(personalApiMethods), () => personal],
   ];
   for (const [channel, allowed, target] of channels) {
     ipcMain.handle(channel, async (event, method: unknown, args: unknown) => {
@@ -655,6 +690,7 @@ app.on("before-quit", () => {
   if (syncTimer) clearInterval(syncTimer);
   if (reminderTimer) clearInterval(reminderTimer);
   if (notifyTimer) clearTimeout(notifyTimer);
+  if (priorityTimer) clearTimeout(priorityTimer);
   // Offene IMAP-Verbindungen sofort trennen, damit die App ohne Verzögerung beendet wird.
   service?.dispose();
   void ai?.dispose();

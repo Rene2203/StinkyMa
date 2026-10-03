@@ -1,6 +1,37 @@
 # Changelog
 
-## W7 – Alleinstellungsmerkmale I (in Arbeit)
+## W8 – Alleinstellungsmerkmale II: Personalisierung (in Arbeit)
+
+### Neu
+- **Kontextfenster 16K für alle Rechner** (Wunsch des Nutzers, ohne vorherige Messung): Das lokale Modell bekommt
+  16 384 Token statt 4 096; Verläufe, Mails und Anhänge dürfen entsprechend länger sein. Der Zwischenspeicher des Modells
+  (KV-Cache) wird in 8 Bit gehalten (halber Speicher); klappt das auf einem Rechner nicht, fällt die App still auf den
+  normalen Speicher zurück. Gilt auch für die Bild-Laufzeit (llama-server).
+- **Komprimierung langer Texte**:
+  - **Laufende Zusammenfassung**: Kommen in einem Verlauf neue Mails dazu, fasst die KI nur noch „bisherige
+    Zusammenfassung + neue Mails“ zusammen statt alles von vorn.
+  - **Map-Reduce** für sehr lange Verläufe und Dokumente: Die neuesten Mails bleiben wörtlich, ältere werden
+    stückweise verdichtet; reicht das nicht, wird gekürzt.
+- **Frag dein Postfach** (W8.1, Seitenleiste): Fragen in eigenen Worten („Wann kommt der Handwerker?“, „Was hat Petra
+  zum Angebot gesagt?“). Die App sucht passende Mails und Anhänge – nach Wörtern (Volltext) und, mit dem kleinen
+  Zusatzmodell **EmbeddingGemma 300M** (≈ 330 MB, optional, Gemma-Lizenz), auch nach Bedeutung – und das lokale Modell
+  antwortet **mit Quellen**, die sich per Klick öffnen. Steht die Antwort nirgends, sagt es das (meistens, siehe Messung).
+  Neue Mails werden im Hintergrund für die Suche vorbereitet. Migration `v21-embeddings`.
+- **Absender-Steckbrief** (W8.2, Knopf „Person“ an der Mail): Mails in beide Richtungen, erste/letzte Mail, wie schnell
+  ich antworte bzw. sie, letzte Gespräche, offene Zusagen und Termine, Belege und Abo dieses Absenders, übliche und
+  eigene Kategorie – plus Schnellfrage „Frag nach dieser Person“ (nur Mails von und an sie). Ohne KI, aus vorhandenen Daten.
+- **Wichtig** (W8.3, Seitenleiste): Die App merkt sich, was du mit Mails tust (öffnen, antworten, markieren, archivieren,
+  ungelesen löschen), und rechnet daraus per Code je Absender, wie wichtig dir seine Mails sind – zusammen mit der
+  Einordnung (Persönlich/Arbeit höher, Newsletter niedriger). Ab 55 % steht die Mail unter „Wichtig“ und bekommt einen
+  Stern in der Liste. Absender lassen sich auf „immer wichtig“ oder „nie wichtig“ festlegen.
+- **Stilprofil** (W8.4): Aus deinen gesendeten Mails liest der Code deine übliche Anrede, deinen Gruß, die typische Länge
+  und je Person, ob du duzt oder siezt und wie du sie ansprichst („Liebe Lena,“). Antwortvorschläge übernehmen das:
+  Anrede wie zuletzt an diese Person, du/Sie wie bisher, Länge wie du schreibst.
+- **Transparenz-Seite** (Optionen, „Was StinkyMail über dich gelernt hat“): Schreibstil, Anrede je Person, Wichtigkeit je
+  Absender mit Kennzahlen und Knöpfen „immer/nie wichtig“, Protokoll-Zähler und **„Alles vergessen“**. Alles bleibt auf
+  diesem Rechner; keine neue Tabelle (genutzt werden `behaviorEvent`/`senderProfile` aus v1).
+
+## W7 – Alleinstellungsmerkmale I
 
 ### Neu
 - **Abos & Verträge** (Seitenleiste): erkennt Abos, Verträge, Mitgliedschaften, Versicherungen und Probe-Abos aus den Mails –

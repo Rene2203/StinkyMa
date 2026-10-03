@@ -8,6 +8,7 @@ import { promptVersions } from "../ai/prompts.js";
 import { AIRouter, GrantPolicy } from "../ai/router.js";
 import { interpretRule, interpretRuleWithRules, type RuleInterpretation } from "../ai/rules.js";
 import { draftReplies } from "../ai/replies.js";
+import type { ReplyStyle } from "../personal.js";
 import { isDigestImportant, localDay, type DigestView } from "../digest.js";
 import type { DigestStore } from "../sqlite/digestStore.js";
 import { extractSubscription, type SubscriptionResult } from "../ai/subscriptions.js";
@@ -59,6 +60,8 @@ export interface AIServiceOptions {
   onStatus?: (status: AIStatus) => void;
   /** Eine Mail hat eine Kategorie bekommen – Oberfläche neu laden. */
   onCategorized?: () => void;
+  /** Schreibstil des Nutzers für Antworten an eine Adresse (W8.4). */
+  replyStyle?: (address: string) => ReplyStyle;
   /** Abfragen für den Tagesüberblick (W6.6). */
   digest?: DigestStore;
   /** Höchstdauer einer Modell-Anfrage, danach Abbruch und Neustart des Modells (Standard: Text 3 Min., Bilder 6 Min.). */
@@ -556,7 +559,8 @@ export class AIService implements AIApi {
     const { router, model } = await this.#router();
     const thread = await this.options.thread(message.threadId);
     const earlier = thread.filter((m) => m.id !== message.id && m.date <= message.date);
-    const result = await draftReplies(router, message, { earlier });
+    const style = this.options.replyStyle?.(message.from.address);
+    const result = await draftReplies(router, message, { earlier, ...(style ? { style } : {}) });
     return { messageId, form: result.form, greeting: result.greeting, replies: result.replies, modelName: model.name, durationMs: result.durationMs };
   }
 

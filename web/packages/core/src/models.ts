@@ -162,6 +162,8 @@ export type MessageScope =
   | { kind: "mailbox"; mailboxId: string }
   /** Türsteher: Mails neuer Absender, die noch auf „Erlauben“ oder „Blockieren“ warten */
   | { kind: "screener" }
+  /** Wichtige Mails im Posteingang (Priorisierung W8.3) */
+  | { kind: "important" }
   /** Alle Mails einer Kategorie (Posteingang, Archiv, eigene Ordner): feste Kategorie oder eigene als `u:<id>` */
   | { kind: "category"; category: string };
 

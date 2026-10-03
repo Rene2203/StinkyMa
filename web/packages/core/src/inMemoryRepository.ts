@@ -1,4 +1,5 @@
 import type { Account, Attachment, EmailAddress, Mailbox, MailboxRole, Message, MessageFlagName, MessageScope } from "./models.js";
+import { importantThreshold } from "./priority.js";
 import { MessageFlag, mailboxRoleRank } from "./models.js";
 import type { MailOverview, MailRepository, UnreadCounts } from "./repository.js";
 import type { MockDataSet } from "./mockData.js";
@@ -63,7 +64,7 @@ export class InMemoryMailRepository implements MailRepository {
     const accounts = await this.accounts();
     const mailboxesByAccount: Record<string, Mailbox[]> = {};
     for (const account of accounts) mailboxesByAccount[account.id] = await this.mailboxes(account.id);
-    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {}, screener: 0 };
+    const counts: UnreadCounts = { unifiedInbox: 0, unread: 0, flagged: 0, mailboxes: {}, screener: 0, important: 0 };
     for (const m of this.#data.messages) {
       const role = this.#roleOf(m.mailboxId);
       if (role === "inbox" && this.#pending(m)) counts.screener += 1;
@@ -73,6 +74,7 @@ export class InMemoryMailRepository implements MailRepository {
       if (role === "inbox") {
         counts.unifiedInbox += 1;
         counts.unread += 1;
+        if ((m.priorityScore ?? 0) >= importantThreshold) counts.important = (counts.important ?? 0) + 1;
       }
       if (role !== "trash" && (m.flags & MessageFlag.flagged) !== 0 && !this.#isArchiveDuplicate(m)) counts.flagged += 1;
     }
@@ -286,6 +288,8 @@ export class InMemoryMailRepository implements MailRepository {
           return role !== "trash" && (m.flags & MessageFlag.flagged) !== 0 && !this.#isArchiveDuplicate(m);
         case "mailbox":
           return m.mailboxId === scope.mailboxId;
+        case "important":
+          return role === "inbox" && (m.priorityScore ?? 0) >= importantThreshold;
         case "category": {
           if (role !== "inbox" && role !== "archive" && role !== "custom") return false;
           if (this.#isArchiveDuplicate(m)) return false;

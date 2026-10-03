@@ -3,7 +3,7 @@
 Laufendes Protokoll des Zwischenstands. Wird nach jedem größeren Arbeitsschritt aktualisiert –
 nicht erst am Ende einer Phase. Abgeschlossene Phasen stehen zusätzlich in `CHANGELOG.md`.
 
-**Zuletzt aktualisiert:** 02.10.2026
+**Zuletzt aktualisiert:** 03.10.2026
 **Aktueller Fokus:** Windows-App (`web/`), danach Server mit Browser – Roadmap: `docs/ROADMAP-WINDOWS.md`
 **Aktuelle Phase:** W5 – KI-Basis. W5.1–W5.4 gebaut, Windows-CI grün; Messlauf fertig → **Standardmodell Gemma 4 E2B**. **W6 – Assistent:** W6.1 (Zu tun: Termine/Fristen/Zahlungen), W6.2 (Phishing-Check), W6.3 (Türsteher), W6.4 (Regeln in eigenen Worten), W6.5 (Antwortvorschläge) und W6.6 (Tagesüberblick) fertig, lokal geprüft und vom Nutzer unter Windows mit echtem Gmail-Konto getestet – **W6 abgeschlossen**. Danach (Wunsch des Nutzers): Zeitraum „alle Mails“, **Aufräumen**, **Newsletter abbestellen** (Abmelde-Seite im verschiebbaren Fenster in der App) und Umbenennung in **StinkyMail** – gebaut, lokal geprüft. Als Nächstes: Feinabstimmung der Modelle
 
@@ -574,3 +574,29 @@ App Intents, großes RAM-Limit für lokale Modelle), lassen sich derzeit nicht a
   auf Kontrollsatz 2. Details `docs/KI-MESSUNG.md`.
   Als Nächstes: W8 (siehe Roadmap) – oder Nachbesserungen nach dem Test des Nutzers.
 
+### 03.10.2026 – W8 Personalisierung (in Arbeit)
+- **Kontext 16K für alle** (Wunsch des Nutzers, ausdrücklich ohne Prüfung): `modelContextTokens = 16 384`, größere
+  Eingabe-Budgets (Verlauf 24 000, Mail 4 000, Anhang 6 000 Zeichen), KV-Cache Q8_0 mit Rückfall auf F16, llama-server
+  `-c 16384 --cache-type-k q8_0`. **Ungeprüft:** Speicher/Tempo bei langen Eingaben auf schwacher Hardware.
+- **Komprimierung – gebaut, Unit-getestet:** laufende Zusammenfassung (nur neue Mails + vorherige Zusammenfassung),
+  Map-Reduce für lange Verläufe/Dokumente (neueste Mails wörtlich, ältere verdichtet, sonst gekürzt). **Ungeprüft:**
+  Qualität der verdichteten Zusammenfassungen (keine Messung).
+- **W8.1 Frag dein Postfach – gebaut, lokal geprüft:** Volltext (FTS5) + Bedeutung (EmbeddingGemma 300M, optionaler
+  Download mit Prüfsumme) mit Rangfusion, Antwort mit Quellen. Migration v21. Messung: Bedeutung+Wörter 13/13 richtig,
+  Wörter allein 10/13; **die eine Falle (ähnliches Thema) beantwortet E2B fälschlich** – auch mit Prompt v2. Unit- und
+  E2E-Test (ohne Zusatzmodell). **Ungeprüft:** echte Postfächer, Dauer des Vorbereitens bei 10 000+ Mails, Windows-CI.
+- **W8.2 Absender-Steckbrief – gebaut, lokal geprüft:** Seitenteil neben der Mail, Daten aus vorhandenen Tabellen,
+  Schnellfrage an „Frag dein Postfach“. Unit- und E2E-Test.
+- **W8.3 Priorisierung – gebaut, lokal geprüft:** Verhaltens-Protokoll (öffnen = einzelne Mail gelesen, antworten,
+  markieren, archivieren, löschen – ungelesen gelöscht zählt negativ), Absender steht im Ereignis (überlebt Verschieben),
+  Wichtigkeit per Code (Absender und Einordnung je zur Hälfte, Festlegung des Nutzers gewinnt), Schwelle 0,55. Bereich
+  „Wichtig“ mit Zähler, Stern in der Liste. Neu gerechnet beim Start, nach neuen Mails und nach der Einordnung
+  (gebündelt) und sofort für den Absender nach jeder Aktion. **Ungeprüft:** ob die Gewichte im Alltag passen
+  (keine Messung, Schwelle geschätzt), Tempo bei großen Postfächern.
+- **W8.4 Stilprofil + Transparenz-Seite – gebaut, lokal geprüft:** Anrede, Gruß, Länge, Emoji/Ausrufezeichen aus
+  gesendeten Mails (ohne Zitat); je Person du/Sie und letzte Anredezeile. Antwortvorschläge: Form und Anrede je Person,
+  Längen-Hinweis im Prompt (ohne Stilprofil bleibt der gemessene Prompt wörtlich gleich). Transparenz-Seite in den
+  Optionen mit „immer/nie wichtig“ und „Alles vergessen“. 4 Unit-Tests, E2E. **Ungeprüft:** ob die Antwortvorschläge mit
+  Längen-Hinweis besser werden (nicht nachgemessen).
+- Stand Tests: 450 Unit-Tests grün (inkl. GreenMail), E2E 19 grün / 2 übersprungen (Modell-abhängig).
+- Als Nächstes: W8.5 Autovervollständigung im Editor.

@@ -15,6 +15,7 @@ import {
   syncSince,
 } from "../models.js";
 import type { MailOverview, MailRepository } from "../repository.js";
+import type { BehaviorType } from "../priority.js";
 import { SecretKeys, type SecretStore } from "../secrets.js";
 import type { SqliteMailRepository } from "../sqlite/repository.js";
 import type { MailWriter, PendingAction } from "../sqlite/writer.js";
@@ -45,6 +46,8 @@ export interface MailServiceOptions {
   draftUploadDelayMs?: number;
   /** Neue ungelesene Mails im Posteingang (nicht beim ersten Abgleich eines Kontos) – für Benachrichtigungen. */
   onNewMail?: (accountId: string, messages: Message[]) => void;
+  /** Was der Nutzer mit Mails tut (öffnen, antworten, markieren, archivieren, löschen) – für die Priorisierung (W8.3). */
+  onUserAction?: (type: BehaviorType, messageIds: string[]) => void;
   /** Alle neu angekommenen Posteingangs-Mails (nicht beim ersten Abgleich) – für Regeln. */
   onArrived?: (accountId: string, messageIds: string[]) => void | Promise<void>;
   /** Wartezeit vor dem Abgleich, nachdem der Server neue Mails gemeldet hat (bündelt mehrere Meldungen). */
@@ -122,6 +125,15 @@ export class MailService implements MailRepository, AccountsApi {
    */
   async send(mail: OutgoingMail): Promise<void> {
     await this.#send(mail, true);
+    if (mail.answeredMessageId) this.#userAction("reply", [mail.answeredMessageId]);
+  }
+
+  #userAction(type: BehaviorType, messageIds: string[]): void {
+    try {
+      this.options.onUserAction?.(type, messageIds);
+    } catch {
+      // Protokoll ist Beiwerk – nie die eigentliche Aktion aufhalten
+    }
   }
 
   async #send(mail: OutgoingMail, rememberRecipients: boolean): Promise<void> {
@@ -283,6 +295,9 @@ export class MailService implements MailRepository, AccountsApi {
 
   /** Sofort lokal; bei echten Konten zusätzlich in die Warteschlange für den Server. */
   async setFlag(flag: MessageFlagName, enabled: boolean, messageIds: string[]): Promise<void> {
+    // Eine Mail als gelesen markiert = geöffnet (Sammel-Aktionen zählen nicht); markiert = wichtig
+    if (enabled && flag === "seen" && messageIds.length === 1) this.#userAction("open", messageIds);
+    if (enabled && flag === "flagged") this.#userAction("flag", messageIds);
     const createdAt = this.#now().toISOString();
     const accounts = new Set<string>();
     this.writer.transaction(() => {
@@ -337,6 +352,7 @@ export class MailService implements MailRepository, AccountsApi {
 
   /** Sofort lokal in den Zielordner; der Server folgt über die Warteschlange. */
   async move(messageIds: string[], role: MailboxRole): Promise<void> {
+    if (role === "archive" || role === "trash") this.#userAction(role, messageIds);
     await this.#moveTo(messageIds, (accountId) => this.writer.mailboxes(accountId).find((m) => m.role === role)?.id ?? null, (ids) => this.repository.move(ids, role));
   }
 

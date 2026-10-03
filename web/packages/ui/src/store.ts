@@ -1,5 +1,6 @@
 import {
   MessageFlag,
+  importantThreshold,
   groupRuleFrom,
   type CleanupApi,
   type StoredSubscription,
@@ -11,6 +12,10 @@ import {
   type ReceiptsApi,
   type PromisesApi,
   type AskApi,
+  type ContactsApi,
+  type PersonalApi,
+  type PersonalOverview,
+  type ContactProfile,
   type AskResult,
   type AskIndexStatus,
   type PromisesView,
@@ -77,6 +82,7 @@ export type SidebarItemKind =
   | { type: "unifiedInbox" }
   | { type: "unread" }
   | { type: "flagged" }
+  | { type: "important" }
   | { type: "screener" }
   | { type: "mailbox"; mailbox: Mailbox };
 
@@ -179,6 +185,10 @@ export interface BrowserState {
   promises: { view: PromisesView | null; tab: "mine" | "theirs"; busy: boolean; error: string | null } | null;
   /** „Frag dein Postfach“ (W8.1) */
   ask: { question: string; sender: string | null; busy: boolean; result: AskResult | null; error: string | null; status: AskIndexStatus | null } | null;
+  /** Absender-Steckbrief (W8.2) neben der Mail; null = zu */
+  contact: { address: string; profile: ContactProfile | null; busy: boolean; error: string | null } | null;
+  /** Transparenz-Seite (W8.3/W8.4): was gelernt wurde */
+  personal: { overview: PersonalOverview | null; busy: boolean; error: string | null } | null;
   /** Rückmeldung nach eigener Zuordnung (geöffnete Mail) */
   userCategoryNote: { messageId: string; categoryId: string | null; remembered: boolean; changed: number } | null;
 }
@@ -306,6 +316,8 @@ export const initialState: BrowserState = {
   receipts: null,
   promises: null,
   ask: null,
+  contact: null,
+  personal: null,
   categoryDialog: null,
   userCategoryNote: null,
 };
@@ -376,10 +388,12 @@ export class BrowserStore {
   readonly #receipts: ReceiptsApi | undefined;
   readonly #promises: PromisesApi | undefined;
   readonly #ask: AskApi | undefined;
+  readonly #contacts: ContactsApi | undefined;
+  readonly #personal: PersonalApi | undefined;
 
   constructor(
     repository: MailRepository,
-    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi; promises?: PromisesApi; ask?: AskApi } = {},
+    options: { pageSize?: number; accounts?: AccountsApi; files?: AttachmentFiles; settings?: AppSettingsApi; ai?: AIApi; rules?: RulesApi; cleanup?: CleanupApi; webPanel?: WebPanelHost; subscriptions?: SubscriptionsApi; categories?: UserCategoriesApi; receipts?: ReceiptsApi; promises?: PromisesApi; ask?: AskApi; contacts?: ContactsApi; personal?: PersonalApi } = {},
   ) {
     this.#repository = repository;
     this.pageSize = options.pageSize ?? 500;
@@ -395,6 +409,64 @@ export class BrowserStore {
     this.#receipts = options.receipts;
     this.#promises = options.promises;
     this.#ask = options.ask;
+    this.#contacts = options.contacts;
+    this.#personal = options.personal;
+  }
+
+  // --- Transparenz-Seite (W8.3/W8.4) ---
+
+  get canPersonal(): boolean {
+    return Boolean(this.#personal);
+  }
+
+  async loadPersonal(): Promise<void> {
+    const api = this.#personal;
+    if (!api) return;
+    this.#set({ personal: { overview: this.#state.personal?.overview ?? null, busy: true, error: null } });
+    try {
+      this.#set({ personal: { overview: await api.overview(), busy: false, error: null } });
+    } catch (e) {
+      this.#set({ personal: { overview: this.#state.personal?.overview ?? null, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  /** „Immer wichtig“ (1), „nie wichtig“ (-1), zurücksetzen (null) – danach Liste und Seitenleiste neu */
+  async setSenderPriority(address: string, value: 1 | -1 | null): Promise<void> {
+    const api = this.#personal;
+    if (!api) return;
+    await this.#guard(() => api.setSenderPriority(address, value));
+    await this.loadPersonal();
+    await this.reload();
+  }
+
+  async forgetPersonal(): Promise<void> {
+    const api = this.#personal;
+    if (!api) return;
+    await this.#guard(() => api.forget());
+    await this.loadPersonal();
+    await this.reload();
+  }
+
+  // --- Absender-Steckbrief (W8.2) ---
+
+  get canContacts(): boolean {
+    return Boolean(this.#contacts);
+  }
+
+  async openContact(address: string): Promise<void> {
+    const api = this.#contacts;
+    if (!api) return;
+    this.#set({ contact: { address, profile: null, busy: true, error: null } });
+    try {
+      const profile = await api.profile(address);
+      if (this.#state.contact?.address === address) this.#set({ contact: { address, profile, busy: false, error: null } });
+    } catch (e) {
+      if (this.#state.contact?.address === address) this.#set({ contact: { address, profile: null, busy: false, error: messageOf(e) } });
+    }
+  }
+
+  closeContact(): void {
+    this.#set({ contact: null });
   }
 
   // --- „Frag dein Postfach“ (W8.1) ---
@@ -1793,6 +1865,8 @@ export class BrowserStore {
       const smart: [SidebarItemKind, MessageScope, number][] = [
         [{ type: "unifiedInbox" }, { kind: "unifiedInbox" }, counts.unifiedInbox],
         [{ type: "unread" }, { kind: "unread" }, counts.unread],
+        // Wichtig (W8.3): aus Verhalten und Einordnung berechnet
+        [{ type: "important" }, { kind: "important" }, counts.important ?? 0],
         [{ type: "flagged" }, { kind: "flagged" }, counts.flagged],
       ];
       // Türsteher: eigener Bereich, sobald er bei einem Konto an ist (Zähler = wartende Mails)
@@ -1895,6 +1969,7 @@ export class BrowserStore {
     if (this.#state.replies && this.#state.replies.messageId !== id) this.#set({ replies: null });
     if (this.#state.categoryNote && this.#state.categoryNote.messageId !== id) this.#set({ categoryNote: null });
     if (this.#state.userCategoryNote && this.#state.userCategoryNote.messageId !== id) this.#set({ userCategoryNote: null });
+    if (this.#state.contact) this.#set({ contact: null });
     void this.#loadCachedSummary();
     void this.#loadActions(id);
     void this.loadUnsubscribe(id);
@@ -2001,7 +2076,8 @@ export class BrowserStore {
           const hit =
             (item.kind.type === "mailbox" && item.kind.mailbox.id === m.mailboxId) ||
             ((item.kind.type === "unifiedInbox" || item.kind.type === "unread") && role === "inbox") ||
-            (item.kind.type === "flagged" && isFlagged(m) && role !== "trash");
+            (item.kind.type === "flagged" && isFlagged(m) && role !== "trash") ||
+            (item.kind.type === "important" && role === "inbox" && (m.priorityScore ?? 0) >= importantThreshold);
           return hit ? { ...item, unreadCount: Math.max(0, item.unreadCount + delta) } : item;
         }),
       }));

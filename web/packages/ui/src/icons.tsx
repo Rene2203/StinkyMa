@@ -22,6 +22,7 @@ import {
   Send,
   ShieldAlert,
   ShieldX,
+  Star,
   Trash2,
   User,
   UserCheck,
@@ -48,6 +49,8 @@ export function sidebarIcon(kind: SidebarItemKind): LucideIcon {
       return Mail;
     case "flagged":
       return Flag;
+    case "important":
+      return Star;
     case "screener":
       return UserCheck;
     case "mailbox":

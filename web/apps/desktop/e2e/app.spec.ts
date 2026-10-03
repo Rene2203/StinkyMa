@@ -382,6 +382,55 @@ test("Frag dein Postfach: ohne Zusatzmodell und KI – Wortsuche mit Quellen, Kl
   await expect(page.getByTestId("thread-subject")).toContainText("Abschlagsrechnung");
 });
 
+test("Steckbrief: alles zur Person neben der Mail, Schnellfrage führt zu „Frag dein Postfach“", async () => {
+  await page.getByTestId("sidebar-unifiedInbox").click();
+  await rows().filter({ hasText: "Petra Schulz" }).first().click();
+  await page.getByTestId("action-contact").click();
+  const panel = page.getByTestId("contact-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("Petra Schulz");
+  await expect(panel.getByTestId("contact-counts")).toContainText("von");
+  await shot("37-Steckbrief");
+  await panel.getByTestId("contact-ask").fill("Was ist mit dem Angebot?");
+  await panel.getByTestId("contact-ask").press("Enter");
+  const ask = page.getByTestId("ask");
+  await expect(ask).toBeVisible();
+  await expect(ask).toContainText("Nur Mails von und an");
+  await ask.getByRole("button", { name: "Zurück zu den Mails" }).click();
+});
+
+test("Transparenz-Seite: gelerntes Verhalten sehen, Absender „immer wichtig“, erscheint unter „Wichtig“, alles vergessen", async () => {
+  await page.getByTestId("open-options").click();
+  const options = page.getByTestId("options-dialog");
+  const section = options.getByTestId("personal-section");
+  await expect(section).toBeVisible();
+  // Mails wurden in den Tests vorher geöffnet – das Protokoll zählt mit
+  await expect(section.getByTestId("personal-events")).toContainText(/[1-9]\d*× geöffnet/);
+  const sender = section.getByTestId("personal-sender").first();
+  const label = (await sender.locator(".ellipsis").first().textContent()) ?? "";
+  const name = label.split(" <")[0] ?? label;
+  const always = sender.getByRole("button", { name: /^Immer wichtig/ });
+  await always.click();
+  await expect(always).toHaveAttribute("aria-pressed", "true");
+  await section.scrollIntoViewIfNeeded();
+  await shot("38-Transparenz");
+  await options.getByRole("button", { name: "Fertig" }).click();
+
+  await page.getByTestId("sidebar-important").click();
+  await expect(page.getByTestId("list-title")).toHaveText("Wichtig");
+  const row = rows().filter({ hasText: name }).first();
+  await expect(row).toBeVisible();
+  await expect(row.getByTestId("row-important")).toBeVisible();
+
+  await page.getByTestId("open-options").click();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await section.getByTestId("personal-forget").click();
+  await expect(section.getByTestId("personal-events")).toContainText(/(^|\D)0× geöffnet, 0× beantwortet/);
+  await expect(section.getByTestId("personal-sender").first().getByRole("button", { name: /^Immer wichtig/ })).toHaveAttribute("aria-pressed", "false");
+  await options.getByRole("button", { name: "Fertig" }).click();
+  await page.getByTestId("sidebar-unifiedInbox").click();
+});
+
 test("Änderungen bleiben nach Neustart erhalten (SQLite-Datei)", async () => {
   await page.getByRole("searchbox").fill("");
   await page.getByTestId("sidebar-unifiedInbox").click();

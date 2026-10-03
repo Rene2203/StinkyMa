@@ -18,7 +18,7 @@ describe("BrowserStore", () => {
   it("Seitenleiste: Übersicht plus ein Abschnitt pro Konto", () => {
     const { sections } = store.getState();
     expect(sections).toHaveLength(4);
-    expect(sections[0]?.items.map((i) => i.scope.kind)).toEqual(["unifiedInbox", "unread", "flagged"]);
+    expect(sections[0]?.items.map((i) => i.scope.kind)).toEqual(["unifiedInbox", "unread", "important", "flagged"]);
     expect(sections.slice(1).map((s) => s.account?.id)).toEqual([MockIds.iCloud, MockIds.gmail, MockIds.work]);
     expect(sidebarItem(store.getState(), { kind: "unifiedInbox" })?.unreadCount).toBeGreaterThan(0);
   });

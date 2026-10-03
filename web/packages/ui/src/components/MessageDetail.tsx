@@ -1,4 +1,4 @@
-import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, MessageSquareReply, Pencil, ReceiptText, Repeat, Reply, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
+import { Archive, Download, Flag, FlagOff, Forward, Loader2, Mail as MailIcon, MessageSquareReply, Pencil, ReceiptText, Repeat, Reply, UserRound, ReplyAll, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 import { assessPhishing, displayName, initials, isFlagged, isRiskyAttachment, type Attachment, type Message } from "@stinkyma/core";
 import { useState } from "react";
 import { useBrowserState, useUi } from "../context.js";
@@ -8,6 +8,7 @@ import { selectedMessage, threadFor } from "../store.js";
 import { CategoryChip } from "./CategoryChip.js";
 import { CategoryPicker } from "./CategoryPicker.js";
 import { UserCategoryPicker } from "./UserCategoryPicker.js";
+import { ContactPanel } from "./ContactPanel.js";
 import { composeLabels } from "../composeLabels.js";
 import { SafeHtml } from "./SafeHtml.js";
 import { SummaryCard } from "./SummaryCard.js";
@@ -36,6 +37,7 @@ export function MessageDetail() {
   const last = thread.at(-1);
   const flagged = isFlagged(message);
   const isDraft = store.isDraft(message);
+  const ownAddresses = Object.values(state.accountsById).map((a) => a.email.toLowerCase());
 
   return (
     <section className="detail" aria-label={message.subject}>
@@ -94,6 +96,18 @@ export function MessageDetail() {
                 <ReceiptText size={17} />
               </button>
             )}
+            {store.canContacts && (
+              <button
+                type="button"
+                title={t("contact.open")}
+                aria-label={t("contact.title")}
+                aria-pressed={state.contact !== null}
+                data-testid="action-contact"
+                onClick={() => (state.contact ? store.closeContact() : void store.openContact(counterpart(message, ownAddresses)))}
+              >
+                <UserRound size={17} />
+              </button>
+            )}
             <span className="toolbar-gap" aria-hidden="true" />
             <button type="button" title={`${flagged ? t("action.unflag") : t("action.flag")} (S)`} onClick={() => void store.toggleFlag(message.id)}>
               {flagged ? <FlagOff size={17} /> : <Flag size={17} />}
@@ -136,8 +150,15 @@ export function MessageDetail() {
           ))}
         </div>
       </div>
+      <ContactPanel />
     </section>
   );
+}
+
+/** Gegenüber einer Mail: Absender – bei eigenen Mails der erste Empfänger */
+function counterpart(message: Message, ownAddresses: string[]): string {
+  const fromMe = ownAddresses.includes(message.from.address.toLowerCase());
+  return (fromMe ? message.to[0]?.address : message.from.address) ?? message.from.address;
 }
 
 function ThreadMessage({ message, attachments, initiallyExpanded }: { message: Message; attachments: Attachment[]; initiallyExpanded: boolean }) {

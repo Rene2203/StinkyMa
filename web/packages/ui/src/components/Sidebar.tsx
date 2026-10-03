@@ -17,6 +17,8 @@ export function sidebarTitle(item: SidebarItem, t: Translate): string {
       return t("sidebar.unread");
     case "flagged":
       return t("sidebar.flagged");
+    case "important":
+      return t("sidebar.important");
     case "screener":
       return t("sidebar.screener");
     case "mailbox":
